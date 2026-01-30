@@ -1262,7 +1262,13 @@ export type Database = {
       unicorn_analyses: {
         Row: {
           analysis_result: Json | null
+          api_connections: Json | null
           burn_rate: number | null
+          chapter: string | null
+          chapter_1_approved: boolean | null
+          chapter_1_approved_at: string | null
+          chapter_2_stable: boolean | null
+          chapter_2_stable_at: string | null
           company_name: string
           company_url: string | null
           completed_at: string | null
@@ -1272,10 +1278,15 @@ export type Database = {
           error_message: string | null
           financials_path: string | null
           founders_bio: string | null
+          health_alerts: Json | null
           id: string
           linkedin_url: string | null
+          milestone_funding: Json | null
           monthly_active_users: number | null
           pitch_deck_path: string | null
+          pivot_history: Json | null
+          regulatory_shield: Json | null
+          shadow_cabinet: Json | null
           status: string | null
           u_score: number | null
           updated_at: string
@@ -1283,7 +1294,13 @@ export type Database = {
         }
         Insert: {
           analysis_result?: Json | null
+          api_connections?: Json | null
           burn_rate?: number | null
+          chapter?: string | null
+          chapter_1_approved?: boolean | null
+          chapter_1_approved_at?: string | null
+          chapter_2_stable?: boolean | null
+          chapter_2_stable_at?: string | null
           company_name: string
           company_url?: string | null
           completed_at?: string | null
@@ -1293,10 +1310,15 @@ export type Database = {
           error_message?: string | null
           financials_path?: string | null
           founders_bio?: string | null
+          health_alerts?: Json | null
           id?: string
           linkedin_url?: string | null
+          milestone_funding?: Json | null
           monthly_active_users?: number | null
           pitch_deck_path?: string | null
+          pivot_history?: Json | null
+          regulatory_shield?: Json | null
+          shadow_cabinet?: Json | null
           status?: string | null
           u_score?: number | null
           updated_at?: string
@@ -1304,7 +1326,13 @@ export type Database = {
         }
         Update: {
           analysis_result?: Json | null
+          api_connections?: Json | null
           burn_rate?: number | null
+          chapter?: string | null
+          chapter_1_approved?: boolean | null
+          chapter_1_approved_at?: string | null
+          chapter_2_stable?: boolean | null
+          chapter_2_stable_at?: string | null
           company_name?: string
           company_url?: string | null
           completed_at?: string | null
@@ -1314,10 +1342,15 @@ export type Database = {
           error_message?: string | null
           financials_path?: string | null
           founders_bio?: string | null
+          health_alerts?: Json | null
           id?: string
           linkedin_url?: string | null
+          milestone_funding?: Json | null
           monthly_active_users?: number | null
           pitch_deck_path?: string | null
+          pivot_history?: Json | null
+          regulatory_shield?: Json | null
+          shadow_cabinet?: Json | null
           status?: string | null
           u_score?: number | null
           updated_at?: string
