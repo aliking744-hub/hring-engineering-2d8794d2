@@ -32,6 +32,7 @@ import LegalSearchPage from "./pages/LegalSearchPage";
 import LegalAdvisor from "./pages/LegalAdvisor";
 import StrategicCompass from "./pages/StrategicCompass";
 import StrategicRadar from "./pages/StrategicRadar";
+import UnicornLab from "./pages/UnicornLab";
 import CompanyMembers from "./pages/CompanyMembers";
 import CompanySettings from "./pages/CompanySettings";
 import Upgrade from "./pages/Upgrade";
@@ -260,6 +261,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <StrategicRadar />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/unicorn-lab" 
+                element={
+                  <ProtectedRoute>
+                    <UnicornLab />
                   </ProtectedRoute>
                 } 
               />
