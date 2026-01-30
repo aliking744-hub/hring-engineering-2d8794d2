@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Building2, TrendingUp, Calendar, Briefcase, 
-  Target, BarChart3, UserPlus, Gem, Settings, Coins, Radar
+  Target, BarChart3, UserPlus, Gem, Settings, Coins, Radar, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -152,11 +152,19 @@ const CorporateDashboard = () => {
             )}
             <Button 
               variant="outline" 
-              className="border-cyan-500/50 bg-cyan-950/30 h-12 col-span-2 hover:bg-cyan-900/50 text-cyan-300"
+              className="border-cyan-500/50 bg-cyan-950/30 h-12 hover:bg-cyan-900/50 text-cyan-300"
               onClick={() => navigate('/strategic-radar')}
             >
               <Radar className="w-4 h-4 ml-2" />
-              رادار اطلاعات استراتژیک
+              رادار استراتژیک
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-violet-500/50 bg-violet-950/30 h-12 hover:bg-violet-900/50 text-violet-300"
+              onClick={() => navigate('/unicorn-lab')}
+            >
+              <Sparkles className="w-4 h-4 ml-2" />
+              آزمایشگاه یونیکورن
             </Button>
           </div>
         </motion.div>
