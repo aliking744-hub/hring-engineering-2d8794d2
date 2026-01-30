@@ -86,8 +86,8 @@ const UnicornLab = () => {
         <meta name="description" content="ارزیابی پیشرفته استارتاپ‌ها برای شناسایی پتانسیل یونیکورن" />
       </Helmet>
 
-      {/* Light Corporate Theme Background */}
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200" dir="rtl">
+      {/* Dark Theme Background - matching site theme */}
+      <div className="min-h-screen bg-background" dir="rtl">
         <Navbar />
         
         <main className="pt-20">

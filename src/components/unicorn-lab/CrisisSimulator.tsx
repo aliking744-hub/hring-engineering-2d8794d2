@@ -80,8 +80,8 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-lg">
-          <p className="font-semibold text-slate-800 mb-1">{label}</p>
+        <div className="glass-card p-3">
+          <p className="font-semibold text-foreground mb-1">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
               {entry.name === 'base' ? 'سناریو پایه' : 'سناریو بحران'}: {entry.value} میلیون تومان
@@ -94,14 +94,14 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
           <Zap className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-slate-800">شبیه‌ساز بحران</h3>
-          <p className="text-sm text-slate-500">Crisis Simulator</p>
+          <h3 className="text-lg font-bold text-foreground">شبیه‌ساز بحران</h3>
+          <p className="text-sm text-muted-foreground">Crisis Simulator</p>
         </div>
       </div>
 
@@ -111,10 +111,10 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-slate-700">شوک نرخ ارز</span>
+              <DollarSign className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">شوک نرخ ارز</span>
             </div>
-            <span className="text-sm font-bold text-blue-600">+{exchangeShock}%</span>
+            <span className="text-sm font-bold text-primary">+{exchangeShock}%</span>
           </div>
           <Slider
             value={[exchangeShock]}
@@ -123,17 +123,17 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
             step={5}
             className="w-full"
           />
-          <p className="text-xs text-slate-400">افزایش هزینه‌های ارزی</p>
+          <p className="text-xs text-muted-foreground">افزایش هزینه‌های ارزی</p>
         </div>
 
         {/* User Churn */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-purple-600" />
-              <span className="text-sm font-medium text-slate-700">نرخ ریزش کاربر</span>
+              <Users className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-foreground">نرخ ریزش کاربر</span>
             </div>
-            <span className="text-sm font-bold text-purple-600">{churnRate}%</span>
+            <span className="text-sm font-bold text-accent">{churnRate}%</span>
           </div>
           <Slider
             value={[churnRate]}
@@ -142,17 +142,17 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
             step={2}
             className="w-full"
           />
-          <p className="text-xs text-slate-400">کاهش درآمد ماهانه</p>
+          <p className="text-xs text-muted-foreground">کاهش درآمد ماهانه</p>
         </div>
 
         {/* Cost Increase */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-red-600" />
-              <span className="text-sm font-medium text-slate-700">افزایش هزینه عملیاتی</span>
+              <TrendingDown className="w-4 h-4 text-destructive" />
+              <span className="text-sm font-medium text-foreground">افزایش هزینه عملیاتی</span>
             </div>
-            <span className="text-sm font-bold text-red-600">+{costIncrease}%</span>
+            <span className="text-sm font-bold text-destructive">+{costIncrease}%</span>
           </div>
           <Slider
             value={[costIncrease]}
@@ -161,24 +161,24 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
             step={2}
             className="w-full"
           />
-          <p className="text-xs text-slate-400">هزینه‌های جاری</p>
+          <p className="text-xs text-muted-foreground">هزینه‌های جاری</p>
         </div>
       </div>
 
       {/* Runway Indicator */}
       <div className={`p-4 rounded-xl mb-6 ${
         stressedRunway <= 0 
-          ? 'bg-red-50 border-2 border-red-300' 
+          ? 'bg-destructive/10 border-2 border-destructive/50' 
           : stressedRunway <= 6 
-            ? 'bg-amber-50 border border-amber-200'
-            : 'bg-emerald-50 border border-emerald-200'
+            ? 'bg-amber-500/10 border border-amber-500/30'
+            : 'bg-emerald-500/10 border border-emerald-500/30'
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {stressedRunway <= 0 && <AlertTriangle className="w-6 h-6 text-red-600 animate-pulse" />}
+            {stressedRunway <= 0 && <AlertTriangle className="w-6 h-6 text-destructive animate-pulse" />}
             <div>
-              <p className="text-sm text-slate-600">عمر مالی تحت بحران</p>
-              <p className="text-xs text-slate-400">Stressed Runway</p>
+              <p className="text-sm text-foreground">عمر مالی تحت بحران</p>
+              <p className="text-xs text-muted-foreground">Stressed Runway</p>
             </div>
           </div>
           <div className="text-left">
@@ -188,15 +188,15 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
               animate={{ scale: 1, opacity: 1 }}
               className={`text-3xl font-bold ${
                 stressedRunway <= 0 
-                  ? 'text-red-600' 
+                  ? 'text-destructive' 
                   : stressedRunway <= 6 
-                    ? 'text-amber-600'
-                    : 'text-emerald-600'
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
               }`}
             >
               {stressedRunway}
             </motion.p>
-            <p className="text-sm text-slate-500">ماه</p>
+            <p className="text-sm text-muted-foreground">ماه</p>
           </div>
         </div>
       </div>
@@ -205,23 +205,23 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
       <div className="h-[200px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis 
               dataKey="month" 
-              tick={{ fontSize: 10, fill: '#64748b' }}
+              tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
               tickFormatter={(value, index) => index % 4 === 0 ? value : ''}
             />
             <YAxis 
-              tick={{ fontSize: 10, fill: '#64748b' }}
+              tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
               tickFormatter={(value) => `${value}M`}
             />
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine y={0} stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" />
+            <ReferenceLine y={0} stroke="hsl(var(--destructive))" strokeWidth={2} strokeDasharray="5 5" />
             <Area
               type="monotone"
               dataKey="base"
-              stroke="#3b82f6"
-              fill="#3b82f6"
+              stroke="hsl(var(--primary))"
+              fill="hsl(var(--primary))"
               fillOpacity={0.1}
               strokeWidth={2}
               name="base"
@@ -229,7 +229,7 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
             <Line
               type="monotone"
               dataKey="stressed"
-              stroke="#ef4444"
+              stroke="hsl(var(--destructive))"
               strokeWidth={3}
               dot={false}
               name="stressed"
@@ -240,12 +240,12 @@ const CrisisSimulator = ({ baseRunway, burnRate, onCritical }: CrisisSimulatorPr
 
       <div className="flex justify-center gap-6 mt-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-          <span className="text-slate-600">سناریو پایه</span>
+          <div className="w-3 h-3 rounded-full bg-primary"></div>
+          <span className="text-muted-foreground">سناریو پایه</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span className="text-slate-600">سناریو بحران</span>
+          <div className="w-3 h-3 rounded-full bg-destructive"></div>
+          <span className="text-muted-foreground">سناریو بحران</span>
         </div>
       </div>
     </div>

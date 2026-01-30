@@ -19,25 +19,25 @@ const UScoreGauge = ({ score }: UScoreGaugeProps) => {
   const getScoreColor = () => {
     if (score >= 90) return { 
       main: '#10b981', 
-      bg: 'from-emerald-50 to-emerald-100',
-      border: 'border-emerald-200',
-      text: 'text-emerald-700',
+      bg: 'glass-card',
+      border: 'border-emerald-500/30',
+      text: 'text-emerald-400',
       label: 'یونیکورن بالقوه',
       icon: Sparkles
     };
     if (score >= 50) return { 
       main: '#f59e0b', 
-      bg: 'from-amber-50 to-amber-100',
-      border: 'border-amber-200',
-      text: 'text-amber-700',
+      bg: 'glass-card',
+      border: 'border-amber-500/30',
+      text: 'text-amber-400',
       label: 'نیازمند توسعه',
       icon: TrendingUp
     };
     return { 
       main: '#ef4444', 
-      bg: 'from-red-50 to-red-100',
-      border: 'border-red-200',
-      text: 'text-red-700',
+      bg: 'glass-card',
+      border: 'border-red-500/30',
+      text: 'text-red-400',
       label: 'رد شده',
       icon: AlertCircle
     };
@@ -52,10 +52,10 @@ const UScoreGauge = ({ score }: UScoreGaugeProps) => {
   const strokeDashoffset = circumference - (animatedScore / 100) * circumference;
 
   return (
-    <div className={`bg-gradient-to-br ${config.bg} border ${config.border} rounded-2xl p-6 shadow-sm`}>
+    <div className={`${config.bg} ${config.border} rounded-2xl p-6`}>
       <div className="text-center mb-4">
-        <h3 className="text-lg font-bold text-slate-800 mb-1">امتیاز یونیکورن</h3>
-        <p className="text-sm text-slate-500">U-Score</p>
+        <h3 className="text-lg font-bold text-foreground mb-1">امتیاز یونیکورن</h3>
+        <p className="text-sm text-muted-foreground">U-Score</p>
       </div>
 
       {/* Gauge */}
@@ -65,7 +65,7 @@ const UScoreGauge = ({ score }: UScoreGaugeProps) => {
           <path
             d="M 15 100 A 85 85 0 0 1 185 100"
             fill="none"
-            stroke="#e2e8f0"
+            stroke="hsl(var(--secondary))"
             strokeWidth="16"
             strokeLinecap="round"
           />
@@ -100,8 +100,8 @@ const UScoreGauge = ({ score }: UScoreGaugeProps) => {
           </text>
 
           {/* Min/Max Labels */}
-          <text x="15" y="115" textAnchor="start" className="text-xs" fill="#94a3b8">0</text>
-          <text x="185" y="115" textAnchor="end" className="text-xs" fill="#94a3b8">100</text>
+          <text x="15" y="115" textAnchor="start" className="text-xs" fill="hsl(var(--muted-foreground))">0</text>
+          <text x="185" y="115" textAnchor="end" className="text-xs" fill="hsl(var(--muted-foreground))">100</text>
         </svg>
       </div>
 
@@ -110,7 +110,7 @@ const UScoreGauge = ({ score }: UScoreGaugeProps) => {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1 }}
-        className={`mt-4 flex items-center justify-center gap-2 py-2 px-4 rounded-full ${config.text} bg-white/60`}
+        className={`mt-4 flex items-center justify-center gap-2 py-2 px-4 rounded-full ${config.text} bg-secondary/50`}
       >
         <Icon className="w-5 h-5" />
         <span className="font-semibold">{config.label}</span>
@@ -118,17 +118,17 @@ const UScoreGauge = ({ score }: UScoreGaugeProps) => {
 
       {/* Score Ranges Legend */}
       <div className="mt-6 grid grid-cols-3 gap-2 text-xs">
-        <div className="text-center p-2 bg-red-100/50 rounded-lg">
-          <div className="font-bold text-red-600">&lt; 50</div>
-          <div className="text-red-500">رد</div>
+        <div className="text-center p-2 bg-red-500/10 rounded-lg">
+          <div className="font-bold text-red-400">&lt; 50</div>
+          <div className="text-red-400/70">رد</div>
         </div>
-        <div className="text-center p-2 bg-amber-100/50 rounded-lg">
-          <div className="font-bold text-amber-600">50-89</div>
-          <div className="text-amber-500">مشروط</div>
+        <div className="text-center p-2 bg-amber-500/10 rounded-lg">
+          <div className="font-bold text-amber-400">50-89</div>
+          <div className="text-amber-400/70">مشروط</div>
         </div>
-        <div className="text-center p-2 bg-emerald-100/50 rounded-lg">
-          <div className="font-bold text-emerald-600">90+</div>
-          <div className="text-emerald-500">یونیکورن</div>
+        <div className="text-center p-2 bg-emerald-500/10 rounded-lg">
+          <div className="font-bold text-emerald-400">90+</div>
+          <div className="text-emerald-400/70">یونیکورن</div>
         </div>
       </div>
     </div>

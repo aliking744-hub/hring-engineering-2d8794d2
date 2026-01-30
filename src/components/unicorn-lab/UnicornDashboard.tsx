@@ -26,7 +26,7 @@ const UnicornDashboard = ({ profile, result, onReset }: UnicornDashboardProps) =
   return (
     <div 
       className={`min-h-screen transition-all duration-500 ${
-        isCritical ? 'ring-4 ring-red-500/50 ring-inset' : ''
+        isCritical ? 'ring-4 ring-destructive/50 ring-inset' : ''
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -37,14 +37,14 @@ const UnicornDashboard = ({ profile, result, onReset }: UnicornDashboardProps) =
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8"
         >
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center shadow-lg">
-              <Building2 className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+              <Building2 className="w-7 h-7 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                 {profile.companyName}
               </h1>
-              <p className="text-slate-500 text-sm">
+              <p className="text-muted-foreground text-sm">
                 تحلیل جامع پتانسیل یونیکورن
               </p>
             </div>
@@ -54,7 +54,6 @@ const UnicornDashboard = ({ profile, result, onReset }: UnicornDashboardProps) =
             <Button 
               variant="outline" 
               size="sm"
-              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
             >
               <Share2 className="w-4 h-4 ml-2" />
               اشتراک‌گذاری
@@ -62,7 +61,6 @@ const UnicornDashboard = ({ profile, result, onReset }: UnicornDashboardProps) =
             <Button 
               variant="outline" 
               size="sm"
-              className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50"
             >
               <Download className="w-4 h-4 ml-2" />
               دانلود PDF
@@ -71,7 +69,6 @@ const UnicornDashboard = ({ profile, result, onReset }: UnicornDashboardProps) =
               variant="ghost" 
               size="sm"
               onClick={onReset}
-              className="text-slate-600 hover:text-slate-800"
             >
               <RotateCcw className="w-4 h-4 ml-2" />
               ارزیابی جدید
@@ -84,12 +81,12 @@ const UnicornDashboard = ({ profile, result, onReset }: UnicornDashboardProps) =
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3"
+            className="mb-6 p-4 glass-card border-destructive/50 flex items-center gap-3"
           >
-            <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
+            <AlertTriangle className="w-6 h-6 text-destructive flex-shrink-0" />
             <div>
-              <p className="font-semibold text-red-800">هشدار بحرانی</p>
-              <p className="text-sm text-red-600">
+              <p className="font-semibold text-destructive">هشدار بحرانی</p>
+              <p className="text-sm text-destructive/80">
                 براساس شبیه‌سازی، عمر مالی شرکت به صفر رسیده است. بازنگری فوری لازم است.
               </p>
             </div>
