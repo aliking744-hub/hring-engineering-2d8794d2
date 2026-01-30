@@ -22,19 +22,19 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
           icon: Sparkles,
           title: 'پتانسیل یونیکورن',
           color: 'from-emerald-500 to-teal-500',
-          bgColor: 'bg-gradient-to-br from-emerald-50 to-teal-50',
-          borderColor: 'border-emerald-200',
-          textColor: 'text-emerald-800',
+          bgColor: 'glass-card',
+          borderColor: 'border-emerald-500/30',
+          textColor: 'text-emerald-400',
           badge: 'تایید شده'
         };
       case 'approved':
         return {
           icon: CheckCircle2,
           title: 'تایید سرمایه‌گذاری',
-          color: 'from-blue-500 to-cyan-500',
-          bgColor: 'bg-gradient-to-br from-blue-50 to-cyan-50',
-          borderColor: 'border-blue-200',
-          textColor: 'text-blue-800',
+          color: 'from-primary to-accent',
+          bgColor: 'glass-card',
+          borderColor: 'border-primary/30',
+          textColor: 'text-primary',
           badge: 'تایید شده'
         };
       case 'conditional':
@@ -42,9 +42,9 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
           icon: AlertCircle,
           title: 'تایید مشروط',
           color: 'from-amber-500 to-orange-500',
-          bgColor: 'bg-gradient-to-br from-amber-50 to-orange-50',
-          borderColor: 'border-amber-200',
-          textColor: 'text-amber-800',
+          bgColor: 'glass-card',
+          borderColor: 'border-amber-500/30',
+          textColor: 'text-amber-400',
           badge: 'نیازمند بازنگری'
         };
       case 'rejected':
@@ -53,9 +53,9 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
           icon: XCircle,
           title: 'رد درخواست',
           color: 'from-red-500 to-rose-500',
-          bgColor: 'bg-gradient-to-br from-red-50 to-rose-50',
-          borderColor: 'border-red-200',
-          textColor: 'text-red-800',
+          bgColor: 'glass-card',
+          borderColor: 'border-destructive/30',
+          textColor: 'text-destructive',
           badge: 'رد شده'
         };
     }
@@ -68,7 +68,7 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`${config.bgColor} border-2 ${config.borderColor} rounded-2xl p-6 shadow-sm`}
+      className={`${config.bgColor} ${config.borderColor} rounded-2xl p-6`}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -77,8 +77,8 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
             <Gavel className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-800">حکم نهایی</h3>
-            <p className="text-sm text-slate-500">The Verdict</p>
+            <h3 className="text-xl font-bold text-foreground">حکم نهایی</h3>
+            <p className="text-sm text-muted-foreground">The Verdict</p>
           </div>
         </div>
         <div className={`flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r ${config.color} text-white`}>
@@ -88,7 +88,7 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
       </div>
 
       {/* Summary */}
-      <div className={`p-5 bg-white/60 rounded-xl border ${config.borderColor} mb-6`}>
+      <div className={`p-5 bg-secondary/30 rounded-xl border ${config.borderColor} mb-6`}>
         <p className={`text-lg leading-relaxed ${config.textColor}`}>
           {verdict.summary}
         </p>
@@ -97,7 +97,7 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
       {/* Recommendations */}
       {verdict.recommendations.length > 0 && (
         <div>
-          <h4 className="font-semibold text-slate-700 mb-3">پیشنهادات:</h4>
+          <h4 className="font-semibold text-foreground mb-3">پیشنهادات:</h4>
           <div className="space-y-2">
             {verdict.recommendations.map((rec, index) => (
               <motion.div
@@ -105,10 +105,10 @@ const VerdictSection = ({ verdict, companyName }: VerdictSectionProps) => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1 * index }}
-                className="flex items-center gap-3 p-3 bg-white/50 rounded-lg"
+                className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg"
               >
-                <ArrowLeft className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                <p className="text-sm text-slate-700">{rec}</p>
+                <ArrowLeft className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <p className="text-sm text-foreground">{rec}</p>
               </motion.div>
             ))}
           </div>

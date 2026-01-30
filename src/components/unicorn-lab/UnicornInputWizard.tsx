@@ -100,14 +100,14 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8"
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-900/10 rounded-full text-blue-900 text-sm font-medium mb-4">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/20 rounded-full text-primary text-sm font-medium mb-4">
           <Building2 className="w-4 h-4" />
           آزمایشگاه یونیکورن
         </div>
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">
-          اتاق بازجویی دیجیتال
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          اتاق دریافت اطلاعات دیجیتال
         </h1>
-        <p className="text-slate-500">
+        <p className="text-muted-foreground">
           اطلاعات شرکت خود را برای ارزیابی جامع وارد کنید
         </p>
       </motion.div>
@@ -122,13 +122,12 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
           return (
             <div key={s.id} className="flex items-center">
               <motion.div
-                animate={{
-                  scale: isActive ? 1.1 : 1,
-                  backgroundColor: isCompleted ? '#1e40af' : isActive ? '#3b82f6' : '#e2e8f0'
-                }}
-                className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${
-                  isCompleted || isActive ? 'text-white' : 'text-slate-400'
+                className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm transition-colors ${
+                  isCompleted ? 'bg-primary text-primary-foreground' : 
+                  isActive ? 'bg-primary/80 text-primary-foreground' : 
+                  'bg-secondary text-muted-foreground'
                 }`}
+                animate={{ scale: isActive ? 1.1 : 1 }}
               >
                 {isCompleted ? (
                   <Check className="w-6 h-6" />
@@ -137,8 +136,8 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 )}
               </motion.div>
               {index < steps.length - 1 && (
-                <div className={`w-16 h-1 mx-2 rounded-full ${
-                  step > s.id ? 'bg-blue-800' : 'bg-slate-200'
+                <div className={`w-16 h-1 mx-2 rounded-full transition-colors ${
+                  step > s.id ? 'bg-primary' : 'bg-secondary'
                 }`} />
               )}
             </div>
@@ -150,7 +149,7 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6 sm:p-8"
+        className="glass-card rounded-2xl p-6 sm:p-8"
       >
         <AnimatePresence mode="wait">
           {/* Step 1: Identity */}
@@ -163,29 +162,29 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
               className="space-y-6"
             >
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">هویت شرکت</h2>
-                  <p className="text-sm text-slate-500">Identity</p>
+                  <h2 className="text-xl font-bold text-foreground">هویت شرکت</h2>
+                  <p className="text-sm text-muted-foreground">Identity</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <Label className="text-slate-700">نام شرکت *</Label>
+                  <Label className="text-foreground">نام شرکت *</Label>
                   <div className="relative mt-1">
-                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       value={formData.companyName}
                       onChange={(e) => updateField('companyName', e.target.value)}
                       placeholder="مثال: تالیا موبایل"
-                      className={`pr-10 bg-slate-50 border-slate-200 ${errors.companyName ? 'border-red-500' : ''}`}
+                      className={`pr-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground ${errors.companyName ? 'border-destructive' : ''}`}
                     />
                   </div>
                   {errors.companyName && (
-                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <p className="text-destructive text-sm mt-1 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
                       {errors.companyName}
                     </p>
@@ -193,19 +192,19 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 </div>
 
                 <div>
-                  <Label className="text-slate-700">آدرس وب‌سایت *</Label>
+                  <Label className="text-foreground">آدرس وب‌سایت *</Label>
                   <div className="relative mt-1">
-                    <Link2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Link2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       value={formData.companyUrl}
                       onChange={(e) => updateField('companyUrl', e.target.value)}
                       placeholder="https://example.com"
-                      className={`pr-10 bg-slate-50 border-slate-200 ${errors.companyUrl ? 'border-red-500' : ''}`}
+                      className={`pr-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground ${errors.companyUrl ? 'border-destructive' : ''}`}
                       dir="ltr"
                     />
                   </div>
                   {errors.companyUrl && (
-                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <p className="text-destructive text-sm mt-1 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
                       {errors.companyUrl}
                     </p>
@@ -213,26 +212,26 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 </div>
 
                 <div>
-                  <Label className="text-slate-700">لینکدین شرکت</Label>
+                  <Label className="text-foreground">لینکدین شرکت</Label>
                   <div className="relative mt-1">
-                    <Linkedin className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Linkedin className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       value={formData.linkedinUrl}
                       onChange={(e) => updateField('linkedinUrl', e.target.value)}
                       placeholder="https://linkedin.com/company/..."
-                      className="pr-10 bg-slate-50 border-slate-200"
+                      className="pr-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
                       dir="ltr"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-slate-700">بیوگرافی بنیان‌گذاران</Label>
+                  <Label className="text-foreground">بیوگرافی بنیان‌گذاران</Label>
                   <Textarea
                     value={formData.foundersBio}
                     onChange={(e) => updateField('foundersBio', e.target.value)}
                     placeholder="سوابق، تجربیات و دستاوردهای بنیان‌گذاران را شرح دهید..."
-                    className="mt-1 bg-slate-50 border-slate-200 min-h-[100px]"
+                    className="mt-1 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground min-h-[100px]"
                   />
                 </div>
               </div>
@@ -249,25 +248,25 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
               className="space-y-6"
             >
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-violet-600" />
+                <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">بارگذاری مستندات</h2>
-                  <p className="text-sm text-slate-500">Evidence Upload</p>
+                  <h2 className="text-xl font-bold text-foreground">بارگذاری مستندات</h2>
+                  <p className="text-sm text-muted-foreground">Evidence Upload</p>
                 </div>
               </div>
 
               <div className="grid gap-4">
                 {/* Pitch Deck Upload */}
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 hover:border-blue-400 transition-colors cursor-pointer bg-slate-50">
+                <div className="border-2 border-dashed border-border rounded-xl p-6 hover:border-primary transition-colors cursor-pointer bg-secondary/30">
                   <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                      <Upload className="w-6 h-6 text-blue-600" />
+                    <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <Upload className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-700">Pitch Deck (PDF)</p>
-                      <p className="text-sm text-slate-500">فایل ارائه شرکت را بکشید و رها کنید</p>
+                      <p className="font-semibold text-foreground">Pitch Deck (PDF)</p>
+                      <p className="text-sm text-muted-foreground">فایل ارائه شرکت را بکشید و رها کنید</p>
                     </div>
                     <Button variant="outline" size="sm" className="mt-2">
                       انتخاب فایل
@@ -276,14 +275,14 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 </div>
 
                 {/* Financials Upload */}
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 hover:border-emerald-400 transition-colors cursor-pointer bg-slate-50">
+                <div className="border-2 border-dashed border-border rounded-xl p-6 hover:border-primary transition-colors cursor-pointer bg-secondary/30">
                   <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                      <DollarSign className="w-6 h-6 text-emerald-600" />
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      <DollarSign className="w-6 h-6 text-emerald-400" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-700">صورت‌های مالی 3 سال اخیر (Excel)</p>
-                      <p className="text-sm text-slate-500">ترازنامه، سود و زیان، جریان نقدی</p>
+                      <p className="font-semibold text-foreground">صورت‌های مالی 3 سال اخیر (Excel)</p>
+                      <p className="text-sm text-muted-foreground">ترازنامه، سود و زیان، جریان نقدی</p>
                     </div>
                     <Button variant="outline" size="sm" className="mt-2">
                       انتخاب فایل
@@ -292,14 +291,14 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 </div>
 
                 {/* Employees List Upload */}
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 hover:border-purple-400 transition-colors cursor-pointer bg-slate-50">
+                <div className="border-2 border-dashed border-border rounded-xl p-6 hover:border-primary transition-colors cursor-pointer bg-secondary/30">
                   <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-                      <Users className="w-6 h-6 text-purple-600" />
+                    <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
+                      <Users className="w-6 h-6 text-accent" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-700">لیست کارکنان کلیدی</p>
-                      <p className="text-sm text-slate-500">نام، سمت و سوابق افراد کلیدی</p>
+                      <p className="font-semibold text-foreground">لیست کارکنان کلیدی</p>
+                      <p className="text-sm text-muted-foreground">نام، سمت و سوابق افراد کلیدی</p>
                     </div>
                     <Button variant="outline" size="sm" className="mt-2">
                       انتخاب فایل
@@ -308,7 +307,7 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 </div>
               </div>
 
-              <p className="text-sm text-slate-400 text-center">
+              <p className="text-sm text-muted-foreground text-center">
                 این مرحله اختیاری است. می‌توانید بدون بارگذاری فایل ادامه دهید.
               </p>
             </motion.div>
@@ -324,31 +323,31 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
               className="space-y-6"
             >
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-amber-400" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">ادعاهای شرکت</h2>
-                  <p className="text-sm text-slate-500">Claims & Metrics</p>
+                  <h2 className="text-xl font-bold text-foreground">ادعاهای شرکت</h2>
+                  <p className="text-sm text-muted-foreground">Claims & Metrics</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <Label className="text-slate-700">ارزش‌گذاری فعلی (میلیون تومان) *</Label>
+                  <Label className="text-foreground">ارزش‌گذاری فعلی (میلیون تومان) *</Label>
                   <div className="relative mt-1">
-                    <DollarSign className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <DollarSign className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       type="number"
                       value={formData.currentValuation || ''}
                       onChange={(e) => updateField('currentValuation', Number(e.target.value))}
                       placeholder="مثال: 50000"
-                      className={`pr-10 bg-slate-50 border-slate-200 ${errors.currentValuation ? 'border-red-500' : ''}`}
+                      className={`pr-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground ${errors.currentValuation ? 'border-destructive' : ''}`}
                       dir="ltr"
                     />
                   </div>
                   {errors.currentValuation && (
-                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <p className="text-destructive text-sm mt-1 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
                       {errors.currentValuation}
                     </p>
@@ -356,40 +355,40 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
                 </div>
 
                 <div>
-                  <Label className="text-slate-700">کاربران فعال ماهانه (MAU)</Label>
+                  <Label className="text-foreground">کاربران فعال ماهانه (MAU)</Label>
                   <div className="relative mt-1">
-                    <Users className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Users className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       type="number"
                       value={formData.monthlyActiveUsers || ''}
                       onChange={(e) => updateField('monthlyActiveUsers', Number(e.target.value))}
                       placeholder="مثال: 500000"
-                      className="pr-10 bg-slate-50 border-slate-200"
+                      className="pr-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
                       dir="ltr"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-slate-700">نرخ سوختن ماهانه (میلیون تومان) *</Label>
+                  <Label className="text-foreground">نرخ سوختن ماهانه (میلیون تومان) *</Label>
                   <div className="relative mt-1">
-                    <Flame className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <Flame className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
                       type="number"
                       value={formData.burnRate || ''}
                       onChange={(e) => updateField('burnRate', Number(e.target.value))}
                       placeholder="مثال: 500"
-                      className={`pr-10 bg-slate-50 border-slate-200 ${errors.burnRate ? 'border-red-500' : ''}`}
+                      className={`pr-10 bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground ${errors.burnRate ? 'border-destructive' : ''}`}
                       dir="ltr"
                     />
                   </div>
                   {errors.burnRate && (
-                    <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <p className="text-destructive text-sm mt-1 flex items-center gap-1">
                       <AlertCircle className="w-4 h-4" />
                       {errors.burnRate}
                     </p>
                   )}
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     هزینه‌های ماهانه منهای درآمدها
                   </p>
                 </div>
@@ -399,22 +398,22 @@ const UnicornInputWizard = ({ onSubmit }: UnicornInputWizardProps) => {
         </AnimatePresence>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
           <Button
             variant="ghost"
             onClick={() => setStep(step - 1)}
             disabled={step === 1}
-            className="text-slate-600"
+            className="text-muted-foreground hover:text-foreground"
           >
             <ChevronRight className="w-4 h-4 ml-2" />
             قبلی
           </Button>
-          <span className="text-sm text-slate-400">
+          <span className="text-sm text-muted-foreground">
             مرحله {step} از 3
           </span>
           <Button
             onClick={handleNext}
-            className="bg-blue-900 hover:bg-blue-800"
+            className="bg-primary hover:bg-primary/90"
           >
             {step === 3 ? 'شروع تحلیل' : 'بعدی'}
             <ChevronLeft className="w-4 h-4 mr-2" />

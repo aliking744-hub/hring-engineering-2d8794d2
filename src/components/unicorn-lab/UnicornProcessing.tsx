@@ -128,13 +128,13 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-10"
       >
-        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center shadow-xl">
-          <Loader2 className="w-10 h-10 text-white animate-spin" />
+        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-xl">
+          <Loader2 className="w-10 h-10 text-primary-foreground animate-spin" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">
+        <h1 className="text-2xl font-bold text-foreground mb-2">
           در حال تحلیل {profile.companyName}
         </h1>
-        <p className="text-slate-500">
+        <p className="text-muted-foreground">
           {error ? 'در حال استفاده از داده‌های پیش‌فرض...' : 'لطفاً صبر کنید. موتورهای تحلیل در حال ارزیابی هستند...'}
         </p>
       </motion.div>
@@ -144,12 +144,12 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3"
+          className="mb-6 p-4 glass-card flex items-center gap-3 border-amber-500/50"
         >
-          <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+          <AlertCircle className="w-6 h-6 text-amber-400 flex-shrink-0" />
           <div>
-            <p className="font-semibold text-amber-800">تحلیل AI در دسترس نیست</p>
-            <p className="text-sm text-amber-600">{error} - در حال استفاده از تحلیل پیش‌فرض</p>
+            <p className="font-semibold text-amber-300">تحلیل AI در دسترس نیست</p>
+            <p className="text-sm text-amber-400/80">{error} - در حال استفاده از تحلیل پیش‌فرض</p>
           </div>
         </motion.div>
       )}
@@ -169,10 +169,10 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
               transition={{ delay: index * 0.1 }}
               className={`p-4 rounded-xl border-2 transition-all ${
                 isCompleted 
-                  ? 'bg-emerald-50 border-emerald-200'
+                  ? 'glass-card border-emerald-500/50'
                   : isCurrent
-                    ? 'bg-white border-blue-300 shadow-lg'
-                    : 'bg-slate-50 border-slate-200 opacity-60'
+                    ? 'glass-card border-primary/50 shadow-lg shadow-primary/20'
+                    : 'bg-secondary/30 border-border opacity-60'
               }`}
             >
               <div className="flex items-center gap-4">
@@ -182,24 +182,24 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-bold text-slate-800">{engine.title}</h3>
-                      <p className="text-xs text-slate-500">{engine.subtitle}</p>
+                      <h3 className="font-bold text-foreground">{engine.title}</h3>
+                      <p className="text-xs text-muted-foreground">{engine.subtitle}</p>
                     </div>
-                    {isCompleted && <span className="text-sm text-emerald-600 font-medium">تکمیل شد</span>}
+                    {isCompleted && <span className="text-sm text-emerald-400 font-medium">تکمیل شد</span>}
                     {isCurrent && (
-                      <div className="flex items-center gap-2 text-blue-600">
+                      <div className="flex items-center gap-2 text-primary">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span className="text-sm font-medium">در حال پردازش...</span>
                       </div>
                     )}
                   </div>
-                  <p className="text-sm text-slate-400 mt-1">{engine.description}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{engine.description}</p>
                 </div>
               </div>
               
               {isCurrent && (
-                <motion.div className="mt-3 h-1 bg-slate-200 rounded-full overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <motion.div className="h-full bg-gradient-to-r from-blue-500 to-blue-600" initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 0.8, ease: 'linear' }} />
+                <motion.div className="mt-3 h-1 bg-secondary rounded-full overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <motion.div className="h-full bg-gradient-to-r from-primary to-accent" initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 0.8, ease: 'linear' }} />
                 </motion.div>
               )}
             </motion.div>
@@ -212,11 +212,11 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-8 p-6 bg-emerald-50 border border-emerald-200 rounded-xl text-center"
+          className="mt-8 p-6 glass-card border-emerald-500/50 text-center"
         >
-          <Check className="w-12 h-12 mx-auto text-emerald-600 mb-3" />
-          <p className="font-bold text-emerald-800">تحلیل کامل شد!</p>
-          <p className="text-sm text-emerald-600">در حال آماده‌سازی داشبورد...</p>
+          <Check className="w-12 h-12 mx-auto text-emerald-400 mb-3" />
+          <p className="font-bold text-emerald-300">تحلیل کامل شد!</p>
+          <p className="text-sm text-emerald-400">در حال آماده‌سازی داشبورد...</p>
         </motion.div>
       )}
     </div>
