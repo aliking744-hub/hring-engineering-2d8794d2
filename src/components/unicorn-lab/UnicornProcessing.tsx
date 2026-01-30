@@ -7,8 +7,11 @@ import {
   Flag,
   Zap,
   Check,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { StartupProfile, AnalysisResult } from "@/pages/UnicornLab";
 
 interface UnicornProcessingProps {
@@ -71,27 +74,52 @@ const engines: Engine[] = [
 const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
   const [currentEngine, setCurrentEngine] = useState(0);
   const [completedEngines, setCompletedEngines] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const processEngines = async () => {
+    const processAnalysis = async () => {
+      // Visual progress through engines
       for (let i = 0; i < engines.length; i++) {
         setCurrentEngine(i);
-        
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-        
+        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
         setCompletedEngines(prev => [...prev, engines[i].id]);
       }
 
-      // Generate mock result after all engines complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockResult: AnalysisResult = generateMockResult(profile);
-      onComplete(mockResult);
+      // Call the AI analysis endpoint
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke('analyze-unicorn', {
+          body: { profile }
+        });
+
+        if (fnError) throw fnError;
+        if (data.error) throw new Error(data.error);
+
+        if (data.success && data.result) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          onComplete(data.result);
+        } else {
+          throw new Error('نتیجه‌ای از تحلیل دریافت نشد');
+        }
+      } catch (err: any) {
+        console.error('Analysis error:', err);
+        setError(err.message || 'خطا در تحلیل');
+        toast({
+          title: "خطا در تحلیل",
+          description: err.message || 'خطای ناشناخته',
+          variant: "destructive"
+        });
+        
+        // Fallback to mock data after error
+        setTimeout(() => {
+          const fallbackResult = generateFallbackResult(profile);
+          onComplete(fallbackResult);
+        }, 2000);
+      }
     };
 
-    processEngines();
-  }, [profile, onComplete]);
+    processAnalysis();
+  }, [profile, onComplete, toast]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
@@ -107,9 +135,24 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
           در حال تحلیل {profile.companyName}
         </h1>
         <p className="text-slate-500">
-          لطفاً صبر کنید. موتورهای تحلیل در حال ارزیابی هستند...
+          {error ? 'در حال استفاده از داده‌های پیش‌فرض...' : 'لطفاً صبر کنید. موتورهای تحلیل در حال ارزیابی هستند...'}
         </p>
       </motion.div>
+
+      {/* Error Banner */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3"
+        >
+          <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-amber-800">تحلیل AI در دسترس نیست</p>
+            <p className="text-sm text-amber-600">{error} - در حال استفاده از تحلیل پیش‌فرض</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Engines Progress */}
       <div className="space-y-4">
@@ -122,11 +165,7 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
             <motion.div
               key={engine.id}
               initial={{ opacity: 0, x: -20 }}
-              animate={{ 
-                opacity: 1, 
-                x: 0,
-                scale: isCurrent ? 1.02 : 1
-              }}
+              animate={{ opacity: 1, x: 0, scale: isCurrent ? 1.02 : 1 }}
               transition={{ delay: index * 0.1 }}
               className={`p-4 rounded-xl border-2 transition-all ${
                 isCompleted 
@@ -137,14 +176,8 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
               }`}
             >
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${engine.color} flex items-center justify-center shadow-md ${
-                  isCurrent ? 'animate-pulse' : ''
-                }`}>
-                  {isCompleted ? (
-                    <Check className="w-6 h-6 text-white" />
-                  ) : (
-                    <Icon className="w-6 h-6 text-white" />
-                  )}
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${engine.color} flex items-center justify-center shadow-md ${isCurrent ? 'animate-pulse' : ''}`}>
+                  {isCompleted ? <Check className="w-6 h-6 text-white" /> : <Icon className="w-6 h-6 text-white" />}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
@@ -152,9 +185,7 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
                       <h3 className="font-bold text-slate-800">{engine.title}</h3>
                       <p className="text-xs text-slate-500">{engine.subtitle}</p>
                     </div>
-                    {isCompleted && (
-                      <span className="text-sm text-emerald-600 font-medium">تکمیل شد</span>
-                    )}
+                    {isCompleted && <span className="text-sm text-emerald-600 font-medium">تکمیل شد</span>}
                     {isCurrent && (
                       <div className="flex items-center gap-2 text-blue-600">
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -166,19 +197,9 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
                 </div>
               </div>
               
-              {/* Progress Bar */}
               {isCurrent && (
-                <motion.div 
-                  className="mt-3 h-1 bg-slate-200 rounded-full overflow-hidden"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 1.5, ease: 'linear' }}
-                  />
+                <motion.div className="mt-3 h-1 bg-slate-200 rounded-full overflow-hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <motion.div className="h-full bg-gradient-to-r from-blue-500 to-blue-600" initial={{ width: 0 }} animate={{ width: '100%' }} transition={{ duration: 0.8, ease: 'linear' }} />
                 </motion.div>
               )}
             </motion.div>
@@ -187,7 +208,7 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
       </div>
 
       {/* All Complete Message */}
-      {completedEngines.length === engines.length && (
+      {completedEngines.length === engines.length && !error && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -202,17 +223,16 @@ const UnicornProcessing = ({ profile, onComplete }: UnicornProcessingProps) => {
   );
 };
 
-// Mock data generator - In production, this would come from AI backend
-function generateMockResult(profile: StartupProfile): AnalysisResult {
+function generateFallbackResult(profile: StartupProfile): AnalysisResult {
   const baseScore = Math.min(95, Math.max(30, 
     50 + 
     (profile.monthlyActiveUsers > 100000 ? 15 : profile.monthlyActiveUsers > 10000 ? 10 : 5) +
     (profile.currentValuation > 10000 ? 10 : 5) +
-    (profile.foundersBio?.length > 200 ? 10 : 5) +
+    (profile.foundersBio && profile.foundersBio.length > 200 ? 10 : 5) +
     Math.random() * 15
   ));
 
-  const burnRate = profile.burnRate * 1000000; // Convert to actual amount
+  const burnRate = profile.burnRate * 1000000;
   const runway = Math.round(profile.currentValuation / (profile.burnRate || 1));
 
   return {
@@ -221,7 +241,7 @@ function generateMockResult(profile: StartupProfile): AnalysisResult {
       grossMargin: Math.round(35 + Math.random() * 30),
       burnRate: burnRate,
       runway: Math.min(36, Math.max(3, runway)),
-      healthGrade: baseScore >= 80 ? 'A' : baseScore >= 60 ? 'B' : baseScore >= 40 ? 'C' : 'D'
+      healthGrade: baseScore >= 80 ? 'A' : baseScore >= 60 ? 'B' : baseScore >= 40 ? 'C' : 'D' as 'A' | 'B' | 'C' | 'D' | 'F'
     },
     founderGrit: {
       resilience: Math.round(60 + Math.random() * 30),
@@ -233,11 +253,11 @@ function generateMockResult(profile: StartupProfile): AnalysisResult {
     techViability: {
       score: Math.round(50 + Math.random() * 40),
       aiProof: Math.random() > 0.4,
-      riskLevel: Math.random() > 0.6 ? 'low' : Math.random() > 0.3 ? 'medium' : 'high',
+      riskLevel: (Math.random() > 0.6 ? 'low' : Math.random() > 0.3 ? 'medium' : 'high') as 'low' | 'medium' | 'high',
       insights: [
-        'زیرساخت فنی مبتنی بر cloud computing',
-        'استفاده از API‌های استاندارد صنعت',
-        'نیاز به بهبود امنیت سایبری'
+        'زیرساخت فنی نیاز به بررسی بیشتر دارد',
+        'پتانسیل رشد در بازار داخلی وجود دارد',
+        'نیاز به تقویت امنیت سایبری'
       ]
     },
     nationalUtility: {
@@ -247,10 +267,8 @@ function generateMockResult(profile: StartupProfile): AnalysisResult {
       jobCreation: Math.round(20 + Math.random() * 180)
     },
     verdict: {
-      status: baseScore >= 90 ? 'unicorn' : baseScore >= 70 ? 'approved' : baseScore >= 50 ? 'conditional' : 'rejected',
-      summary: baseScore >= 70 
-        ? `شرکت ${profile.companyName} دارای زیرساخت فنی قوی و پتانسیل رشد بالا است. با وجود چالش‌های مالی جزئی، ارزیابی کلی مثبت است.`
-        : `شرکت ${profile.companyName} دارای زیرساخت فنی قابل قبول است اما تاب‌آوری مالی در برابر شوک‌های بازار را ندارد. پیشنهاد: تایید مشروط با نظارت مستمر.`,
+      status: (baseScore >= 90 ? 'unicorn' : baseScore >= 70 ? 'approved' : baseScore >= 50 ? 'conditional' : 'rejected') as 'rejected' | 'conditional' | 'approved' | 'unicorn',
+      summary: `شرکت ${profile.companyName} نیاز به بررسی بیشتر دارد. تحلیل اولیه انجام شده است.`,
       recommendations: [
         'تنوع‌بخشی به منابع درآمدی',
         'کاهش وابستگی به خدمات خارجی',

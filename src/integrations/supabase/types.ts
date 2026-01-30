@@ -1259,6 +1259,72 @@ export type Database = {
         }
         Relationships: []
       }
+      unicorn_analyses: {
+        Row: {
+          analysis_result: Json | null
+          burn_rate: number | null
+          company_name: string
+          company_url: string | null
+          completed_at: string | null
+          created_at: string
+          current_valuation: number | null
+          employees_list_path: string | null
+          error_message: string | null
+          financials_path: string | null
+          founders_bio: string | null
+          id: string
+          linkedin_url: string | null
+          monthly_active_users: number | null
+          pitch_deck_path: string | null
+          status: string | null
+          u_score: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_result?: Json | null
+          burn_rate?: number | null
+          company_name: string
+          company_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          current_valuation?: number | null
+          employees_list_path?: string | null
+          error_message?: string | null
+          financials_path?: string | null
+          founders_bio?: string | null
+          id?: string
+          linkedin_url?: string | null
+          monthly_active_users?: number | null
+          pitch_deck_path?: string | null
+          status?: string | null
+          u_score?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_result?: Json | null
+          burn_rate?: number | null
+          company_name?: string
+          company_url?: string | null
+          completed_at?: string | null
+          created_at?: string
+          current_valuation?: number | null
+          employees_list_path?: string | null
+          error_message?: string | null
+          financials_path?: string | null
+          founders_bio?: string | null
+          id?: string
+          linkedin_url?: string | null
+          monthly_active_users?: number | null
+          pitch_deck_path?: string | null
+          status?: string | null
+          u_score?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_credits: {
         Row: {
           created_at: string
