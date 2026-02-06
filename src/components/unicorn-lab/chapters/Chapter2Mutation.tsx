@@ -25,7 +25,7 @@ const demoCompanies: Partial<UnicornAnalysis>[] = [
     id: 'demo-1',
     company_name: 'تالیا موبایل',
     u_score: 85,
-    chapter: 'chapter_2',
+    chapter: 'mutation',
     chapter_1_approved: true,
     chapter_2_stable: false,
     shadow_cabinet: {
