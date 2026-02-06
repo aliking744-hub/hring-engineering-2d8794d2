@@ -178,7 +178,7 @@ const UnicornLabLayout = () => {
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="chapter_2" className="mt-0">
+          <TabsContent value="mutation" className="mt-0">
             <motion.div
               key="chapter2"
               initial={{ opacity: 0, y: 20 }}
@@ -193,7 +193,7 @@ const UnicornLabLayout = () => {
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="chapter_3" className="mt-0">
+          <TabsContent value="monitoring" className="mt-0">
             <motion.div
               key="chapter3"
               initial={{ opacity: 0, y: 20 }}
