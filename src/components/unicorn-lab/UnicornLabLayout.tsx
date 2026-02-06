@@ -72,7 +72,7 @@ const chapters = [
 ];
 
 const UnicornLabLayout = () => {
-  const [activeChapter, setActiveChapter] = useState('chapter_1');
+  const [activeChapter, setActiveChapter] = useState('screening');
   const [analyses, setAnalyses] = useState<UnicornAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -163,7 +163,7 @@ const UnicornLabLayout = () => {
         </TabsList>
 
         <AnimatePresence mode="wait">
-          <TabsContent value="chapter_1" className="mt-0">
+          <TabsContent value="screening" className="mt-0">
             <motion.div
               key="chapter1"
               initial={{ opacity: 0, y: 20 }}
@@ -171,7 +171,7 @@ const UnicornLabLayout = () => {
               exit={{ opacity: 0, y: -20 }}
             >
               <Chapter1Screening 
-                analyses={getChapterAnalyses('chapter_1')}
+                analyses={getChapterAnalyses('screening')}
                 onRefresh={fetchAnalyses}
                 loading={loading}
               />
