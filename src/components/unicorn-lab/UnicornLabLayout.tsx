@@ -43,7 +43,8 @@ export interface UnicornAnalysis {
 
 const chapters = [
   { 
-    id: 'chapter_1', 
+    id: 'screening', 
+    tabId: 'chapter_1',
     title: 'فصل ۱: غربالگری ژنومیک',
     subtitle: 'Genomic Screening',
     icon: Dna,
@@ -51,7 +52,8 @@ const chapters = [
     color: 'from-emerald-500 to-teal-500'
   },
   { 
-    id: 'chapter_2', 
+    id: 'mutation', 
+    tabId: 'chapter_2',
     title: 'فصل ۲: آزمایشگاه جهش',
     subtitle: 'Mutation Laboratory',
     icon: FlaskConical,
@@ -59,7 +61,8 @@ const chapters = [
     color: 'from-violet-500 to-purple-500'
   },
   { 
-    id: 'chapter_3', 
+    id: 'monitoring', 
+    tabId: 'chapter_3',
     title: 'فصل ۳: مانیتورینگ عصبی',
     subtitle: 'Neural Monitoring & Kill Switch',
     icon: Eye,
@@ -69,7 +72,7 @@ const chapters = [
 ];
 
 const UnicornLabLayout = () => {
-  const [activeChapter, setActiveChapter] = useState('chapter_1');
+  const [activeChapter, setActiveChapter] = useState('screening');
   const [analyses, setAnalyses] = useState<UnicornAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -160,7 +163,7 @@ const UnicornLabLayout = () => {
         </TabsList>
 
         <AnimatePresence mode="wait">
-          <TabsContent value="chapter_1" className="mt-0">
+          <TabsContent value="screening" className="mt-0">
             <motion.div
               key="chapter1"
               initial={{ opacity: 0, y: 20 }}
@@ -168,14 +171,14 @@ const UnicornLabLayout = () => {
               exit={{ opacity: 0, y: -20 }}
             >
               <Chapter1Screening 
-                analyses={getChapterAnalyses('chapter_1')}
+                analyses={getChapterAnalyses('screening')}
                 onRefresh={fetchAnalyses}
                 loading={loading}
               />
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="chapter_2" className="mt-0">
+          <TabsContent value="mutation" className="mt-0">
             <motion.div
               key="chapter2"
               initial={{ opacity: 0, y: 20 }}
@@ -190,7 +193,7 @@ const UnicornLabLayout = () => {
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="chapter_3" className="mt-0">
+          <TabsContent value="monitoring" className="mt-0">
             <motion.div
               key="chapter3"
               initial={{ opacity: 0, y: 20 }}

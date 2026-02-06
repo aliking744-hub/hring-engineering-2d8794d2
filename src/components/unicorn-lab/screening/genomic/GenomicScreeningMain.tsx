@@ -66,7 +66,7 @@ const GenomicScreeningMain = ({ onBack }: GenomicScreeningMainProps) => {
       const { data, error } = await supabase
         .from('unicorn_analyses')
         .select('*')
-        .eq('chapter', 'chapter_1')
+        .eq('chapter', 'screening')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -25,7 +25,7 @@ const demoCompanies: Partial<UnicornAnalysis>[] = [
     id: 'demo-1',
     company_name: 'تالیا موبایل',
     u_score: 85,
-    chapter: 'chapter_2',
+    chapter: 'mutation',
     chapter_1_approved: true,
     chapter_2_stable: false,
     shadow_cabinet: {
@@ -54,7 +54,7 @@ const demoCompanies: Partial<UnicornAnalysis>[] = [
     id: 'demo-2',
     company_name: 'دیجی‌هلث',
     u_score: 78,
-    chapter: 'chapter_2',
+    chapter: 'mutation',
     chapter_1_approved: true,
     chapter_2_stable: true,
     shadow_cabinet: {
@@ -109,7 +109,7 @@ const Chapter2Mutation = ({ analyses, onRefresh, loading }: Chapter2MutationProp
       const { error } = await supabase
         .from('unicorn_analyses')
         .update({
-          chapter: 'chapter_3',
+          chapter: 'monitoring',
           chapter_2_stable: true,
           chapter_2_stable_at: new Date().toISOString()
         })

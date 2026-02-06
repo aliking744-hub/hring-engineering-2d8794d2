@@ -99,7 +99,7 @@ const AnalysisDetail = ({ analysis, onBack, onRefresh }: AnalysisDetailProps) =>
       const { error } = await supabase
         .from('unicorn_analyses')
         .update({
-          chapter: 'chapter_2',
+          chapter: 'mutation',
           chapter_1_approved: true,
           chapter_1_approved_at: new Date().toISOString()
         })
