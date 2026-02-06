@@ -54,7 +54,7 @@ const demoCompanies: Partial<UnicornAnalysis>[] = [
     id: 'demo-2',
     company_name: 'دیجی‌هلث',
     u_score: 78,
-    chapter: 'chapter_2',
+    chapter: 'mutation',
     chapter_1_approved: true,
     chapter_2_stable: true,
     shadow_cabinet: {
