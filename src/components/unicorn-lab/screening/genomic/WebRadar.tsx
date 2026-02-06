@@ -99,7 +99,7 @@ const WebRadar = ({ onBack, onAddCompany }: WebRadarProps) => {
         company_name: company.name,
         company_url: company.url,
         founders_bio: company.description,
-        chapter: 'chapter_1',
+        chapter: 'screening',
         status: 'pending'
       });
 

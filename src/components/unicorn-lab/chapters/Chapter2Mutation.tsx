@@ -109,7 +109,7 @@ const Chapter2Mutation = ({ analyses, onRefresh, loading }: Chapter2MutationProp
       const { error } = await supabase
         .from('unicorn_analyses')
         .update({
-          chapter: 'chapter_3',
+          chapter: 'monitoring',
           chapter_2_stable: true,
           chapter_2_stable_at: new Date().toISOString()
         })

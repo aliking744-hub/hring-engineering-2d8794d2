@@ -43,7 +43,8 @@ export interface UnicornAnalysis {
 
 const chapters = [
   { 
-    id: 'chapter_1', 
+    id: 'screening', 
+    tabId: 'chapter_1',
     title: 'فصل ۱: غربالگری ژنومیک',
     subtitle: 'Genomic Screening',
     icon: Dna,
@@ -51,7 +52,8 @@ const chapters = [
     color: 'from-emerald-500 to-teal-500'
   },
   { 
-    id: 'chapter_2', 
+    id: 'mutation', 
+    tabId: 'chapter_2',
     title: 'فصل ۲: آزمایشگاه جهش',
     subtitle: 'Mutation Laboratory',
     icon: FlaskConical,
@@ -59,7 +61,8 @@ const chapters = [
     color: 'from-violet-500 to-purple-500'
   },
   { 
-    id: 'chapter_3', 
+    id: 'monitoring', 
+    tabId: 'chapter_3',
     title: 'فصل ۳: مانیتورینگ عصبی',
     subtitle: 'Neural Monitoring & Kill Switch',
     icon: Eye,

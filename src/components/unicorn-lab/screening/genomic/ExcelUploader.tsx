@@ -145,7 +145,7 @@ const ExcelUploader = ({ onBack, onSuccess }: ExcelUploaderProps) => {
           current_valuation: company.currentValuation || null,
           monthly_active_users: company.monthlyActiveUsers || null,
           burn_rate: company.burnRate || null,
-          chapter: 'chapter_1',
+          chapter: 'screening',
           status: 'pending'
         });
 
