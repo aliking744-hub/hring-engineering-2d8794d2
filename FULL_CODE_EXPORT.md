@@ -1599,4 +1599,62 @@ CREATE POLICY "Users can delete own" ON public.unicorn_analyses FOR DELETE USING
 
 ---
 
+# 📁 Complete File List Summary
+
+## Strategic Radar Files (20 files)
+- `src/pages/StrategicRadar.tsx` - Main page
+- `src/components/strategic-radar/RadarDashboard.tsx` - Dashboard layout
+- `src/components/strategic-radar/RadarInputPhase.tsx` - Input phase
+- `src/components/strategic-radar/VerificationPhase.tsx` - Verification
+- `src/components/strategic-radar/StrategicConfigWizard.tsx` - Config wizard
+- `src/components/strategic-radar/sections/MarketPosition.tsx`
+- `src/components/strategic-radar/sections/FundingTracker.tsx`
+- `src/components/strategic-radar/sections/TechStackComparison.tsx`
+- `src/components/strategic-radar/sections/GlobalTrends.tsx`
+- `src/components/strategic-radar/sections/ValueChainMap.tsx`
+- `src/components/strategic-radar/sections/CompetitorAnatomy.tsx`
+- `src/components/strategic-radar/sections/CompetitorComparison.tsx`
+- `src/components/strategic-radar/sections/DailyMonitor.tsx`
+- `src/components/strategic-radar/sections/DataSources.tsx`
+- `src/components/strategic-radar/sections/GapFitAnalysis.tsx`
+- `src/components/strategic-radar/sections/GlobalBenchmarkEngine.tsx`
+- `src/components/strategic-radar/sections/MarketAlerts.tsx`
+- `src/components/strategic-radar/sections/OverallScore.tsx`
+- `src/components/strategic-radar/sections/StrategicRecommendations.tsx`
+- `src/components/strategic-radar/sections/TechnologyEdge.tsx`
+
+## Unicorn Lab Files (15 files)
+- `src/pages/UnicornLab.tsx` - Main page
+- `src/components/unicorn-lab/UnicornLabLayout.tsx` - 3-chapter layout
+- `src/components/unicorn-lab/chapters/Chapter1Screening.tsx`
+- `src/components/unicorn-lab/chapters/Chapter2Mutation.tsx`
+- `src/components/unicorn-lab/chapters/Chapter3Monitoring.tsx`
+- `src/components/unicorn-lab/screening/GenomicScreeningHub.tsx`
+- `src/components/unicorn-lab/screening/genomic/GenomicScreeningMain.tsx`
+- `src/components/unicorn-lab/screening/genomic/AnalysisWizard.tsx`
+- `src/components/unicorn-lab/screening/genomic/CompanyCard.tsx`
+- `src/components/unicorn-lab/screening/genomic/DataMiningSection.tsx`
+- `src/components/unicorn-lab/screening/genomic/DigitalInterrogation.tsx`
+- `src/components/unicorn-lab/screening/genomic/ExcelUploader.tsx`
+- `src/components/unicorn-lab/screening/genomic/WebRadar.tsx`
+- `src/components/unicorn-lab/screening/partners/StrategicPartnersMain.tsx`
+
+## Edge Functions (14 functions)
+- `fetch-company-intel` - Multi-query company research
+- `analyze-competitor` - Single competitor analysis
+- `analyze-competitor-swot` - SWOT analysis
+- `analyze-market-position` - Market position matrix
+- `analyze-global-trends` - Global trends & unicorns
+- `analyze-tech-edge` - Technology gap analysis
+- `analyze-value-chain` - Value chain mapping
+- `track-funding` - Funding & valuation tracking
+- `search-competitor-news` - Real-time news (Firecrawl)
+- `daily-competitor-monitor` - Daily monitoring
+- `generate-strategic-recommendations` - AI recommendations
+- `analyze-unicorn-engine` - 5-engine startup analysis
+- `unicorn-ai-chat` - Dual-mode AI chat
+- `unicorn-web-radar` - Web discovery
+
+---
+
 **End of Export Package v3.0**
