@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,35 +18,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const initialCheckDoneRef = useRef(false);
 
   useEffect(() => {
-    // First, get the initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (initialSession) {
-          setSession(initialSession);
-          setUser(initialSession.user);
-        }
-        setInitialCheckDone(true);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error getting initial session:', error);
-        setInitialCheckDone(true);
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    // Then set up the listener for future changes
+    // Set up the auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        // Only update after initial check is done to avoid race conditions
-        // or if this is a sign-in/sign-out event
-        if (initialCheckDone || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        // Always update on auth events after initial check
+        if (initialCheckDoneRef.current) {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
           setLoading(false);
@@ -54,9 +33,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
+    // Then get the initial session
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        initialCheckDoneRef.current = true;
+        setLoading(false);
+      } catch (error) {
+        console.error('Error getting initial session:', error);
+        initialCheckDoneRef.current = true;
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
     // Cleanup subscription on unmount
     return () => subscription.unsubscribe();
-  }, [initialCheckDone]);
+  }, []); // Empty dependency array - runs once
 
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
