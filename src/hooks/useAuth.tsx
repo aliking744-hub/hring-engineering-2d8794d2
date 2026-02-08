@@ -18,24 +18,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   useEffect(() => {
-    // FIX: Auth Race Condition
-    // onAuthStateChange fires immediately with the current session on setup,
-    // so we rely solely on it as the single source of truth.
-    // This eliminates the race condition between getSession and onAuthStateChange.
-    
+    // First, get the initial session
+    const initializeAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (initialSession) {
+          setSession(initialSession);
+          setUser(initialSession.user);
+        }
+        setInitialCheckDone(true);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error getting initial session:', error);
+        setInitialCheckDone(true);
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Then set up the listener for future changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setLoading(false);
+        // Only update after initial check is done to avoid race conditions
+        // or if this is a sign-in/sign-out event
+        if (initialCheckDone || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          setLoading(false);
+        }
       }
     );
 
     // Cleanup subscription on unmount
     return () => subscription.unsubscribe();
-  }, []);
+  }, [initialCheckDone]);
 
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
