@@ -2,179 +2,95 @@ import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Users, 
-  UserPlus,
-  Settings,
-  LogOut,
-  Bell,
-  Search,
-  Grid3X3,
-  Home,
-  Menu,
-  X,
-  Boxes,
-  Calculator,
-  Crosshair,
-  Compass,
-  FileText,
-  Scale,
-  Shield,
-  Building2,
-  Loader2,
-  Crown,
-  History,
-  Lock,
-  Eye,
-  User
+  LogOut, Search, Home, Menu, X, 
+  Loader2, Crown, History, User, Shield, Settings,
+  Building2, ChevronDown, Lock,
+  // Tier 1 - Smart Workspace
+  Briefcase, Mic, Megaphone,
+  // Tier 2 - HR & Operations
+  UserPlus, Users, Network,
+  // Tier 3 - Command Center
+  BarChart3, Calculator, Crosshair,
+  // Tier 4 - Vision Deck
+  Compass, Scale, TrendingUp
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuroraBackground from "@/components/AuroraBackground";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserContext } from "@/hooks/useUserContext";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useCredits } from "@/hooks/useCredits";
-import IndividualDashboard from "@/components/dashboard/IndividualDashboard";
-import CorporateDashboard from "@/components/dashboard/CorporateDashboard";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
-import type { SubscriptionTier } from "@/types/multiTenant";
 import { useSiteSettings, useSiteName } from "@/hooks/useSiteSettings";
+import DashboardModuleCards from "@/components/dashboard/DashboardModuleCards";
 
-// Feature visibility rules based on plan
-const getFeatureVisibility = (tier: SubscriptionTier | null, userType: 'individual' | 'corporate') => {
-  // Corporate users have different rules
-  if (userType === 'corporate') {
-    return {
-      modules: true,
-      headhunting: true,
-      onboarding: tier !== 'corporate_expert', // Hidden for Expert
-      strategicCompass: tier === 'corporate_decision_support' || tier === 'corporate_decision_making',
-      hrDashboard: tier === 'corporate_decision_making',
-      costCalculator: true,
-    };
-  }
-
-  // Individual users
-  const isFree = tier === 'individual_free' || !tier;
-  const isPro = tier === 'individual_pro';
-  const isPlus = tier === 'individual_plus';
-
-  return {
-    modules: true, // Always visible
-    costCalculator: true, // Always visible
-    headhunting: isPro || isPlus, // Hidden for Free
-    onboarding: isPlus, // Hidden for Free/Pro (Plus gets demo)
-    strategicCompass: isPlus, // Hidden for Free/Pro (Plus gets demo)
-    hrDashboard: isPro || isPlus, // Hidden for Free
-    canSaveData: isPlus, // Only Plus can save data
-    isDemoMode: isPlus && !userType, // Plus users get demo mode for restricted features
-  };
-};
+// 4-Tier sidebar structure
+const TIERS = [
+  {
+    id: "smart-workspace",
+    label: "میزکار هوشمند",
+    labelEn: "Smart Workspace",
+    icon: Briefcase,
+    modules: [
+      { id: "job-engineering", label: "مهندسی مشاغل", desc: "تولید هوشمند شناسنامه شغلی و پروفایل موقعیت", icon: Briefcase, path: "/job-description" },
+      { id: "interview-assistant", label: "دستیار مصاحبه", desc: "تولید راهنما، سؤالات تخصصی و کلیدهای ارزیابی", icon: Mic, path: "/interview-assistant" },
+      { id: "smart-ad-writer", label: "آگهی‌نویس هوشمند", desc: "نوشتن آگهی‌های جذاب برای LinkedIn و سایت‌های کار", icon: Megaphone, path: "/smart-ad-generator" },
+    ],
+  },
+  {
+    id: "hr-operations",
+    label: "سرمایه انسانی و عملیات",
+    labelEn: "Human Resources & Operations",
+    icon: Users,
+    modules: [
+      { id: "success-architect", label: "معمار موفقیت ۹۰ روزه", desc: "نقشه راه آنبوردینگ ۳۰-۶۰-۹۰ روزه", icon: UserPlus, path: "/onboarding" },
+      { id: "profiles", label: "پروفایل‌ها", desc: "لیست پرسنل و پرونده دیجیتال", icon: Users, path: "/profile" },
+      { id: "org-design", label: "طراحی سازمان", desc: "ساختار و چارت سازمانی", icon: Network, path: "/modules", comingSoon: true },
+    ],
+  },
+  {
+    id: "command-center",
+    label: "پنل راهبری",
+    labelEn: "Command Center",
+    icon: BarChart3,
+    modules: [
+      { id: "hr-dashboard", label: "داشبورد منابع انسانی", desc: "نمای گرافیکی ۳۶۰ درجه‌ای از اطلاعات پرسنل و ساختار", icon: BarChart3, path: "/hr-dashboard" },
+      { id: "costing", label: "بهای تمام شده", desc: "مدیریت بودجه و محاسبه هزینه‌های جذب", icon: Calculator, path: "/cost-calculator" },
+      { id: "headhunting", label: "شکار مدیران", desc: "ماژول اختصاصی جذب پوزیشن‌های حساس C-Level", icon: Crosshair, path: "/smart-headhunting" },
+    ],
+  },
+  {
+    id: "vision-deck",
+    label: "اتاق فرماندهی",
+    labelEn: "Vision Deck",
+    icon: Compass,
+    modules: [
+      { id: "strategic-compass", label: "قطب‌نمای استراتژی", desc: "سنجش هوشمند شکاف ذهنی و هم‌سویی مدیرعامل با ارشد مدیران", icon: Compass, path: "/strategic-compass" },
+      { id: "legal-advisor", label: "مشاور حقوقی", desc: "دستیار هوشمند حقوقی برای مسائل منابع انسانی", icon: Scale, path: "/legal-advisor" },
+      { id: "macro-analytics", label: "گزارش‌های کلان", desc: "شاخص‌های کلیدی سطح هلدینگ (مثل نرخ خروج کل، eNPS)", icon: TrendingUp, path: "#", comingSoon: true },
+    ],
+  },
+];
 
 const Dashboard = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openTiers, setOpenTiers] = useState<string[]>(["smart-workspace"]);
+  const [activeTier, setActiveTier] = useState("smart-workspace");
   const { signOut, user } = useAuth();
   const { context, loading: contextLoading } = useUserContext();
   const { isAdmin } = useAdmin();
   const { credits } = useCredits();
   const navigate = useNavigate();
-  const location = useLocation();
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
 
-  // Dynamic texts
-  const creditLabel = getSetting('dashboard_credit_label', 'اعتبار باقی‌مانده');
-  const backHomeText = getSetting('dashboard_back_home', 'بازگشت به صفحه اصلی');
-  const upgradeText = getSetting('dashboard_upgrade_btn', 'ارتقای پلن');
+  const creditLabel = getSetting('dashboard_credit_label', 'اعتبار شرکت');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
   const searchPlaceholder = getSetting('dashboard_search_placeholder', 'جستجو...');
-  const corporateLabel = getSetting('dashboard_corporate_label', 'حساب شرکتی');
 
-  // Get visibility rules based on user's plan
-  const visibility = getFeatureVisibility(
-    context?.subscriptionTier || context?.companyTier || null,
-    context?.userType || 'individual'
-  );
-
-  // Dynamic sidebar items based on user type and plan
-  const getSidebarItems = () => {
-    const items: Array<{
-      icon: any;
-      label: string;
-      path: string;
-      hidden?: boolean;
-      demoMode?: boolean;
-    }> = [
-      { icon: LayoutDashboard, label: "نمای کلی", path: "/dashboard" },
-      { icon: Boxes, label: "ماژول‌ها", path: "/modules" },
-      { icon: Calculator, label: "بهای تمام شده", path: "/cost-calculator" },
-    ];
-
-    // Headhunting - Hidden for Free users
-    if (visibility.headhunting) {
-      items.push({ icon: Crosshair, label: "هدهانتینگ", path: "/smart-headhunting" });
-    }
-
-    // Onboarding - Hidden for Free/Pro, Demo for Plus (individual)
-    if (visibility.onboarding) {
-      const isPlus = context?.subscriptionTier === 'individual_plus';
-      items.push({ 
-        icon: UserPlus, 
-        label: "آنبوردینگ", 
-        path: "/onboarding",
-        demoMode: isPlus && context?.userType === 'individual'
-      });
-    }
-
-    // HR Dashboard - Hidden for Free
-    if (visibility.hrDashboard) {
-      items.push({ icon: Grid3X3, label: "داشبورد HR", path: "/hr-dashboard" });
-    }
-
-    // Strategic Compass - Only for corporate or Plus (demo)
-    if (visibility.strategicCompass) {
-      const isPlus = context?.subscriptionTier === 'individual_plus';
-      items.push({ 
-        icon: Compass, 
-        label: "قطب نمای استراتژی", 
-        path: "/strategic-compass",
-        demoMode: isPlus && context?.userType === 'individual'
-      });
-    }
-
-    // Legal Advisor - Always visible
-    items.push({ icon: Scale, label: "مشاور حقوقی", path: "/legal-advisor" });
-
-    // Shop - Always visible
-    items.push({ icon: FileText, label: "فروشگاه", path: "/shop" });
-    
-    // Profile - Always visible
-    items.push({ icon: User, label: "پروفایل", path: "/profile" });
-
-    if (context?.userType === 'corporate') {
-      items.splice(1, 0, { icon: Users, label: "اعضای تیم", path: "/company-members" });
-      if (context.companyRole === 'ceo') {
-        items.push({ icon: Settings, label: "تنظیمات شرکت", path: "/company-settings" });
-      }
-    }
-
-    // Add admin link
-    if (isAdmin) {
-      items.push({ icon: Shield, label: "پنل ادمین", path: "/admin" });
-    }
-
-    return items;
-  };
-
-  const sidebarItems = getSidebarItems();
-
-  // Get max credits based on user's plan
   const getMaxCredits = () => {
     const tier = context?.subscriptionTier || context?.companyTier;
     switch (tier) {
@@ -196,7 +112,12 @@ const Dashboard = () => {
     navigate('/');
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  const toggleTier = (tierId: string) => {
+    setOpenTiers(prev => 
+      prev.includes(tierId) ? prev.filter(t => t !== tierId) : [...prev, tierId]
+    );
+    setActiveTier(tierId);
+  };
 
   if (contextLoading) {
     return (
@@ -206,14 +127,165 @@ const Dashboard = () => {
     );
   }
 
+  const currentTier = TIERS.find(t => t.id === activeTier) || TIERS[0];
+
+  // Sidebar content (shared between mobile and desktop)
+  const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <>
+      {/* Logo */}
+      <div className="mb-3">
+        <Link to="/" className="text-2xl font-bold gradient-text-primary" onClick={onNavigate}>
+          {siteName}
+        </Link>
+      </div>
+
+      {/* User Profile & Credit */}
+      <div className="mb-4 px-3 py-3 rounded-xl bg-secondary/50 border border-border/50">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+            <User className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {context?.fullName || context?.email || 'کاربر'}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">{context?.title || ''}</p>
+          </div>
+        </div>
+        {/* Company Credit */}
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-muted-foreground">{creditLabel}</span>
+          <Link to="/payment-history" className="text-xs text-primary hover:underline flex items-center gap-1" onClick={onNavigate}>
+            <History className="w-3 h-3" />
+            تاریخچه
+          </Link>
+        </div>
+        <div className="text-xl font-bold text-primary mb-2">
+          {credits.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ {maxCredits.toLocaleString()}</span>
+        </div>
+        <Progress value={creditPercentage} className="h-1.5" />
+      </div>
+
+      {/* 4-Tier Accordion Nav */}
+      <nav className="flex-1 space-y-1 overflow-y-auto">
+        {TIERS.map((tier) => {
+          const isOpen = openTiers.includes(tier.id);
+          const isActive = activeTier === tier.id;
+          return (
+            <div key={tier.id}>
+              <button
+                onClick={() => toggleTier(tier.id)}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-right ${
+                  isActive
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <tier.icon className="w-5 h-5 shrink-0" />
+                <div className="flex-1 min-w-0 text-right">
+                  <span className="font-medium text-sm block">{tier.label}</span>
+                  <span className="text-[10px] opacity-60 block">{tier.labelEn}</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pr-4 py-1 space-y-0.5">
+                      {tier.modules.map((mod) => (
+                        <button
+                          key={mod.id}
+                          onClick={() => {
+                            if (!mod.comingSoon) {
+                              navigate(mod.path);
+                              onNavigate?.();
+                            }
+                          }}
+                          disabled={mod.comingSoon}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-right text-xs transition-colors ${
+                            mod.comingSoon
+                              ? "text-muted-foreground/50 cursor-not-allowed"
+                              : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                          }`}
+                        >
+                          <mod.icon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="flex-1">{mod.label}</span>
+                          {mod.comingSoon && (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 opacity-60">
+                              <Lock className="w-2.5 h-2.5 ml-0.5" />
+                              به زودی
+                            </Badge>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Bottom Actions */}
+      <div className="mt-auto pt-3 space-y-1 border-t border-border/30">
+        {/* Settings */}
+        {context?.userType === 'corporate' && context.companyRole === 'ceo' && (
+          <Link
+            to="/company-settings"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors text-sm"
+          >
+            <Settings className="w-4 h-4" />
+            <span>تنظیمات سیستم</span>
+          </Link>
+        )}
+
+        {/* Admin */}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors text-sm"
+          >
+            <Shield className="w-4 h-4" />
+            <span>پنل ادمین</span>
+          </Link>
+        )}
+
+        {/* Upgrade */}
+        <Link 
+          to="/upgrade"
+          onClick={onNavigate}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all text-sm"
+        >
+          <Crown className="w-4 h-4" />
+          <span className="font-medium">ارتقای پلن</span>
+        </Link>
+
+        {/* Logout */}
+        <button 
+          onClick={() => { handleLogout(); onNavigate?.(); }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors text-sm"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>{logoutText}</span>
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <>
       <Helmet>
         <title>داشبورد | {siteName} - پنل مدیریت منابع انسانی</title>
-        <meta 
-          name="description" 
-          content={`پنل مدیریت منابع انسانی ${siteName}. مشاهده وضعیت استخدام، مصاحبه‌ها و آمار تیم در یک نگاه.`}
-        />
+        <meta name="description" content={`پنل مدیریت منابع انسانی ${siteName}`} />
       </Helmet>
       <div className="relative min-h-screen flex" dir="rtl">
         <AuroraBackground />
@@ -244,97 +316,13 @@ const Dashboard = () => {
                 transition={{ duration: 0.3 }}
                 className="lg:hidden fixed top-0 right-0 bottom-0 w-72 glass-card z-50 p-4 flex flex-col overflow-y-auto"
               >
-                {/* Close Button */}
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-secondary/50 transition-colors"
                 >
                   <X className="w-5 h-5 text-foreground" />
                 </button>
-
-                {/* Logo & User Type Badge */}
-                <div className="mb-4">
-                  <Link to="/" className="text-2xl font-bold gradient-text-primary">
-                    {siteName}
-                  </Link>
-                  {context?.userType === 'corporate' && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <Building2 className="w-4 h-4 text-primary" />
-                      <span className="text-sm text-muted-foreground">{corporateLabel}</span>
-                    </div>
-                  )}
-                  {/* Credits Display with Progress */}
-                  <div className="mt-3 px-3 py-2 rounded-lg bg-secondary/50 border border-border/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">{creditLabel}</span>
-                      <Link to="/payment-history" className="text-xs text-primary hover:underline flex items-center gap-1">
-                        <History className="w-3 h-3" />
-                        تاریخچه
-                      </Link>
-                    </div>
-                    <div className="text-lg font-bold text-primary mb-2">
-                      {credits} <span className="text-xs font-normal text-muted-foreground">/ {maxCredits} واحد</span>
-                    </div>
-                    <Progress value={creditPercentage} className="h-2" />
-                  </div>
-                </div>
-
-                {/* Back to Home */}
-                <Link 
-                  to="/" 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 mb-4 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors border border-border/50"
-                >
-                  <Home className="w-5 h-5" />
-                  <span className="font-medium">{backHomeText}</span>
-                </Link>
-
-                {/* Nav Items */}
-                <nav className="flex-1 space-y-2">
-                  {sidebarItems.map((item) => (
-                    <Link
-                      key={item.label}
-                      to={item.path}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-right ${
-                        isActive(item.path)
-                          ? "bg-primary/10 text-primary" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                      }`}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.label}</span>
-                      {item.demoMode && (
-                        <Badge variant="secondary" className="mr-auto text-xs">
-                          <Eye className="w-3 h-3 ml-1" />
-                          دمو
-                        </Badge>
-                      )}
-                    </Link>
-                  ))}
-                </nav>
-
-                {/* Upgrade Button */}
-                <Link 
-                  to="/upgrade" 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 mb-2 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all"
-                >
-                  <Crown className="w-5 h-5" />
-                  <span className="font-medium">{upgradeText}</span>
-                </Link>
-
-                {/* Logout */}
-                <button 
-                  onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                  <span className="font-medium">{logoutText}</span>
-                </button>
+                <SidebarContent onNavigate={() => setMobileMenuOpen(false)} />
               </motion.aside>
             </>
           )}
@@ -347,83 +335,7 @@ const Dashboard = () => {
           transition={{ duration: 0.5 }}
           className="w-64 glass-card m-4 p-4 hidden lg:flex flex-col"
         >
-          {/* Logo & User Type */}
-          <div className="mb-4">
-            <Link to="/" className="text-2xl font-bold gradient-text-primary">
-              {siteName}
-            </Link>
-            {context?.userType === 'corporate' && (
-              <div className="flex items-center gap-2 mt-2">
-                <Building2 className="w-4 h-4 text-primary" />
-                <span className="text-sm text-muted-foreground">{corporateLabel}</span>
-              </div>
-            )}
-            {/* Credits Display with Progress */}
-            <div className="mt-3 px-3 py-2 rounded-lg bg-secondary/50 border border-border/50">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">{creditLabel}</span>
-                <Link to="/payment-history" className="text-xs text-primary hover:underline flex items-center gap-1">
-                  <History className="w-3 h-3" />
-                  تاریخچه
-                </Link>
-              </div>
-              <div className="text-lg font-bold text-primary mb-2">
-                {credits} <span className="text-xs font-normal text-muted-foreground">/ {maxCredits} واحد</span>
-              </div>
-              <Progress value={creditPercentage} className="h-2" />
-            </div>
-          </div>
-
-          {/* Back to Home */}
-          <Link 
-            to="/" 
-            className="flex items-center gap-3 px-4 py-3 mb-4 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors border border-border/50"
-          >
-            <Home className="w-5 h-5" />
-            <span className="font-medium">{backHomeText}</span>
-          </Link>
-
-          {/* Nav Items */}
-          <nav className="flex-1 space-y-2">
-            {sidebarItems.map((item) => (
-              <Link
-                key={item.label}
-                to={item.path}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-right ${
-                  isActive(item.path)
-                    ? "bg-primary/10 text-primary" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                }`}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
-                {item.demoMode && (
-                  <Badge variant="secondary" className="mr-auto text-xs">
-                    <Eye className="w-3 h-3 ml-1" />
-                    دمو
-                  </Badge>
-                )}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Upgrade Button */}
-          <Link 
-            to="/upgrade" 
-            className="flex items-center gap-3 px-4 py-3 mb-2 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all"
-          >
-            <Crown className="w-5 h-5" />
-            <span className="font-medium">{upgradeText}</span>
-          </Link>
-
-          {/* Logout */}
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">{logoutText}</span>
-          </button>
+          <SidebarContent />
         </motion.aside>
 
         {/* Main Content */}
@@ -434,24 +346,23 @@ const Dashboard = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="glass-card h-full p-4 sm:p-6 overflow-auto max-w-[1920px] mx-auto"
           >
-            {/* Header with Search & Notifications */}
-            <header className="flex items-center justify-end gap-3 mb-6">
-              <div className="relative hidden sm:block">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input 
-                  placeholder={searchPlaceholder} 
-                  className="pr-9 w-48 bg-secondary/50 border-border"
-                />
+            {/* Header */}
+            <header className="flex items-center justify-between gap-3 mb-6">
+              <div>
+                <h1 className="text-xl font-bold text-foreground">{currentTier.label}</h1>
+                <p className="text-xs text-muted-foreground">{currentTier.labelEn}</p>
               </div>
-              <NotificationsDropdown />
+              <div className="flex items-center gap-3">
+                <div className="relative hidden sm:block">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder={searchPlaceholder} className="pr-9 w-48 bg-secondary/50 border-border" />
+                </div>
+                <NotificationsDropdown />
+              </div>
             </header>
 
-            {/* Conditional Dashboard Content */}
-            {context?.userType === 'corporate' ? (
-              <CorporateDashboard />
-            ) : (
-              <IndividualDashboard />
-            )}
+            {/* Module Cards for Active Tier */}
+            <DashboardModuleCards tier={currentTier} />
           </motion.div>
         </div>
       </div>
