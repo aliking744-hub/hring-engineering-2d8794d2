@@ -60,6 +60,7 @@ const TIERS = [
       { id: "hr-dashboard", label: "داشبورد منابع انسانی", desc: "نمای گرافیکی ۳۶۰ درجه‌ای از اطلاعات پرسنل و ساختار", icon: BarChart3, path: "/hr-dashboard" },
       { id: "costing", label: "بهای تمام شده", desc: "مدیریت بودجه و محاسبه هزینه‌های جذب", icon: Calculator, path: "/cost-calculator" },
       { id: "headhunting", label: "شکار مدیران", desc: "ماژول اختصاصی جذب پوزیشن‌های حساس C-Level", icon: Crosshair, path: "/smart-headhunting" },
+      { id: "performance-eval", label: "ارزیابی عملکرد", desc: "سنجش و ارزیابی عملکرد کارکنان و مدیران", icon: TrendingUp, path: "#", comingSoon: true },
     ],
   },
   {
