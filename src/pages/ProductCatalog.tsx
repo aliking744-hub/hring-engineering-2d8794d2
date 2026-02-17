@@ -1,4 +1,10 @@
 import { Helmet } from "react-helmet-async";
+import dashboardOverview from "@/assets/dashboard-overview.png";
+import dashboardSalary from "@/assets/dashboard-salary.png";
+import dashboardOvertime from "@/assets/dashboard-overtime.png";
+import dashboardMap from "@/assets/dashboard-map.png";
+import dashboardProfile from "@/assets/dashboard-profile.png";
+import dashboardBirthdays from "@/assets/dashboard-birthdays.png";
 
 const ProductCatalog = () => {
   return (
@@ -40,15 +46,15 @@ const ProductCatalog = () => {
           .cat-badge-green { background: #10b98130; color: #6ee7b7; border: 1px solid #10b98150; }
           .cat-badge-orange { background: #f9731630; color: #fdba74; border: 1px solid #f9731650; }
           .cat-divider { height: 1px; background: linear-gradient(90deg, transparent, #334155, transparent); margin: 48px 0; }
-          .cat-table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 24px 0; }
-          .cat-table th { background: #1e1b4b; padding: 14px 20px; text-align: right; font-size: 14px; color: #c4b5fd; border-bottom: 2px solid #7c3aed; }
-          .cat-table td { padding: 12px 20px; border-bottom: 1px solid #1e293b; font-size: 14px; }
-          .cat-table tr:nth-child(even) td { background: #0f172a80; }
-          .cat-check { color: #10b981; }
-          .cat-cross { color: #475569; }
           .cat-tech { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0; }
           .cat-tag { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 8px 16px; font-size: 13px; color: #94a3b8; }
           .cat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 16px; }
+          .cat-screenshot { width: 100%; border-radius: 12px; border: 1px solid #334155; margin: 24px 0; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+          .cat-screenshot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+          @media (max-width: 768px) { .cat-screenshot-grid { grid-template-columns: 1fr; } }
+          .cat-screenshot-grid img { width: 100%; border-radius: 10px; border: 1px solid #334155; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+          .cat-screenshot-label { text-align: center; font-size: 13px; color: #64748b; margin-top: 8px; }
+          .cat-highlight { background: linear-gradient(135deg, #7c3aed10, #06b6d410); border: 1px solid #7c3aed30; border-radius: 16px; padding: 32px; margin: 32px 0; }
           @media print { body { background: white !important; color: #1e293b !important; } .cat-card { border-color: #e2e8f0; background: #f8fafc; } }
         `}</style>
 
@@ -63,9 +69,12 @@ const ProductCatalog = () => {
         {/* OVERVIEW */}
         <div className="cat-page">
           <h2 className="cat-h2">📋 نمای کلی سیستم</h2>
-          <p className="cat-desc">hring یک پلتفرم جامع مدیریت منابع انسانی مبتنی بر هوش مصنوعی است که تمام فرآیندهای HR را از استخدام تا تحلیل استراتژیک پوشش می‌دهد.</p>
+          <p className="cat-desc">
+            hring یک پلتفرم جامع مدیریت منابع انسانی مبتنی بر هوش مصنوعی است که تمام فرآیندهای HR را از استخدام تا تحلیل و گزارش‌گیری پرسنلی پوشش می‌دهد.
+            این سیستم به مدیران منابع انسانی کمک می‌کند تا با ابزارهای هوشمند، فرآیندهای استخدام، آنبوردینگ، تحلیل حقوق و دستمزد و مدیریت عملکرد کارکنان را بهینه‌سازی کنند.
+          </p>
           <div className="cat-stats">
-            <div className="cat-stat"><div className="num">۱۵+</div><div className="lbl">ماژول تخصصی</div></div>
+            <div className="cat-stat"><div className="num">۱۰+</div><div className="lbl">ماژول تخصصی HR</div></div>
             <div className="cat-stat"><div className="num">۴</div><div className="lbl">لایه سازمانی</div></div>
             <div className="cat-stat"><div className="num">AI</div><div className="lbl">هوش مصنوعی یکپارچه</div></div>
             <div className="cat-stat"><div className="num">۲۴/۷</div><div className="lbl">دسترسی ابری</div></div>
@@ -73,181 +82,256 @@ const ProductCatalog = () => {
 
           <div className="cat-divider" />
 
-          <h3 className="cat-h3">معماری ۴ لایه‌ای داشبورد</h3>
-          <p className="cat-desc">سیستم در چهار لایه سازمانی طراحی شده که هر لایه ابزارهای متناسب با نقش کاربر را ارائه می‌دهد.</p>
+          <h3 className="cat-h3">معماری ۴ لایه‌ای سیستم</h3>
+          <p className="cat-desc">سیستم در چهار لایه سازمانی طراحی شده که هر لایه ابزارهای متناسب با نقش کاربر را ارائه می‌دهد. از کارشناس منابع انسانی تا مدیرعامل، هر نقش ابزار مخصوص خود را دارد.</p>
           <div className="cat-grid">
             <div className="cat-card">
               <div className="cat-icon" style={{ background: '#7c3aed30' }}>💼</div>
               <h4>لایه ۱: میزکار هوشمند</h4>
-              <p>ابزارهای روزانه HR شامل تولید شرح شغل، آگهی استخدام و دستیار مصاحبه</p>
+              <p>ابزارهای روزانه کارشناس HR — تولید شرح شغل حرفه‌ای، نوشتن آگهی استخدامی جذاب، تولید سوالات مصاحبه و ارزیابی کاندیداها</p>
               <span className="cat-badge cat-badge-purple">Smart Workspace</span>
             </div>
             <div className="cat-card">
               <div className="cat-icon" style={{ background: '#06b6d430' }}>👥</div>
               <h4>لایه ۲: سرمایه انسانی و عملیات</h4>
-              <p>آنبوردینگ ۹۰ روزه، پروفایل‌ها و طراحی سازمان</p>
-              <span className="cat-badge cat-badge-cyan">HR & Operations</span>
+              <p>برنامه آنبوردینگ ۹۰ روزه هوشمند، محاسبه هزینه تمام‌شده نیروی انسانی و مدیریت قانون کار</p>
+              <span className="cat-badge cat-badge-cyan">HR Operations</span>
             </div>
             <div className="cat-card">
               <div className="cat-icon" style={{ background: '#10b98130' }}>📊</div>
-              <h4>لایه ۳: پنل راهبری</h4>
-              <p>داشبورد HR، هزینه‌یابی، هدهانتینگ هوشمند و ارزیابی عملکرد</p>
+              <h4>لایه ۳: پنل راهبری و تحلیل</h4>
+              <p>داشبورد تحلیلی منابع انسانی با ۶ زیربخش، آپلود اکسل، نمودارهای تعاملی و خروجی PDF</p>
               <span className="cat-badge cat-badge-green">Command Center</span>
             </div>
             <div className="cat-card">
-              <div className="cat-icon" style={{ background: '#f9731630' }}>🎯</div>
-              <h4>لایه ۴: اتاق فرماندهی</h4>
-              <p>قطب‌نمای استراتژیک، مشاور حقوقی AI و تحلیل کلان</p>
-              <span className="cat-badge cat-badge-orange">Vision Deck</span>
+              <div className="cat-icon" style={{ background: '#f9731630' }}>⚖️</div>
+              <h4>لایه ۴: مشاوره و حقوق</h4>
+              <p>مشاور حقوقی AI تخصصی قانون کار ایران، سازنده لایحه دفاعیه و دستیار شکایت کارگری</p>
+              <span className="cat-badge cat-badge-orange">Legal & Advisory</span>
             </div>
           </div>
         </div>
 
-        {/* TIER 1 */}
+        {/* TIER 1 - DETAILED */}
         <div className="cat-page">
           <div className="cat-tier"><h3>🔹 لایه ۱: میزکار هوشمند <span className="en">Smart Workspace</span></h3></div>
+          <p className="cat-desc">مجموعه ابزارهای هوشمند برای کارشناسان و مدیران منابع انسانی که فرآیندهای روزانه استخدام و جذب نیرو را از ساعت‌ها به دقیقه‌ها تبدیل می‌کند.</p>
+          
+          <div className="cat-card" style={{ marginBottom: 24 }}>
+            <h4>📝 مهندسی شغل (Job Engineering)</h4>
+            <p>تولید شرح شغل حرفه‌ای و استاندارد با هوش مصنوعی — فقط کافی‌ست عنوان شغلی و صنعت را وارد کنید:</p>
+            <ul className="cat-flist">
+              <li>تولید خودکار شرح وظایف بر اساس عنوان شغلی و صنعت فعالیت</li>
+              <li>تعیین مهارت‌های فنی و نرم مورد نیاز</li>
+              <li>شرایط احراز شغل و حداقل تجربه</li>
+              <li>تعریف شاخص‌های کلیدی عملکرد (KPI)</li>
+              <li>خروجی قابل دانلود، ویرایش و چاپ</li>
+              <li>پشتیبانی از فارسی و انگلیسی</li>
+            </ul>
+          </div>
+
           <div className="cat-grid">
             <div className="cat-card">
-              <h4>📝 مهندسی شغل (Job Engineering)</h4>
-              <p>تولید شرح شغل حرفه‌ای و استاندارد با هوش مصنوعی:</p>
-              <ul className="cat-flist">
-                <li>تولید خودکار شرح شغل بر اساس عنوان و صنعت</li>
-                <li>تعیین مهارت‌ها، شرایط احراز و KPIها</li>
-                <li>خروجی قابل دانلود و ویرایش</li>
-                <li>پشتیبانی از چند زبان</li>
-              </ul>
-            </div>
-            <div className="cat-card">
               <h4>📢 آگهی‌نویس هوشمند (Smart Ad Writer)</h4>
-              <p>ایجاد آگهی‌های استخدامی جذاب و بهینه:</p>
+              <p>ایجاد آگهی‌های استخدامی جذاب و متناسب با هر پلتفرم:</p>
               <ul className="cat-flist">
-                <li>تولید آگهی متناسب با هر پلتفرم</li>
-                <li>بهینه‌سازی تون و لحن بر اساس فرهنگ سازمانی</li>
-                <li>پیشنهاد هشتگ و کلمات کلیدی</li>
+                <li>تولید آگهی برای لینکدین، جابینجا، جابویژن و...</li>
+                <li>بهینه‌سازی لحن بر اساس فرهنگ سازمانی</li>
+                <li>پیشنهاد هشتگ و کلمات کلیدی SEO</li>
+                <li>قابلیت تولید آگهی در چند لحن مختلف</li>
               </ul>
             </div>
             <div className="cat-card">
               <h4>🎤 دستیار مصاحبه (Interview Assistant)</h4>
-              <p>راهنمای جامع مصاحبه:</p>
+              <p>تولید خودکار پکیج کامل مصاحبه:</p>
               <ul className="cat-flist">
-                <li>تولید سوالات رفتاری و فنی متناسب با شغل</li>
-                <li>کارت امتیازدهی مصاحبه</li>
-                <li>تحلیل پاسخ‌ها با AI</li>
-              </ul>
-            </div>
-            <div className="cat-card">
-              <h4>🎯 هدهانتینگ هوشمند (Smart Headhunting)</h4>
-              <p>شناسایی و جذب استعدادها:</p>
-              <ul className="cat-flist">
-                <li>تحلیل چندلایه رزومه و تطبیق با شغل</li>
-                <li>امتیازدهی خودکار کاندیداها</li>
-                <li>شناسایی Red/Green Flags</li>
+                <li>سوالات رفتاری (Behavioral) بر اساس مدل STAR</li>
+                <li>سوالات فنی متناسب با عنوان شغلی</li>
+                <li>کارت امتیازدهی (Scorecard) مصاحبه</li>
+                <li>تحلیل و مقایسه پاسخ‌های کاندیداها با AI</li>
               </ul>
             </div>
           </div>
+
+          <div className="cat-card" style={{ marginTop: 24 }}>
+            <h4>🎯 هدهانتینگ هوشمند (Smart Headhunting)</h4>
+            <p>سیستم جامع شناسایی و ارزیابی کاندیداها با تحلیل چندلایه AI:</p>
+            <ul className="cat-flist">
+              <li>آپلود رزومه (PDF) و استخراج خودکار اطلاعات</li>
+              <li>تحلیل ۵ لایه‌ای: تناسب فنی، فرهنگی، تجربه، مهارت نرم و ریسک</li>
+              <li>امتیازدهی ۰ تا ۱۰۰ هر کاندیدا</li>
+              <li>شناسایی Red Flags (نشانه‌های هشدار) و Green Flags (نقاط قوت)</li>
+              <li>تعیین «دمای کاندیدا» — داغ، گرم یا سرد</li>
+              <li>توصیه نهایی AI برای هر کاندیدا</li>
+            </ul>
+          </div>
         </div>
 
-        {/* TIER 2 */}
+        {/* TIER 2 - DETAILED */}
         <div className="cat-page">
-          <div className="cat-tier"><h3>🔹 لایه ۲: سرمایه انسانی و عملیات <span className="en">HR & Operations</span></h3></div>
+          <div className="cat-tier"><h3>🔹 لایه ۲: سرمایه انسانی و عملیات <span className="en">HR Operations</span></h3></div>
+          <p className="cat-desc">ابزارهای عملیاتی برای مدیریت چرخه حیات کارکنان، از روز اول ورود تا محاسبه هزینه‌ها و حقوق.</p>
+
+          <div className="cat-card" style={{ marginBottom: 24 }}>
+            <h4>🚀 معمار موفقیت ۹۰ روزه (Success Architect)</h4>
+            <p>برنامه جامع آنبوردینگ نیروی جدید — مهم‌ترین ۹۰ روز اول حضور کارمند در سازمان:</p>
+            <ul className="cat-flist">
+              <li>تولید خودکار برنامه ۹۰ روزه شخصی‌سازی‌شده بر اساس نقش شغلی</li>
+              <li>تقسیم‌بندی به ۳ فاز: یادگیری (۳۰ روز)، مشارکت (۶۰ روز)، عملکرد (۹۰ روز)</li>
+              <li>اهداف هفتگی و ماهانه قابل پیگیری</li>
+              <li>چک‌لیست‌های خودکار برای هر مرحله</li>
+              <li>تعیین منتور و مسیر آموزشی</li>
+              <li>گزارش پیشرفت قابل ارائه به مدیر</li>
+            </ul>
+          </div>
+
           <div className="cat-grid">
             <div className="cat-card">
-              <h4>🚀 معمار موفقیت ۹۰ روزه (Success Architect)</h4>
-              <p>برنامه جامع آنبوردینگ نیروی جدید:</p>
-              <ul className="cat-flist">
-                <li>برنامه‌ریزی ۹۰ روزه شخصی‌سازی‌شده</li>
-                <li>تعیین اهداف هفتگی و ماهانه</li>
-                <li>چک‌لیست‌های خودکار</li>
-                <li>پیگیری پیشرفت و گزارش‌دهی</li>
-              </ul>
-            </div>
-            <div className="cat-card">
-              <h4>💰 محاسبه‌گر هزینه (Cost Calculator)</h4>
-              <p>تحلیل دقیق هزینه‌های نیروی انسانی:</p>
+              <h4>💰 محاسبه‌گر هزینه نیروی انسانی (Cost Calculator)</h4>
+              <p>تحلیل دقیق و جامع هزینه‌های نیروی انسانی:</p>
               <ul className="cat-flist">
                 <li>محاسبه هزینه تمام‌شده هر پوزیشن</li>
-                <li>تحلیل مزایا و بیمه</li>
-                <li>پیش‌بینی بودجه سالانه</li>
+                <li>لحاظ بیمه، مالیات، عیدی، سنوات و مزایا</li>
+                <li>مقایسه هزینه بین دپارتمان‌ها</li>
+                <li>پیش‌بینی بودجه سالانه نیروی انسانی</li>
+                <li>محاسبه مطابق قانون کار ایران</li>
+              </ul>
+            </div>
+            <div className="cat-card">
+              <h4>📋 مدیریت قانون ۷۴۴ (King 744)</h4>
+              <p>ابزار مدیریت و پیگیری الزامات قانونی:</p>
+              <ul className="cat-flist">
+                <li>چک‌لیست الزامات قانونی کار</li>
+                <li>یادآوری مهلت‌های قانونی</li>
+                <li>محاسبه حق بیمه و مالیات</li>
+                <li>راهنمای تنظیم قراردادهای کاری</li>
               </ul>
             </div>
           </div>
         </div>
 
-        {/* TIER 3 */}
+        {/* TIER 3 - HR DASHBOARD - DETAILED WITH SCREENSHOTS */}
         <div className="cat-page">
-          <div className="cat-tier"><h3>🔹 لایه ۳: پنل راهبری <span className="en">Command Center</span></h3></div>
+          <div className="cat-tier"><h3>🔹 لایه ۳: داشبورد تحلیلی منابع انسانی <span className="en">HR Analytics Dashboard</span></h3></div>
+          <p className="cat-desc">
+            قدرتمندترین بخش سیستم — داشبورد تحلیلی جامع که با آپلود یک فایل اکسل، تمام تحلیل‌های HR را به‌صورت خودکار و بصری ارائه می‌دهد. بدون نیاز به دانش فنی، فقط اکسل پرسنلی خود را آپلود کنید.
+          </p>
+
+          <div className="cat-highlight">
+            <h4 style={{ color: '#a78bfa', fontSize: 18, marginBottom: 12 }}>✨ ویژگی‌های کلیدی داشبورد</h4>
+            <div className="cat-grid" style={{ margin: 0 }}>
+              <div><ul className="cat-flist">
+                <li>آپلود مستقیم فایل اکسل پرسنلی</li>
+                <li>شناسایی خودکار ستون‌ها و داده‌ها</li>
+                <li>فیلتر پیشرفته بر اساس جنسیت، تحصیلات، واحد و موقعیت</li>
+              </ul></div>
+              <div><ul className="cat-flist">
+                <li>نمودارهای تعاملی و زنده</li>
+                <li>خروجی PDF حرفه‌ای برای گزارش‌دهی</li>
+                <li>۶ زیربخش تحلیلی تخصصی</li>
+              </ul></div>
+            </div>
+          </div>
+
+          {/* Overview Tab */}
+          <h3 className="cat-h3">📊 ۱. نمای کلی (Overview)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 16 }}>
+            KPIهای کلیدی سازمان شامل تعداد کل کارکنان، میانگین سن، میانگین سابقه، توزیع جنسیتی و نمودار ترکیب نیروی انسانی بر اساس واحد سازمانی. این بخش یک نگاه سریع و جامع به وضعیت پرسنلی سازمان ارائه می‌دهد.
+          </p>
+          <img src={dashboardOverview} alt="داشبورد نمای کلی منابع انسانی" className="cat-screenshot" />
+          <div className="cat-screenshot-label">نمای کلی داشبورد — KPIهای کلیدی و نمودار ترکیب نیروی انسانی</div>
+
+          <div className="cat-divider" />
+
+          {/* Salary Tab */}
+          <h3 className="cat-h3">💰 ۲. تحلیل حقوق و دستمزد (Salary Analysis)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 16 }}>
+            تحلیل جامع حقوق و دستمزد شامل توزیع حقوق پایه، مقایسه بین واحدها، میانگین حقوق بر اساس سطح تحصیلات و تجربه. ابزاری ضروری برای مدیران HR جهت تصمیم‌گیری در مورد افزایش حقوق و بررسی عدالت درون‌سازمانی.
+          </p>
+          <img src={dashboardSalary} alt="تحلیل حقوق و دستمزد" className="cat-screenshot" />
+          <div className="cat-screenshot-label">تحلیل حقوق — توزیع حقوق، مقایسه واحدها و تحلیل عدالت پرداخت</div>
+
+          <div className="cat-divider" />
+
+          {/* Overtime Tab */}
+          <h3 className="cat-h3">⏰ ۳. تحلیل اضافه‌کاری (Overtime Analysis)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 16 }}>
+            بررسی دقیق ساعات اضافه‌کاری به تفکیک واحد سازمانی و ماه. شناسایی واحدهایی که بیشترین اضافه‌کاری را دارند و تحلیل روند ماهانه. این بخش به مدیران کمک می‌کند تا فشار کاری تیم‌ها را مدیریت و بهینه‌سازی کنند.
+          </p>
+          <img src={dashboardOvertime} alt="تحلیل اضافه‌کاری" className="cat-screenshot" />
+          <div className="cat-screenshot-label">تحلیل اضافه‌کاری — نمودار ماهانه و مقایسه واحدها</div>
+
+          <div className="cat-divider" />
+
+          {/* Map Tab */}
+          <h3 className="cat-h3">🗺️ ۴. نقشه پراکندگی نیرو (Workforce Map)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 16 }}>
+            نمایش جغرافیایی محل سکونت کارکنان روی نقشه تعاملی. شناسایی مناطق تمرکز نیرو، برنامه‌ریزی سرویس ایاب و ذهاب و تحلیل دسترسی به محل کار. ابزاری کلیدی برای سازمان‌هایی با نیروی پراکنده.
+          </p>
+          <img src={dashboardMap} alt="نقشه پراکندگی نیروی انسانی" className="cat-screenshot" />
+          <div className="cat-screenshot-label">نقشه پراکندگی — توزیع جغرافیایی کارکنان</div>
+
+          <div className="cat-divider" />
+
+          {/* Profile Tab */}
+          <h3 className="cat-h3">👤 ۵. پروفایل کارکنان (Employee Profile)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 16 }}>
+            جستجو و مشاهده پروفایل کامل هر کارمند شامل اطلاعات شخصی، شغلی، سابقه کاری، تحصیلات و وضعیت حقوقی. قابلیت فیلتر و جستجوی سریع برای دسترسی فوری به اطلاعات هر فرد.
+          </p>
+          <img src={dashboardProfile} alt="پروفایل کارکنان" className="cat-screenshot" />
+          <div className="cat-screenshot-label">پروفایل کارکنان — اطلاعات جامع هر فرد</div>
+
+          <div className="cat-divider" />
+
+          {/* Birthdays Tab */}
+          <h3 className="cat-h3">🎂 ۶. تقویم تولدها (Birthday Calendar)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 15, marginBottom: 16 }}>
+            تقویم هوشمند تولد کارکنان با نمایش تولدهای امروز، این هفته و این ماه. ابزاری ساده ولی مؤثر برای تقویت فرهنگ سازمانی و ایجاد حس تعلق در کارکنان.
+          </p>
+          <img src={dashboardBirthdays} alt="تقویم تولدها" className="cat-screenshot" />
+          <div className="cat-screenshot-label">تقویم تولدها — یادآوری هوشمند مناسبت‌های پرسنلی</div>
+        </div>
+
+        {/* TIER 4 - LEGAL */}
+        <div className="cat-page">
+          <div className="cat-tier"><h3>🔹 لایه ۴: مشاور حقوقی هوشمند <span className="en">AI Legal Advisor</span></h3></div>
+          <p className="cat-desc">
+            چت‌بات حقوقی تخصصی قانون کار ایران مبتنی بر هوش مصنوعی — پاسخ‌گویی فوری به سوالات حقوقی HR با استناد به مواد قانونی.
+          </p>
+
           <div className="cat-card" style={{ marginBottom: 24 }}>
-            <h4>📊 داشبورد منابع انسانی (HR Dashboard)</h4>
-            <p>داشبورد تحلیلی جامع با قابلیت آپلود اکسل:</p>
+            <h4>⚖️ مشاور حقوقی AI (Legal Advisor)</h4>
+            <p>سیستم پاسخ‌گویی هوشمند به سوالات حقوقی مرتبط با منابع انسانی:</p>
             <ul className="cat-flist">
-              <li><strong>نمای کلی:</strong> KPIهای کلیدی، نمودار ترکیب نیروی انسانی</li>
-              <li><strong>تحلیل حقوق:</strong> توزیع حقوق، مقایسه واحدها</li>
-              <li><strong>اضافه‌کاری:</strong> تحلیل اضافه‌کاری به تفکیک واحد و ماه</li>
-              <li><strong>نقشه سازمانی:</strong> نمایش جغرافیایی پراکندگی نیروها</li>
-              <li><strong>پروفایل کارکنان:</strong> جستجو و مشاهده جزئیات هر فرد</li>
-              <li><strong>تقویم تولدها:</strong> یادآوری تولد کارکنان</li>
-              <li><strong>خروجی PDF:</strong> گزارش‌گیری حرفه‌ای</li>
+              <li>پاسخ‌گویی بر اساس قانون کار جمهوری اسلامی ایران</li>
+              <li>استناد دقیق به شماره ماده و بند قانونی</li>
+              <li>لینک مستقیم به متن کامل قانون</li>
+              <li>پشتیبانی از قانون تأمین اجتماعی</li>
+              <li>تاریخچه مکالمات و ذخیره‌سازی</li>
             </ul>
           </div>
-        </div>
 
-        {/* TIER 4 */}
-        <div className="cat-page">
-          <div className="cat-tier"><h3>🔹 لایه ۴: اتاق فرماندهی <span className="en">Vision Deck</span></h3></div>
           <div className="cat-grid">
             <div className="cat-card">
-              <h4>🧭 قطب‌نمای استراتژیک (Strategic Compass)</h4>
-              <p>سیستم مدیریت استراتژیک:</p>
+              <h4>🛡️ سازنده لایحه دفاعیه (Defense Builder)</h4>
+              <p>تولید خودکار لایحه دفاعیه برای دعاوی کارگر و کارفرما:</p>
               <ul className="cat-flist">
-                <li>تعریف نیت‌های استراتژیک</li>
-                <li>ماژول رفتار و ثبت عملکرد</li>
-                <li>ژورنال تصمیم (Decision Journal)</li>
-                <li>منشور ذهنی AI (Mental Prism)</li>
-                <li>شرط‌بندی استراتژیک</li>
-                <li>درخت Erdtree — نمایش سه‌بعدی پیشرفت</li>
+                <li>تولید لایحه دفاعیه حرفه‌ای با AI</li>
+                <li>استناد به مواد قانونی مرتبط</li>
+                <li>قابلیت ویرایش و شخصی‌سازی</li>
+                <li>خروجی قابل چاپ و ارسال</li>
               </ul>
             </div>
             <div className="cat-card">
-              <h4>⚖️ مشاور حقوقی AI (Legal Advisor)</h4>
-              <p>چت‌بات حقوقی تخصصی قانون کار:</p>
+              <h4>📋 دستیار شکایت کارگری (Labor Complaint)</h4>
+              <p>راهنمای گام‌به‌گام ثبت شکایت در مراجع قانونی:</p>
               <ul className="cat-flist">
-                <li>پاسخ‌گویی بر اساس قانون کار و تأمین اجتماعی</li>
-                <li>استناد به مواد قانونی با لینک منبع</li>
-                <li>سازنده لایحه دفاعیه</li>
-                <li>دستیار شکایت کارگری</li>
+                <li>تعیین مرجع رسیدگی مناسب</li>
+                <li>تهیه فرم شکایت استاندارد</li>
+                <li>راهنمای مدارک مورد نیاز</li>
+                <li>پیش‌بینی نتیجه احتمالی</li>
               </ul>
             </div>
-          </div>
-        </div>
-
-        {/* STRATEGIC RADAR */}
-        <div className="cat-page">
-          <div className="cat-tier"><h3>🛰️ رادار اطلاعات استراتژیک <span className="en">Strategic Intelligence Radar</span></h3></div>
-          <p className="cat-desc">سیستم جمع‌آوری و تحلیل اطلاعات رقابتی به‌صورت real-time با AI و جستجوی وب.</p>
-          <div className="cat-grid">
-            <div className="cat-card"><h4>📍 موقعیت بازار</h4><p>تحلیل جایگاه شرکت در نمودار NExTT</p></div>
-            <div className="cat-card"><h4>🌍 روندهای جهانی</h4><p>شناسایی ترندهای صنعت و فرصت‌های نوظهور</p></div>
-            <div className="cat-card"><h4>⚔️ تشریح رقبا + SWOT</h4><p>تحلیل عمیق رقبا</p></div>
-            <div className="cat-card"><h4>💎 ردیاب سرمایه‌گذاری</h4><p>رصد فاندینگ و ارزش‌گذاری رقبا</p></div>
-            <div className="cat-card"><h4>🔗 نقشه زنجیره ارزش</h4><p>تحلیل زنجیره ارزش و شکاف‌ها</p></div>
-            <div className="cat-card"><h4>🖥️ مقایسه Tech Stack</h4><p>بررسی فناوری‌های رقبا</p></div>
-            <div className="cat-card"><h4>🔔 هشدارهای بازار</h4><p>اعلان‌های فوری تغییرات</p></div>
-            <div className="cat-card"><h4>📰 مانیتور روزانه</h4><p>اخبار لحظه‌ای صنعت</p></div>
-          </div>
-        </div>
-
-        {/* UNICORN LAB */}
-        <div className="cat-page">
-          <div className="cat-tier"><h3>🦄 آزمایشگاه یونیکورن <span className="en">Unicorn Lab</span></h3></div>
-          <p className="cat-desc">پلتفرم ارزیابی پتانسیل یونیکورنی استارتاپ‌ها با تحلیل عمیق AI.</p>
-          <div className="cat-card">
-            <ul className="cat-flist">
-              <li><strong>فصل ۱ — غربالگری ژنومیک:</strong> ورود اطلاعات، کشف خودکار، تحلیل عمیق</li>
-              <li><strong>فصل ۲ — جهش:</strong> شبیه‌سازی بحران، مقایسه با الگوهای موفق</li>
-              <li><strong>فصل ۳ — مانیتورینگ:</strong> رصد مستمر سلامت استارتاپ</li>
-              <li><strong>U-Score:</strong> امتیاز جامع پتانسیل یونیکورنی (۰-۱۰۰)</li>
-              <li><strong>وب رادار:</strong> اسکن وب برای جمع‌آوری اطلاعات</li>
-            </ul>
           </div>
         </div>
 
@@ -255,49 +339,52 @@ const ProductCatalog = () => {
         <div className="cat-page">
           <h2 className="cat-h2">🔧 امکانات جانبی</h2>
           <div className="cat-grid">
-            <div className="cat-card"><h4>🛒 فروشگاه دیجیتال</h4><p>بازارچه محصولات HR — قالب‌ها، چک‌لیست‌ها و منابع آموزشی</p></div>
-            <div className="cat-card"><h4>📝 وبلاگ</h4><p>سیستم مدیریت محتوا با SEO</p></div>
-            <div className="cat-card"><h4>💬 چت‌بات پشتیبانی</h4><p>پشتیبانی ۲۴ ساعته با AI</p></div>
-            <div className="cat-card"><h4>🔔 سیستم اعلان‌ها</h4><p>نوتیفیکیشن‌های هوشمند</p></div>
-            <div className="cat-card"><h4>👤 پروفایل کاربری</h4><p>مدیریت اطلاعات و تنظیمات</p></div>
-            <div className="cat-card"><h4>🏢 مدیریت شرکت</h4><p>پنل مالتی‌تنانت — اعضا، نقش‌ها، دعوت‌نامه</p></div>
+            <div className="cat-card">
+              <h4>🛒 فروشگاه دیجیتال HR</h4>
+              <p>بازارچه محصولات منابع انسانی — قالب‌های آماده شرح شغل، چک‌لیست‌های مصاحبه، فرم‌های ارزیابی و منابع آموزشی تخصصی HR</p>
+            </div>
+            <div className="cat-card">
+              <h4>📝 وبلاگ تخصصی</h4>
+              <p>مقالات تخصصی منابع انسانی، آخرین ترندهای HR، راهنماهای عملی و بهترین شیوه‌های مدیریت نیروی انسانی</p>
+            </div>
+            <div className="cat-card">
+              <h4>💬 چت‌بات پشتیبانی ۲۴/۷</h4>
+              <p>پشتیبانی هوشمند با AI — پاسخ‌گویی فوری به سوالات کاربران، راهنمای استفاده از سیستم و رفع مشکلات</p>
+            </div>
+            <div className="cat-card">
+              <h4>🏢 مدیریت چندشرکتی (Multi-Tenant)</h4>
+              <p>پنل مدیریت سازمانی — مدیریت اعضا، نقش‌ها و دسترسی‌ها، سیستم دعوت‌نامه و مدیریت اعتبار تیمی</p>
+            </div>
           </div>
+
           <div className="cat-divider" />
-          <h2 className="cat-h2">🔐 امنیت و زیرساخت</h2>
+
+          <h2 className="cat-h2">🔐 امنیت و حریم خصوصی</h2>
+          <p className="cat-desc">امنیت داده‌های پرسنلی اولویت اول ماست. تمام اطلاعات با بالاترین استانداردهای امنیتی محافظت می‌شوند.</p>
           <div className="cat-grid">
-            <div className="cat-card"><h4>Row Level Security</h4><p>هر کاربر فقط به داده‌های خود دسترسی دارد</p></div>
-            <div className="cat-card"><h4>رمزنگاری End-to-End</h4><p>تمام ارتباطات رمزنگاری می‌شوند</p></div>
-            <div className="cat-card"><h4>احراز هویت چندلایه</h4><p>ایمیل + OTP</p></div>
-            <div className="cat-card"><h4>Audit Logs</h4><p>ثبت تمام فعالیت‌ها</p></div>
+            <div className="cat-card">
+              <h4>🔒 Row Level Security (RLS)</h4>
+              <p>هر کاربر و هر سازمان فقط به داده‌های خود دسترسی دارد — جداسازی کامل داده‌ها در سطح پایگاه داده</p>
+            </div>
+            <div className="cat-card">
+              <h4>🔐 رمزنگاری End-to-End</h4>
+              <p>تمام ارتباطات بین کاربر و سرور با پروتکل TLS رمزنگاری می‌شوند</p>
+            </div>
+            <div className="cat-card">
+              <h4>🛡️ احراز هویت امن</h4>
+              <p>ورود با ایمیل و رمز عبور، ورود با گوگل (OAuth 2.0) و تأیید ایمیل</p>
+            </div>
+            <div className="cat-card">
+              <h4>📋 Audit Logs</h4>
+              <p>ثبت و پیگیری تمام فعالیت‌های کاربران با جزئیات IP و زمان — قابلیت بررسی تاریخچه عملیات</p>
+            </div>
           </div>
         </div>
 
-        {/* PRICING + TECH */}
+        {/* TECH STACK */}
         <div className="cat-page">
-          <h2 className="cat-h2">💎 پلن‌های اشتراک</h2>
-          <table className="cat-table">
-            <thead>
-              <tr>
-                <th>ویژگی</th><th>رایگان</th><th>اکسپرت</th><th>پرو</th><th>پلاس</th><th>سازمانی</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>شرح شغل AI</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td></tr>
-              <tr><td>آگهی استخدام</td><td className="cat-cross">—</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td></tr>
-              <tr><td>دستیار مصاحبه</td><td className="cat-cross">—</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td></tr>
-              <tr><td>آنبوردینگ ۹۰ روزه</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td></tr>
-              <tr><td>داشبورد HR</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-check">✓</td><td className="cat-check">✓</td><td className="cat-check">✓</td></tr>
-              <tr><td>مشاور حقوقی AI</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-check">✓</td><td className="cat-check">✓</td></tr>
-              <tr><td>رادار استراتژیک</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-check">✓</td></tr>
-              <tr><td>قطب‌نمای استراتژیک</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-check">✓</td></tr>
-              <tr><td>یونیکورن لب</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-cross">—</td><td className="cat-check">✓</td></tr>
-              <tr><td>اعتبار ماهانه</td><td>۵</td><td>۲۰</td><td>۵۰</td><td>۱۰۰</td><td>نامحدود</td></tr>
-            </tbody>
-          </table>
-
-          <div className="cat-divider" />
-
-          <h2 className="cat-h2">🏗️ استک فناوری</h2>
+          <h2 className="cat-h2">🏗️ زیرساخت فناوری</h2>
+          <p className="cat-desc">hring با استفاده از جدیدترین فناوری‌های وب ساخته شده و بر بستر ابری اجرا می‌شود.</p>
           <div className="cat-tech">
             <span className="cat-tag">⚛️ React 18</span>
             <span className="cat-tag">📘 TypeScript</span>
@@ -305,11 +392,10 @@ const ProductCatalog = () => {
             <span className="cat-tag">🎨 Tailwind CSS</span>
             <span className="cat-tag">🗄️ PostgreSQL</span>
             <span className="cat-tag">🔐 Row Level Security</span>
-            <span className="cat-tag">🤖 AI Models (GPT-5, Gemini)</span>
+            <span className="cat-tag">🤖 AI (GPT-5 & Gemini)</span>
             <span className="cat-tag">🌐 Edge Functions (Deno)</span>
             <span className="cat-tag">📊 Recharts</span>
             <span className="cat-tag">🎭 Framer Motion</span>
-            <span className="cat-tag">🌲 Three.js</span>
           </div>
         </div>
 
