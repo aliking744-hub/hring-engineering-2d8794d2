@@ -42,6 +42,7 @@ import NotFound from "./pages/NotFound";
 import SupportChatWidget from "./components/SupportChatWidget";
 import FAQ from "./pages/FAQ";
 import Admin from "./pages/Admin";
+import ProductCatalog from "./pages/ProductCatalog";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -248,6 +249,7 @@ const App = () => (
                 } 
               />
               <Route path="/faq" element={<FAQ />} />
+              <Route path="/product-catalog" element={<ProductCatalog />} />
               <Route 
                 path="/admin" 
                 element={
