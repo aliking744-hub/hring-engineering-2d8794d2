@@ -5,10 +5,10 @@ const ProductCatalog = () => {
     <>
       <Helmet>
         <title>hring - کاتالوگ محصول</title>
+        <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
       </Helmet>
       <div dir="rtl" style={{ fontFamily: "'Vazirmatn', sans-serif", background: '#0a0e1a', color: '#e2e8f0', lineHeight: 1.8, minHeight: '100vh' }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap');
           .cat-page { max-width: 1000px; margin: 0 auto; padding: 60px 40px; }
           .cat-cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%); }
           .cat-cover h1 { font-size: 72px; font-weight: 900; background: linear-gradient(135deg, #a78bfa, #7c3aed, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; }
