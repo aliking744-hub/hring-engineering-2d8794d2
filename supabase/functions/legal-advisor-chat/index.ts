@@ -7,19 +7,43 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Rate limit: 10 requests per minute per user
-const RATE_LIMIT_CONFIG = { windowMs: 60000, maxRequests: 10 };
+// Rate limit: 5 requests per minute per authenticated user
+const RATE_LIMIT_CONFIG = { windowMs: 60000, maxRequests: 5 };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Rate limiting
-  const clientId = getClientIdentifier(req);
+  // Validate authentication
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Authentication required' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data: claimsData, error: claimsError } = await supabaseUserClient.auth.getClaims(token);
+  if (claimsError || !claimsData?.claims) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Rate limiting per authenticated user
+  const clientId = claimsData.claims.sub;
   const rateLimit = checkRateLimit(clientId, RATE_LIMIT_CONFIG);
   if (!rateLimit.allowed) {
-    console.log(`Rate limit exceeded for ${clientId}`);
+    console.log(`Rate limit exceeded for user ${clientId}`);
     return rateLimitResponse(rateLimit.resetIn, corsHeaders);
   }
 
