@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Employee } from '@/types/employee';
 import { ChartCard } from './ChartCard';
-import { PrintButton } from './PrintButton';
+import { PrintButton, printMapPDF } from './PrintButton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Users } from 'lucide-react';
@@ -59,7 +59,7 @@ export function MapTab({ data }: MapTabProps) {
     <div className="space-y-4 print-area">
       {/* Print Button */}
       <div className="flex justify-end">
-        <PrintButton title="گزارش نقشه مناطق" />
+        <PrintButton title="گزارش نقشه مناطق" onPrint={() => printMapPDF(data)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" dir="rtl">

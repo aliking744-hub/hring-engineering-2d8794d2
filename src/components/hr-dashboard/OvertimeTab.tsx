@@ -1,6 +1,6 @@
 import { Employee } from '@/types/employee';
 import { ChartCard } from './ChartCard';
-import { PrintButton } from './PrintButton';
+import { PrintButton, printOvertimePDF } from './PrintButton';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
@@ -55,7 +55,7 @@ export function OvertimeTab({ data }: OvertimeTabProps) {
     <div className="space-y-4 md:space-y-6 print-area">
       {/* Print Button */}
       <div className="flex justify-end">
-        <PrintButton title="گزارش اضافه کار" />
+        <PrintButton title="گزارش اضافه کار" onPrint={() => printOvertimePDF(data)} />
       </div>
 
       {/* Monthly Chart */}

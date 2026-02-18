@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Employee } from '@/types/employee';
 import { ChartCard } from './ChartCard';
-import { PrintButton } from './PrintButton';
+import { PrintButton, printBirthdaysPDF } from './PrintButton';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,7 +42,7 @@ export function BirthdaysTab({ data }: BirthdaysTabProps) {
     <div className="space-y-4 print-area">
       {/* Print Button */}
       <div className="flex justify-end">
-        <PrintButton title="گزارش تولدها" />
+        <PrintButton title="گزارش تولدها" onPrint={() => printBirthdaysPDF(data)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
