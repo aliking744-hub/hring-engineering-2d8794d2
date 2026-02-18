@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Briefcase, Sparkles, Download, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits, DIAMOND_COSTS } from "@/hooks/useCredits";
-import { jsPDF } from "jspdf";
 import logoImage from "@/assets/logo.png";
 import DataPrivacyWarning from "@/components/DataPrivacyWarning";
 
@@ -21,11 +20,6 @@ const seniorityLevels = [
   { value: "manager", label: "مدیر (Manager)" },
 ];
 
-// Function to reverse Persian text for RTL display in PDF
-const reverseText = (text: string): string => {
-  return text.split('').reverse().join('');
-};
-
 const JobDescriptionGenerator = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [industry, setIndustry] = useState("");
@@ -33,26 +27,8 @@ const JobDescriptionGenerator = () => {
   const [companyName, setCompanyName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
-  const [fontBase64, setFontBase64] = useState<string | null>(null);
   const { toast } = useToast();
   const { credits, deductForOperation, hasEnoughCredits } = useCredits();
-
-  // Load font on mount
-  useEffect(() => {
-    const loadFont = async () => {
-      try {
-        const response = await fetch('/fonts/BNAZANIN.TTF');
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = btoa(
-          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-        );
-        setFontBase64(base64);
-      } catch (error) {
-        console.error('Error loading font:', error);
-      }
-    };
-    loadFont();
-  }, []);
 
   const handleGenerate = async () => {
     if (!jobTitle || !industry || !seniorityLevel) {
@@ -101,165 +77,237 @@ const JobDescriptionGenerator = () => {
     }
   };
 
-  const generatePDF = async () => {
-    if (!generatedContent || !fontBase64) {
-      toast({ title: "خطا", description: "لطفاً صبر کنید تا فونت بارگذاری شود", variant: "destructive" });
-      return;
-    }
+  const generatePDF = () => {
+    if (!generatedContent) return;
 
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    // Add B Nazanin font
-    doc.addFileToVFS("BNazanin.ttf", fontBase64);
-    doc.addFont("BNazanin.ttf", "BNazanin", "normal");
-    doc.setFont("BNazanin");
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    const contentWidth = pageWidth - margin * 2;
-
-    // Load and add logo
-    const img = new Image();
-    img.src = logoImage;
-    
-    await new Promise((resolve) => {
-      img.onload = resolve;
-    });
-
-    const logoWidth = 25;
-    const logoHeight = 25;
-    doc.addImage(img, "PNG", (pageWidth - logoWidth) / 2, 10, logoWidth, logoHeight);
-
-    // Add title
-    doc.setFontSize(16);
-    doc.setTextColor(59, 130, 246);
-    const title = "سند هویت و مشخصات شغلی";
-    doc.text(reverseText(title), pageWidth - margin, 45, { align: "left" });
-
-    // Parse and clean content
-    const lines = generatedContent
-      .replace(/\*\*/g, "")
-      .replace(/\*/g, "")
-      .split("\n")
-      .filter(line => line.trim() !== "" && !line.match(/^-{3,}$/));
-
-    let yPosition = 55;
-    const lineHeight = 6;
-
-    for (const line of lines) {
-      // Check for new page
-      if (yPosition > pageHeight - 25) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
-      const trimmedLine = line.trim();
-      
-      // Section headers (## )
-      if (trimmedLine.startsWith("##")) {
-        const headerText = trimmedLine.replace(/^#+\s*/, "");
-        doc.setFontSize(13);
-        doc.setTextColor(59, 130, 246);
-        yPosition += 4;
-        doc.text(reverseText(headerText), pageWidth - margin, yPosition, { align: "left" });
-        yPosition += lineHeight + 2;
-        
-        // Add underline
-        doc.setDrawColor(59, 130, 246);
-        doc.setLineWidth(0.3);
-        doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
-        yPosition += 2;
-        continue;
-      }
-
-      // Sub-headers (### )
-      if (trimmedLine.startsWith("###")) {
-        const subHeaderText = trimmedLine.replace(/^#+\s*/, "");
-        doc.setFontSize(11);
-        doc.setTextColor(100, 100, 100);
-        yPosition += 2;
-        doc.text(reverseText(subHeaderText), pageWidth - margin, yPosition, { align: "left" });
-        yPosition += lineHeight;
-        continue;
-      }
-
-      // Table rows
-      if (trimmedLine.startsWith("|")) {
-        const cells = trimmedLine.split("|").filter(c => c.trim() !== "");
-        if (cells.length >= 2 && !cells[0].match(/^-+$/)) {
-          doc.setFontSize(9);
-          doc.setTextColor(51, 51, 51);
-          
-          // Draw table row background
-          doc.setFillColor(245, 245, 245);
-          doc.rect(margin, yPosition - 4, contentWidth, lineHeight + 2, "F");
-          
-          const cellWidth = contentWidth / cells.length;
-          cells.forEach((cell, index) => {
-            const cellText = cell.trim();
-            const xPos = pageWidth - margin - (index * cellWidth) - cellWidth / 2;
-            doc.text(reverseText(cellText), xPos, yPosition, { align: "center" });
-          });
-          yPosition += lineHeight + 1;
+    // Build HTML content for the print area
+    const parsedContent = generatedContent
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .split('\n')
+      .map(line => {
+        const t = line.trim();
+        if (!t || t.match(/^-{3,}$/)) return '';
+        if (t.startsWith('##')) {
+          const text = t.replace(/^#+\s*/, '');
+          return `<h2 class="pdf-section-title">${text}</h2>`;
         }
-        continue;
-      }
-
-      // Bullet points
-      if (trimmedLine.startsWith("-") || trimmedLine.startsWith("•")) {
-        const bulletText = trimmedLine.replace(/^[-•]\s*/, "");
-        doc.setFontSize(10);
-        doc.setTextColor(51, 51, 51);
-        
-        // Add bullet
-        doc.circle(pageWidth - margin - 2, yPosition - 1.5, 0.8, "F");
-        
-        // Split long text
-        const maxTextWidth = contentWidth - 10;
-        const splitLines = doc.splitTextToSize(reverseText(bulletText), maxTextWidth);
-        for (const splitLine of splitLines) {
-          if (yPosition > pageHeight - 25) {
-            doc.addPage();
-            yPosition = 20;
+        if (t.startsWith('#')) {
+          const text = t.replace(/^#+\s*/, '');
+          return `<h3 class="pdf-sub-title">${text}</h3>`;
+        }
+        if (t.startsWith('|')) {
+          const cells = t.split('|').filter(c => c.trim() && !c.trim().match(/^-+$/));
+          if (cells.length >= 2) {
+            return `<div class="pdf-table-row">${cells.map(c => `<span>${c.trim()}</span>`).join('')}</div>`;
           }
-          doc.text(splitLine, pageWidth - margin - 6, yPosition, { align: "left" });
-          yPosition += lineHeight;
+          return '';
         }
-        continue;
-      }
-
-      // Regular text
-      doc.setFontSize(10);
-      doc.setTextColor(51, 51, 51);
-      const maxTextWidth = contentWidth;
-      const splitLines = doc.splitTextToSize(reverseText(trimmedLine), maxTextWidth);
-      for (const splitLine of splitLines) {
-        if (yPosition > pageHeight - 25) {
-          doc.addPage();
-          yPosition = 20;
+        if (t.startsWith('-') || t.startsWith('•')) {
+          const text = t.replace(/^[-•]\s*/, '');
+          return `<li>${text}</li>`;
         }
-        doc.text(splitLine, pageWidth - margin, yPosition, { align: "left" });
-        yPosition += lineHeight;
-      }
-    }
+        return `<p>${t}</p>`;
+      })
+      .filter(Boolean)
+      .join('\n');
 
-    // Add footer to all pages
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      const footerText = `${i} / ${pageCount}`;
-      doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: "center" });
-    }
+    const today = new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date());
+    const meta = [
+      companyName ? `شرکت: ${companyName}` : '',
+      industry ? `صنعت: ${industry}` : '',
+      seniorityLevel ? `سطح: ${seniorityLevels.find(s => s.value === seniorityLevel)?.label ?? seniorityLevel}` : '',
+    ].filter(Boolean).join('  |  ');
 
-    doc.save(`پروفایل-شغلی-${jobTitle || "سند"}.pdf`);
-    toast({ title: "موفق", description: "فایل PDF با موفقیت دانلود شد." });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>پروفایل شغلی - ${jobTitle}</title>
+  <style>
+    @font-face {
+      font-family: 'BNazanin';
+      src: url('/fonts/BNAZANIN.TTF') format('truetype');
+      font-weight: normal;
+    }
+    @font-face {
+      font-family: 'IRANSans';
+      src: url('/fonts/IRANSansBold-Edit.ttf') format('truetype');
+      font-weight: bold;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'BNazanin', Tahoma, Arial, sans-serif;
+      direction: rtl;
+      background: #ffffff;
+      color: #1a1a2e;
+      font-size: 11pt;
+      line-height: 1.8;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    /* HEADER */
+    .pdf-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+      border-bottom: 3px solid #2563eb;
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      padding: 16px 20px;
+      border-radius: 8px;
+      color: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-header-right {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pdf-header-title {
+      font-family: 'IRANSans', 'BNazanin', Tahoma, sans-serif;
+      font-size: 18pt;
+      font-weight: bold;
+      color: #ffffff;
+    }
+    .pdf-header-subtitle {
+      font-size: 10pt;
+      color: #bfdbfe;
+    }
+    .pdf-logo {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      filter: brightness(0) invert(1);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    /* META STRIP */
+    .pdf-meta {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 8px 16px;
+      margin-bottom: 20px;
+      font-size: 9.5pt;
+      color: #1e40af;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    /* CONTENT */
+    .pdf-body {
+      padding: 0 4px;
+    }
+    .pdf-section-title {
+      font-family: 'IRANSans', 'BNazanin', Tahoma, sans-serif;
+      font-size: 13pt;
+      font-weight: bold;
+      color: #1e40af;
+      background: linear-gradient(90deg, #dbeafe 0%, transparent 100%);
+      padding: 6px 10px;
+      border-right: 4px solid #2563eb;
+      border-radius: 0 4px 4px 0;
+      margin: 18px 0 8px 0;
+      page-break-after: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-sub-title {
+      font-size: 11pt;
+      font-weight: bold;
+      color: #374151;
+      margin: 10px 0 4px 0;
+      page-break-after: avoid;
+    }
+    p {
+      margin-bottom: 6px;
+      color: #111827;
+    }
+    li {
+      margin: 4px 0 4px 0;
+      padding-right: 8px;
+      color: #1f2937;
+      list-style: none;
+      position: relative;
+    }
+    li::before {
+      content: '◆';
+      color: #2563eb;
+      font-size: 7pt;
+      position: absolute;
+      right: -10px;
+      top: 3px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-table-row {
+      display: flex;
+      justify-content: space-between;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 5px 10px;
+      margin-bottom: 4px;
+      font-size: 10pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-table-row span:first-child {
+      font-weight: bold;
+      color: #1e40af;
+    }
+    /* FOOTER */
+    .pdf-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      border-top: 1px solid #dbeafe;
+      padding: 6px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8pt;
+      color: #94a3b8;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-header">
+    <div class="pdf-header-right">
+      <div class="pdf-header-title">پروفایل شغلی: ${jobTitle}</div>
+      <div class="pdf-header-subtitle">سند هویت و مشخصات شغلی | ${today}</div>
+    </div>
+    <img class="pdf-logo" src="${window.location.origin}/favicon.ico" onerror="this.style.display='none'" />
+  </div>
+  ${meta ? `<div class="pdf-meta">${meta}</div>` : ''}
+  <div class="pdf-body">
+    ${parsedContent}
+  </div>
+  <div class="pdf-footer">
+    <span>hring.io</span>
+    <span>${today}</span>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); window.close(); }, 600);
+    };
+  </script>
+</body>
+</html>`);
+
+    printWindow.document.close();
+    toast({ title: "موفق", description: "فایل PDF با موفقیت آماده شد." });
   };
 
   return (
@@ -317,7 +365,7 @@ const JobDescriptionGenerator = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground">پیش‌نمایش</h2>
               {generatedContent && (
-                <Button onClick={generatePDF} disabled={!fontBase64} className="glow-button text-foreground">
+                <Button onClick={generatePDF} className="glow-button text-foreground">
                   <Download className="w-4 h-4 ml-2" />
                   دانلود PDF
                 </Button>
