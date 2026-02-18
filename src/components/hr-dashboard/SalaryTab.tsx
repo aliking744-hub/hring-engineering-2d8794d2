@@ -1,6 +1,6 @@
 import { Employee } from '@/types/employee';
 import { ChartCard } from './ChartCard';
-import { PrintButton } from './PrintButton';
+import { PrintButton, printSalaryPDF } from './PrintButton';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, ComposedChart, Line
 } from 'recharts';
@@ -83,7 +83,7 @@ export function SalaryTab({ data }: SalaryTabProps) {
     <div className="space-y-6 print-area">
       {/* Print Button */}
       <div className="flex justify-end">
-        <PrintButton title="گزارش حقوق" />
+        <PrintButton title="گزارش حقوق" onPrint={() => printSalaryPDF(data)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1,6 +1,6 @@
 import { Employee } from '@/types/employee';
 import { ChartCard } from './ChartCard';
-import { PrintButton } from './PrintButton';
+import { PrintButton, printProfilePDF } from './PrintButton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useState } from 'react';
@@ -112,7 +112,7 @@ export function ProfileTab({ data }: ProfileTabProps) {
     <div className="space-y-6 print-area" dir="rtl">
       {/* Print Button */}
       <div className="flex justify-start">
-        <PrintButton title="گزارش پروفایل کارمند" />
+        <PrintButton title="گزارش پروفایل کارمند" onPrint={() => printProfilePDF(selectedEmployee)} />
       </div>
 
       {/* Employee Selector */}
