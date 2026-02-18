@@ -5,8 +5,13 @@ import dashboardOvertime from "@/assets/dashboard-overtime.png";
 import dashboardMap from "@/assets/dashboard-map.png";
 import dashboardProfile from "@/assets/dashboard-profile.png";
 import dashboardBirthdays from "@/assets/dashboard-birthdays.png";
+import logoImage from "@/assets/logo.png";
 
 const ProductCatalog = () => {
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <>
       <Helmet>
@@ -16,7 +21,7 @@ const ProductCatalog = () => {
       <div dir="rtl" style={{ fontFamily: "'Vazirmatn', sans-serif", background: '#0a0e1a', color: '#e2e8f0', lineHeight: 1.8, minHeight: '100vh' }}>
         <style>{`
           .cat-page { max-width: 1000px; margin: 0 auto; padding: 60px 40px; }
-          .cat-cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%); }
+          .cat-cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%); padding: 40px; position: relative; }
           .cat-cover h1 { font-size: 72px; font-weight: 900; background: linear-gradient(135deg, #a78bfa, #7c3aed, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; }
           .cat-cover .subtitle { font-size: 28px; color: #94a3b8; margin-bottom: 40px; }
           .cat-cover .tagline { font-size: 18px; color: #64748b; border: 1px solid #334155; padding: 12px 32px; border-radius: 999px; }
@@ -55,11 +60,36 @@ const ProductCatalog = () => {
           .cat-screenshot-grid img { width: 100%; border-radius: 10px; border: 1px solid #334155; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
           .cat-screenshot-label { text-align: center; font-size: 13px; color: #64748b; margin-top: 8px; }
           .cat-highlight { background: linear-gradient(135deg, #7c3aed10, #06b6d410); border: 1px solid #7c3aed30; border-radius: 16px; padding: 32px; margin: 32px 0; }
-          @media print { body { background: white !important; color: #1e293b !important; } .cat-card { border-color: #e2e8f0; background: #f8fafc; } }
+          .download-bar { position: fixed; top: 24px; left: 24px; z-index: 1000; display: flex; gap: 12px; }
+          .download-btn { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 15px; font-weight: 700; transition: all 0.2s; }
+          .download-btn-primary { background: linear-gradient(135deg, #7c3aed, #06b6d4); color: white; box-shadow: 0 4px 20px rgba(124,58,237,0.4); }
+          .download-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(124,58,237,0.6); }
+
+          @media print {
+            .download-bar { display: none !important; }
+            body { background: white !important; color: #1e293b !important; margin: 0; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .cat-cover { page-break-after: always; min-height: auto; padding: 80px 40px; background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%) !important; }
+            .cat-page { page-break-inside: avoid; }
+            .cat-card { page-break-inside: avoid; border-color: #334155 !important; background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%) !important; }
+            .cat-screenshot { max-height: 350px; object-fit: cover; page-break-inside: avoid; }
+            h2, h3, h4 { page-break-after: avoid; }
+            .cat-divider { margin: 24px 0; }
+            .cat-tier { page-break-before: always; }
+          }
         `}</style>
+
+        {/* FLOATING DOWNLOAD BUTTON */}
+        <div className="download-bar">
+          <button className="download-btn download-btn-primary" onClick={handlePrint}>
+            <span>⬇</span>
+            دانلود PDF
+          </button>
+        </div>
 
         {/* COVER */}
         <div className="cat-cover">
+          <img src={logoImage} alt="hring logo" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 24, filter: 'drop-shadow(0 0 24px rgba(124,58,237,0.5))' }} />
           <h1>hring</h1>
           <div className="subtitle">دستیار هوشمند منابع انسانی نسل جدید</div>
           <div className="tagline">🚀 مبتنی بر هوش مصنوعی • ابری • امن</div>
@@ -401,6 +431,7 @@ const ProductCatalog = () => {
 
         {/* CONTACT */}
         <div style={{ minHeight: '50vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '60px 40px' }}>
+          <img src={logoImage} alt="hring" style={{ width: 64, height: 64, objectFit: 'contain', marginBottom: 24, opacity: 0.7 }} />
           <h2 className="cat-h2">🤝 آماده همکاری</h2>
           <p className="cat-desc" style={{ textAlign: 'center', marginTop: 20 }}>برای دموی اختصاصی و مشاوره رایگان با ما تماس بگیرید.</p>
           <div style={{ marginTop: 32, fontSize: 18, color: '#a78bfa' }}>🌐 hring.ir</div>
