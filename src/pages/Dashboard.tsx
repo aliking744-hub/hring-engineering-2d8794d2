@@ -36,8 +36,9 @@ const TIERS = [
     icon: Briefcase,
     modules: [
       { id: "job-engineering", label: "مهندسی مشاغل", desc: "تولید هوشمند شناسنامه شغلی و پروفایل موقعیت", icon: Briefcase, path: "/job-description" },
-      { id: "interview-assistant", label: "دستیار مصاحبه", desc: "تولید راهنما، سؤالات تخصصی و کلیدهای ارزیابی", icon: Mic, path: "/interview-assistant" },
       { id: "smart-ad-writer", label: "آگهی‌نویس هوشمند", desc: "نوشتن آگهی‌های جذاب برای LinkedIn و سایت‌های کار", icon: Megaphone, path: "/smart-ad-generator" },
+      { id: "interview-assistant", label: "دستیار مصاحبه", desc: "تولید راهنما، سؤالات تخصصی و کلیدهای ارزیابی", icon: Mic, path: "/interview-assistant" },
+      { id: "success-architect", label: "معمار موفقیت ۹۰ روزه", desc: "نقشه راه آنبوردینگ ۳۰-۶۰-۹۰ روزه", icon: UserPlus, path: "/onboarding" },
     ],
   },
   {
@@ -46,7 +47,6 @@ const TIERS = [
     labelEn: "Human Resources & Operations",
     icon: Users,
     modules: [
-      { id: "success-architect", label: "معمار موفقیت ۹۰ روزه", desc: "نقشه راه آنبوردینگ ۳۰-۶۰-۹۰ روزه", icon: UserPlus, path: "/onboarding" },
       { id: "profiles", label: "پروفایل‌ها", desc: "لیست پرسنل و پرونده دیجیتال", icon: Users, path: "/profile" },
       { id: "org-design", label: "طراحی سازمان", desc: "ساختار و چارت سازمانی", icon: Network, path: "/modules", comingSoon: true },
     ],
