@@ -211,8 +211,8 @@ ${knowledgeBase}
           await supabase
             .from('support_chat_logs')
             .update({ 
-              messages: allMessages,
-              user_id: userId || null 
+          messages: allMessages,
+              user_id: authenticatedUserId 
             })
             .eq('id', existing.id);
         } else {
@@ -221,7 +221,7 @@ ${knowledgeBase}
             .from('support_chat_logs')
             .insert({
               session_id: sessionId,
-              user_id: userId || null,
+              user_id: authenticatedUserId,
               messages: allMessages
             });
         }
