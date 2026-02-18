@@ -12,18 +12,47 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, rating, comment } = await req.json();
+    // Validate authentication header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    if (!userId || !rating) {
-      return new Response(JSON.stringify({ error: "userId and rating are required" }), {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Create client with user's auth token to verify identity
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    if (claimsError || !data?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Use authenticated user's ID — never trust client-supplied userId
+    const userId = data.claims.sub;
+
+    const { rating, comment } = await req.json();
+
+    if (!rating) {
+      return new Response(JSON.stringify({ error: "rating is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Use service role for database operations after identity is verified
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check if user has already submitted feedback
     const { data: existingFeedback } = await supabase
@@ -54,7 +83,6 @@ serve(async (req) => {
 
     // Award 50 diamonds if first feedback
     if (isFirstFeedback) {
-      // Get current user credits
       const { data: userCredits } = await supabase
         .from('user_credits')
         .select('credits')
@@ -62,24 +90,18 @@ serve(async (req) => {
         .single();
 
       if (userCredits) {
-        // Update credits (add 50 diamonds)
         await supabase
           .from('user_credits')
           .update({ credits: userCredits.credits + 50 })
           .eq('user_id', userId);
-        
         diamondsAwarded = 50;
-        console.log(`Awarded 50 diamonds to user ${userId}`);
       } else {
-        // Create credits record if doesn't exist
         await supabase
           .from('user_credits')
           .insert({ user_id: userId, credits: 50 });
-        
         diamondsAwarded = 50;
       }
 
-      // Also log the credit transaction
       await supabase
         .from('credit_transactions')
         .insert({

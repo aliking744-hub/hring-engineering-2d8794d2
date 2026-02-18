@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,30 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    if (claimsError || !data?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { candidateName, jobPosition } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
@@ -93,19 +118,16 @@ Please create a comprehensive interview guide in Persian.` }
       });
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
+    const data2 = await response.json();
+    const content = data2.choices?.[0]?.message?.content;
 
-    // Try to parse JSON from the response
     let guide;
     try {
-      // Extract JSON from markdown code blocks if present
       const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
       const jsonString = jsonMatch ? jsonMatch[1] : content;
       guide = JSON.parse(jsonString);
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
-      // Return raw content if parsing fails
       guide = { rawContent: content, candidateName, jobPosition };
     }
 
