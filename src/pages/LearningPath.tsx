@@ -33,6 +33,7 @@ interface LearningPathResult {
   hardSkills: HardSoftSkill[];
   softSkills: HardSoftSkill[];
   roadmap: RoadmapMonth[];
+  trainingNote?: string;
 }
 
 const SENIORITY_LEVELS = [
@@ -63,6 +64,7 @@ export default function LearningPath() {
     educationLevel: "",
     fieldOfStudy: "",
     experienceYears: "",
+    trainingMonths: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -93,6 +95,7 @@ export default function LearningPath() {
           educationLevel: form.educationLevel,
           fieldOfStudy: form.fieldOfStudy,
           experienceYears: Number(form.experienceYears),
+          trainingMonths: form.trainingMonths ? Number(form.trainingMonths) : null,
         },
       });
 
@@ -242,6 +245,22 @@ export default function LearningPath() {
                     />
                   </div>
 
+                  {/* Training time available */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">مدت زمان آموزش تا پایان سال (ماه)</Label>
+                    <p className="text-xs text-muted-foreground">چقدر وقت واقعی برای آموزش دارید؟</p>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={12}
+                      placeholder="مثال: 4"
+                      value={form.trainingMonths}
+                      onChange={(e) => setForm((p) => ({ ...p, trainingMonths: e.target.value }))}
+                      className="bg-secondary/40 border-border/60"
+                      dir="ltr"
+                    />
+                  </div>
+
                   <Button
                     onClick={handleSubmit}
                     disabled={loading || !isFormValid}
@@ -289,7 +308,7 @@ export default function LearningPath() {
                   ref={printRef}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
+                  className="space-y-5"
                 >
                   {/* Download button */}
                   <div className="flex justify-end no-print">
@@ -299,36 +318,46 @@ export default function LearningPath() {
                     </Button>
                   </div>
 
+                  {/* trainingNote banner */}
+                  {result.trainingNote && (
+                    <Card className="glass-card border-primary/40 bg-primary/5">
+                      <CardContent className="pt-4 pb-4 flex items-start gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                        <p className="text-sm text-foreground leading-relaxed">{result.trainingNote}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* 1. Skill Gap Analysis */}
                   <Card className="glass-card border-amber-500/30 bg-amber-500/5">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2 text-amber-400">
                         <AlertCircle className="w-4 h-4" />
                         تحلیل شکاف مهارتی
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-foreground leading-relaxed">{result.skillGapAnalysis}</p>
+                      <p className="text-sm text-foreground leading-7">{result.skillGapAnalysis}</p>
                     </CardContent>
                   </Card>
 
                   {/* 2. Hard Skills */}
                   <Card className="glass-card border-blue-500/30 bg-blue-500/5">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2 text-blue-400">
                         <Wrench className="w-4 h-4" />
-                        توسعه مهارت‌های سخت (Hard Skills)
+                        مهارت‌های سخت (Hard Skills) که باید توسعه دهید
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2.5">
+                      <div className="space-y-3">
                         {result.hardSkills.map((hs, i) => (
-                          <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-secondary/30 border border-border/30">
-                            <Badge className="shrink-0 mt-0.5 bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">
-                              <BookOpen className="w-3 h-3 ml-1" />
-                              {hs.skill}
-                            </Badge>
-                            <p className="text-xs text-muted-foreground leading-relaxed">{hs.reason}</p>
+                          <div key={i} className="p-3 rounded-lg bg-secondary/30 border border-border/30 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                              <span className="text-sm font-semibold text-foreground">{hs.skill}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-6 pr-5">{hs.reason}</p>
                           </div>
                         ))}
                       </div>
@@ -337,58 +366,61 @@ export default function LearningPath() {
 
                   {/* 3. Soft Skills */}
                   <Card className="glass-card border-purple-500/30 bg-purple-500/5">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2 text-purple-400">
                         <Users className="w-4 h-4" />
-                        توسعه مهارت‌های نرم (Soft Skills)
+                        مهارت‌های نرم (Soft Skills) که باید توسعه دهید
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2.5">
+                      <div className="space-y-3">
                         {result.softSkills.map((ss, i) => (
-                          <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-secondary/30 border border-border/30">
-                            <Badge className="shrink-0 mt-0.5 bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs">
-                              {ss.skill}
-                            </Badge>
-                            <p className="text-xs text-muted-foreground leading-relaxed">{ss.reason}</p>
+                          <div key={i} className="p-3 rounded-lg bg-secondary/30 border border-border/30 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              <span className="text-sm font-semibold text-foreground">{ss.skill}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-6 pr-5">{ss.reason}</p>
                           </div>
                         ))}
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* 4. Roadmap Timeline */}
+                  {/* 4. Realistic Roadmap Timeline */}
                   <Card className="glass-card border-green-500/30 bg-green-500/5">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2 text-green-400">
                         <Calendar className="w-4 h-4" />
-                        نقشه راه اجرایی
+                        نقشه راه اجرایی – اولویت‌بندی واقع‌بینانه
                       </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        در بازه زمانی موجود، این دوره‌ها را به ترتیب اولویت طی کنید
+                      </p>
                     </CardHeader>
                     <CardContent>
-                      <div className="relative">
+                      <div className="relative pr-2">
                         {/* Vertical line */}
-                        <div className="absolute right-[22px] top-4 bottom-4 w-0.5 bg-green-500/20" />
-
+                        <div className="absolute right-[26px] top-6 bottom-6 w-0.5 bg-green-500/20" />
                         <div className="space-y-6">
                           {result.roadmap.map((item, i) => (
-                            <div key={i} className="flex gap-4 items-start">
+                            <div key={i} className="flex gap-5 items-start">
                               {/* Circle */}
-                              <div className="shrink-0 w-11 h-11 rounded-full bg-green-500/20 border-2 border-green-500/50 flex items-center justify-center z-10">
-                                <span className="text-xs font-bold text-green-400">{i + 1}</span>
+                              <div className="shrink-0 w-12 h-12 rounded-full bg-green-500/20 border-2 border-green-500/50 flex items-center justify-center z-10">
+                                <span className="text-sm font-bold text-green-400">{i + 1}</span>
                               </div>
                               {/* Content */}
-                              <div className="flex-1 pb-2">
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <span className="text-xs font-semibold text-green-300 bg-green-500/10 px-2 py-0.5 rounded-md border border-green-500/20">
+                              <div className="flex-1 pb-2 pt-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-green-300 bg-green-500/10 px-2.5 py-1 rounded-md border border-green-500/20">
                                     {item.month}
                                   </span>
-                                  <span className="text-sm font-medium text-foreground">{item.focus}</span>
+                                  <span className="text-sm font-semibold text-foreground">{item.focus}</span>
                                 </div>
-                                <ul className="space-y-1">
+                                <ul className="space-y-2">
                                   {item.actionItems.map((action, j) => (
-                                    <li key={j} className="flex items-start gap-2 text-xs text-muted-foreground">
-                                      <ArrowRight className="w-3 h-3 shrink-0 mt-0.5 text-green-400" />
+                                    <li key={j} className="flex items-start gap-2 text-sm text-muted-foreground leading-6">
+                                      <ArrowRight className="w-3.5 h-3.5 shrink-0 mt-1 text-green-400" />
                                       {action}
                                     </li>
                                   ))}

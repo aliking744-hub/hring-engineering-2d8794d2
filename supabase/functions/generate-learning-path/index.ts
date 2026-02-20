@@ -9,25 +9,40 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { jobTitle, industry, seniorityLevel, educationLevel, fieldOfStudy, experienceYears } = await req.json();
+    const { jobTitle, industry, seniorityLevel, educationLevel, fieldOfStudy, experienceYears, trainingMonths } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are an expert HR and L&D (Learning and Development) strategist. Based on the user's current profile, generate a highly personalized, practical learning and development roadmap. You MUST return ONLY a valid JSON object with no markdown, no code blocks, no extra text. The JSON must have exactly this structure, with all text in Persian (Farsi):
+    const hasTrainingMonths = trainingMonths && trainingMonths > 0;
+
+    const systemPrompt = `You are an expert HR and L&D (Learning and Development) strategist with a deep understanding of realistic capacity planning. Based on the user's current profile${hasTrainingMonths ? ` and their STRICT time budget of ${trainingMonths} months until year-end` : ""}, generate a highly personalized, practical learning and development roadmap. 
+
+CRITICAL REALISM RULE: ${hasTrainingMonths
+  ? `The user has ONLY ${trainingMonths} months available for training this year. A full-time employee can realistically complete ONE course per month (2-4 weeks per course, a few hours per week alongside their job). Therefore, the roadmap should contain EXACTLY ${trainingMonths} milestones (one per month), each with ONE primary course or skill focus — not a list of many things. Choose only the HIGHEST PRIORITY items. Quality over quantity. This is not a wishlist; it's a realistic plan.`
+  : `A full-time employee can realistically complete ONE course per month (2-4 weeks per course). Each monthly milestone should have ONE primary course or skill focus. Do not overwhelm the user. Generate 4-6 months of realistic milestones.`}
+
+Each roadmap milestone should contain:
+- The month label
+- The ONE main course or skill focus for that month
+- 2-3 specific, concrete action items (e.g., "تماشای دوره React Router در یودمی", "تمرین با پروژه شخصی روی GitHub")
+
+You MUST return ONLY a valid JSON object with no markdown, no code blocks, no extra text. The JSON must have exactly this structure, with all text in Persian (Farsi):
 {
-  "skillGapAnalysis": "A short paragraph explaining what the user lacks to reach the next level.",
+  "skillGapAnalysis": "A concise paragraph (3-4 sentences) explaining the most important gaps the user must close to reach the next career level.",
   "hardSkills": [
-    {"skill": "Name of technical skill", "reason": "Why it is needed"}
+    {"skill": "Name of technical skill", "reason": "Why it is needed and what level to aim for"}
   ],
   "softSkills": [
     {"skill": "Name of soft skill", "reason": "Why it is needed"}
   ],
   "roadmap": [
-    {"month": "ماه اول", "focus": "Main focus area", "actionItems": ["Task 1", "Task 2", "Task 3"]}
-  ]
+    {"month": "ماه اول", "focus": "نام یک دوره یا مهارت اصلی", "actionItems": ["اقدام اول", "اقدام دوم", "اقدام سوم"]}
+  ],
+  "trainingNote": "A one-sentence realistic summary of what the user can achieve in their available time, e.g. 'در ${hasTrainingMonths ? trainingMonths : "N"} ماه آینده، اگر هر ماه یک دوره اصلی طی کنید، می‌توانید مهارت X، Y و Z را به سطح کاربردی برسانید.'"
 }
-Return at least 4 hard skills, 3 soft skills, and 4-6 months in the roadmap. All content must be in Persian.`;
+
+Return exactly ${hasTrainingMonths ? trainingMonths : "4 to 6"} months in the roadmap. Return at least 4 hard skills and 3 soft skills. All content must be in Persian.`;
 
     const userMessage = `Profile:
 - Job Title: ${jobTitle}
@@ -36,8 +51,9 @@ Return at least 4 hard skills, 3 soft skills, and 4-6 months in the roadmap. All
 - Education Level: ${educationLevel}
 - Field of Study: ${fieldOfStudy || "Not specified"}
 - Years of Relevant Experience: ${experienceYears}
+${hasTrainingMonths ? `- Training Time Available Until Year-End: ${trainingMonths} months` : ""}
 
-Generate a personalized learning roadmap for this person to reach the next career level.`;
+Generate a personalized, REALISTIC learning roadmap for this person to reach the next career level, respecting their time constraints.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
