@@ -272,13 +272,56 @@ export default function LearningPath() {
             <TabsContent value="generate">
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-                {/* LEFT: Form */}
-                <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-2">
+                {/* RIGHT (in RTL = visual right = grid col first rendered): Output */}
+                <div className="lg:col-span-3 order-2 lg:order-1">
+                  {loading && <LoadingSkeleton />}
+
+                  {!loading && !result && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex items-center justify-center">
+                      <div className="text-center space-y-3 py-20">
+                        <GraduationCap className="w-16 h-16 text-muted-foreground/30 mx-auto" />
+                        <p className="text-muted-foreground text-sm">مشخصات کارمند و شغل را وارد کنید تا نقشه راه آموزشی تولید شود</p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {!loading && result && (
+                    <motion.div id="learning-path-result" ref={printRef} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-between no-print">
+                        <div className="flex items-center gap-2">
+                          {savedRecordId && (
+                            <Badge variant="outline" className="gap-1 text-xs border-green-500/40 text-green-400">
+                              <CheckCircle2 className="w-3 h-3" /> ذخیره شد
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {form.employeeEmail && (
+                            <Button variant="outline" size="sm" onClick={() => handleSendEmail()} disabled={sendingEmail} className="gap-2">
+                              {sendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                              ارسال به ایمیل
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                            <Download className="w-4 h-4" /> دانلود PDF
+                          </Button>
+                        </div>
+                      </div>
+
+                      <ResultView result={result} employeeName={form.employeeName} jobTitle={form.jobTitle} />
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* LEFT (in RTL = visual left = form): Form */}
+                <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-2 order-1 lg:order-2">
                   <Card className="glass-card border-border/50 no-print">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <UserCircle className="w-4 h-4 text-primary" />
+                      <CardTitle className="text-base flex items-center gap-2 justify-end">
                         اطلاعات کارمند و شغل
+                        <UserCircle className="w-4 h-4 text-primary" />
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -393,48 +436,6 @@ export default function LearningPath() {
                   </Card>
                 </motion.div>
 
-                {/* RIGHT: Output */}
-                <div className="lg:col-span-3">
-                  {loading && <LoadingSkeleton />}
-
-                  {!loading && !result && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex items-center justify-center">
-                      <div className="text-center space-y-3 py-20">
-                        <GraduationCap className="w-16 h-16 text-muted-foreground/30 mx-auto" />
-                        <p className="text-muted-foreground text-sm">مشخصات کارمند و شغل را وارد کنید تا نقشه راه آموزشی تولید شود</p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {!loading && result && (
-                    <motion.div id="learning-path-result" ref={printRef} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-
-                      {/* Action buttons */}
-                      <div className="flex items-center justify-between no-print">
-                        <div className="flex items-center gap-2">
-                          {savedRecordId && (
-                            <Badge variant="outline" className="gap-1 text-xs border-green-500/40 text-green-400">
-                              <CheckCircle2 className="w-3 h-3" /> ذخیره شد
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {form.employeeEmail && (
-                            <Button variant="outline" size="sm" onClick={() => handleSendEmail()} disabled={sendingEmail} className="gap-2">
-                              {sendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                              ارسال به ایمیل
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
-                            <Download className="w-4 h-4" /> دانلود PDF
-                          </Button>
-                        </div>
-                      </div>
-
-                      <ResultView result={result} employeeName={form.employeeName} jobTitle={form.jobTitle} />
-                    </motion.div>
-                  )}
-                </div>
               </div>
             </TabsContent>
 
