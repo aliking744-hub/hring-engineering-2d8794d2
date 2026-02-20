@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { jobTitle, industry, seniorityLevel, educationLevel, experienceYears } = await req.json();
+    const { jobTitle, industry, seniorityLevel, educationLevel, fieldOfStudy, experienceYears } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -34,7 +34,8 @@ Return at least 4 hard skills, 3 soft skills, and 4-6 months in the roadmap. All
 - Industry: ${industry}
 - Seniority Level: ${seniorityLevel}
 - Education Level: ${educationLevel}
-- Years of Experience: ${experienceYears}
+- Field of Study: ${fieldOfStudy || "Not specified"}
+- Years of Relevant Experience: ${experienceYears}
 
 Generate a personalized learning roadmap for this person to reach the next career level.`;
 
