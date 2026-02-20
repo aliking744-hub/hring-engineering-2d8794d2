@@ -630,6 +630,54 @@ export type Database = {
           },
         ]
       }
+      learning_path_records: {
+        Row: {
+          created_at: string
+          education_level: string
+          employee_email: string | null
+          employee_name: string
+          experience_years: number
+          field_of_study: string | null
+          id: string
+          industry: string
+          job_title: string
+          result: Json
+          seniority_level: string
+          training_months: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          education_level: string
+          employee_email?: string | null
+          employee_name: string
+          experience_years: number
+          field_of_study?: string | null
+          id?: string
+          industry: string
+          job_title: string
+          result: Json
+          seniority_level: string
+          training_months?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          education_level?: string
+          employee_email?: string | null
+          employee_name?: string
+          experience_years?: number
+          field_of_study?: string | null
+          id?: string
+          industry?: string
+          job_title?: string
+          result?: Json
+          seniority_level?: string
+          training_months?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       legal_conversations: {
         Row: {
           created_at: string
