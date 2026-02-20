@@ -88,7 +88,6 @@ export default function LearningPath() {
   const [activeTab, setActiveTab] = useState("generate");
 
   const isFormValid =
-    form.employeeName.trim() &&
     form.jobTitle.trim() &&
     form.industry &&
     form.seniorityLevel &&
@@ -116,7 +115,7 @@ export default function LearningPath() {
     const { data, error } = await (supabase.from("learning_path_records") as any)
       .insert({
         user_id: user.id,
-        employee_name: form.employeeName,
+        employee_name: form.employeeName.trim() || "—",
         employee_email: form.employeeEmail || null,
         job_title: form.jobTitle,
         industry: form.industry,
@@ -162,12 +161,13 @@ export default function LearningPath() {
       setResult(aiResult);
 
       // Auto-save
-      const newId = await saveRecord(aiResult);
-      if (newId) {
-        setSavedRecordId(newId);
-        toast({ title: "نقشه راه ذخیره شد ✓", description: `برای ${form.employeeName}` });
-        fetchHistory();
-      }
+        const newId = await saveRecord(aiResult);
+        if (newId) {
+          setSavedRecordId(newId);
+          const nameLabel = form.employeeName.trim() ? `برای ${form.employeeName}` : "";
+          toast({ title: "نقشه راه ذخیره شد ✓", description: nameLabel });
+          fetchHistory();
+        }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "خطا در ارتباط با سرور";
       toast({ title: "خطا", description: msg, variant: "destructive" });
@@ -179,12 +179,16 @@ export default function LearningPath() {
   /* ── Send Email ────────────────────────────────────────── */
   const handleSendEmail = async (record?: SavedRecord) => {
     const targetEmail = record ? record.employee_email : form.employeeEmail;
-    const targetName = record ? record.employee_name : form.employeeName;
+    const targetName = record ? record.employee_name : (form.employeeName.trim() || form.jobTitle);
     const targetResult = record ? record.result : result;
     const targetJobTitle = record ? record.job_title : form.jobTitle;
 
     if (!targetEmail) {
-      toast({ title: "ایمیل کارمند وارد نشده", description: "لطفاً ایمیل را وارد کنید", variant: "destructive" });
+      toast({ title: "ایمیل کارمند وارد نشده", description: "لطفاً ایمیل کارمند را وارد کنید", variant: "destructive" });
+      return;
+    }
+    if (!targetName) {
+      toast({ title: "نام کارمند وارد نشده", description: "برای ارسال ایمیل، نام کارمند را وارد کنید", variant: "destructive" });
       return;
     }
     setSendingEmail(true);
@@ -241,10 +245,10 @@ export default function LearningPath() {
 
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30 shrink-0">
               <GraduationCap className="w-6 h-6 text-primary" />
             </div>
-            <div>
+            <div className="text-right">
               <h1 className="text-2xl font-bold text-foreground">طراح مسیر یادگیری</h1>
               <p className="text-sm text-muted-foreground">نیازسنجی و تولید برنامه آموزشی هوشمند با هوش مصنوعی</p>
             </div>
@@ -281,20 +285,26 @@ export default function LearningPath() {
 
                       {/* ── Employee Info section ── */}
                       <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
-                        <p className="text-xs font-semibold text-primary">مشخصات کارمند</p>
+                        <p className="text-xs font-semibold text-primary text-right">مشخصات کارمند</p>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">نام و نام خانوادگی <span className="text-destructive">*</span></Label>
+                          <Label className="text-sm text-right block">
+                            نام و نام خانوادگی
+                            <span className="text-muted-foreground text-xs mr-1">(اختیاری)</span>
+                          </Label>
                           <Input
                             placeholder="مثال: علی محمدی"
                             value={form.employeeName}
                             onChange={(e) => setForm((p) => ({ ...p, employeeName: e.target.value }))}
-                            className="bg-background/50 border-border/60"
+                            className="bg-background/50 border-border/60 text-right"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">ایمیل کارمند <span className="text-muted-foreground text-xs">(برای ارسال نقشه راه)</span></Label>
+                          <Label className="text-sm text-right block">
+                            ایمیل کارمند
+                            <span className="text-muted-foreground text-xs mr-1">(برای ارسال نقشه راه)</span>
+                          </Label>
                           <Input
                             type="email"
                             placeholder="example@company.com"
@@ -308,10 +318,10 @@ export default function LearningPath() {
 
                       {/* ── Job Info section ── */}
                       <div className="space-y-3">
-                        <p className="text-xs font-semibold text-muted-foreground">مشخصات شغلی</p>
+                        <p className="text-xs font-semibold text-muted-foreground text-right">مشخصات شغلی</p>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">عنوان شغلی <span className="text-destructive">*</span></Label>
+                          <Label className="text-sm text-right block">عنوان شغلی <span className="text-destructive">*</span></Label>
                           <Input
                             placeholder="مثال: Senior Frontend Developer"
                             value={form.jobTitle}
@@ -322,17 +332,17 @@ export default function LearningPath() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">صنعت</Label>
+                          <Label className="text-sm text-right block">صنعت <span className="text-destructive">*</span></Label>
                           <Input
                             placeholder="مثال: فناوری اطلاعات، بانکداری..."
                             value={form.industry}
                             onChange={(e) => setForm((p) => ({ ...p, industry: e.target.value }))}
-                            className="bg-secondary/40 border-border/60"
+                            className="bg-secondary/40 border-border/60 text-right"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">سطح ارشدیت</Label>
+                          <Label className="text-sm text-right block">سطح ارشدیت <span className="text-destructive">*</span></Label>
                           <Select value={form.seniorityLevel} onValueChange={(v) => setForm((p) => ({ ...p, seniorityLevel: v }))}>
                             <SelectTrigger className="bg-secondary/40 border-border/60"><SelectValue placeholder="انتخاب سطح..." /></SelectTrigger>
                             <SelectContent>{SENIORITY_LEVELS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
@@ -340,7 +350,7 @@ export default function LearningPath() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">سطح تحصیلات</Label>
+                          <Label className="text-sm text-right block">سطح تحصیلات <span className="text-destructive">*</span></Label>
                           <Select value={form.educationLevel} onValueChange={(v) => setForm((p) => ({ ...p, educationLevel: v }))}>
                             <SelectTrigger className="bg-secondary/40 border-border/60"><SelectValue placeholder="انتخاب تحصیلات..." /></SelectTrigger>
                             <SelectContent>{EDUCATION_LEVELS.map((e) => <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>)}</SelectContent>
@@ -348,17 +358,17 @@ export default function LearningPath() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">رشته تحصیلی</Label>
+                          <Label className="text-sm text-right block">رشته تحصیلی</Label>
                           <Input
                             placeholder="مثال: مهندسی نرم‌افزار، مدیریت..."
                             value={form.fieldOfStudy}
                             onChange={(e) => setForm((p) => ({ ...p, fieldOfStudy: e.target.value }))}
-                            className="bg-secondary/40 border-border/60"
+                            className="bg-secondary/40 border-border/60 text-right"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">سابقه کاری مرتبط (سال)</Label>
+                          <Label className="text-sm text-right block">سابقه کاری مرتبط (سال) <span className="text-destructive">*</span></Label>
                           <Input type="number" min={0} max={40} placeholder="مثال: 3"
                             value={form.experienceYears}
                             onChange={(e) => setForm((p) => ({ ...p, experienceYears: e.target.value }))}
@@ -366,8 +376,8 @@ export default function LearningPath() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-sm">مدت زمان آموزش تا پایان سال (ماه)</Label>
-                          <p className="text-xs text-muted-foreground">چقدر وقت واقعی برای آموزش دارید؟</p>
+                          <Label className="text-sm text-right block">مدت زمان آموزش تا پایان سال (ماه)</Label>
+                          <p className="text-xs text-muted-foreground text-right">چقدر وقت واقعی برای آموزش دارید؟</p>
                           <Input type="number" min={1} max={12} placeholder="مثال: 4"
                             value={form.trainingMonths}
                             onChange={(e) => setForm((p) => ({ ...p, trainingMonths: e.target.value }))}
