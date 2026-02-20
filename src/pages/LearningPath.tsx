@@ -35,20 +35,6 @@ interface LearningPathResult {
   roadmap: RoadmapMonth[];
 }
 
-const INDUSTRIES = [
-  "فناوری اطلاعات",
-  "مالی و بانکداری",
-  "بهداشت و درمان",
-  "تولید و صنعت",
-  "بازاریابی و تبلیغات",
-  "آموزش",
-  "خرده‌فروشی",
-  "نفت و انرژی",
-  "حمل‌ونقل",
-  "ساختمان و مسکن",
-  "سایر",
-];
-
 const SENIORITY_LEVELS = [
   { value: "Junior", label: "Junior – جونیور" },
   { value: "Mid-Level", label: "Mid-Level – میانه" },
@@ -58,6 +44,7 @@ const SENIORITY_LEVELS = [
 ];
 
 const EDUCATION_LEVELS = [
+  { value: "ZirDiplom", label: "زیر دیپلم" },
   { value: "Diploma", label: "دیپلم" },
   { value: "Bachelor", label: "لیسانس" },
   { value: "Master", label: "فوق لیسانس" },
@@ -74,6 +61,7 @@ export default function LearningPath() {
     industry: "",
     seniorityLevel: "",
     educationLevel: "",
+    fieldOfStudy: "",
     experienceYears: "",
   });
 
@@ -103,6 +91,7 @@ export default function LearningPath() {
           industry: form.industry,
           seniorityLevel: form.seniorityLevel,
           educationLevel: form.educationLevel,
+          fieldOfStudy: form.fieldOfStudy,
           experienceYears: Number(form.experienceYears),
         },
       });
@@ -186,19 +175,15 @@ export default function LearningPath() {
                     />
                   </div>
 
-                  {/* Industry */}
+                  {/* Industry - free text */}
                   <div className="space-y-1.5">
                     <Label className="text-sm">صنعت</Label>
-                    <Select value={form.industry} onValueChange={(v) => setForm((p) => ({ ...p, industry: v }))}>
-                      <SelectTrigger className="bg-secondary/40 border-border/60">
-                        <SelectValue placeholder="انتخاب صنعت..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDUSTRIES.map((ind) => (
-                          <SelectItem key={ind} value={ind}>{ind}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      placeholder="مثال: فناوری اطلاعات، بانکداری، بهداشت..."
+                      value={form.industry}
+                      onChange={(e) => setForm((p) => ({ ...p, industry: e.target.value }))}
+                      className="bg-secondary/40 border-border/60"
+                    />
                   </div>
 
                   {/* Seniority */}
@@ -231,9 +216,20 @@ export default function LearningPath() {
                     </Select>
                   </div>
 
+                  {/* Field of Study - free text */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">رشته تحصیلی</Label>
+                    <Input
+                      placeholder="مثال: مهندسی نرم‌افزار، مدیریت، حسابداری..."
+                      value={form.fieldOfStudy}
+                      onChange={(e) => setForm((p) => ({ ...p, fieldOfStudy: e.target.value }))}
+                      className="bg-secondary/40 border-border/60"
+                    />
+                  </div>
+
                   {/* Experience */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm">سابقه کاری (سال)</Label>
+                    <Label className="text-sm">سابقه کاری مرتبط (سال)</Label>
                     <Input
                       type="number"
                       min={0}
