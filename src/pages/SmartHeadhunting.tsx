@@ -443,15 +443,41 @@ const SmartHeadhunting = () => {
       setShowNewCampaignForm(false);
 
       if (autoHeadhunting) {
-        toast.info("هدهانتینگ خودکار در حال آماده‌سازی...");
+        toast.info("در حال جستجوی کاندیداها با هوش مصنوعی...");
+
+        // Use Perplexity AI to search for candidates automatically
+        const searchQuery = `${formData.jobTitle} ${formData.city} ${formData.skills || ""} ${formData.industry || ""}`;
         
-        // Update campaign to paused - auto headhunting not yet connected
-        await updateCampaign(campaign.id, {
-          status: "paused",
-          progress: 0,
+        const { data: searchData, error: searchError } = await supabase.functions.invoke("analyze-candidates", {
+          body: {
+            candidates: [{
+              name: "جستجوی خودکار",
+              skills: formData.skills || "",
+              experience: formData.experience || "",
+              location: formData.city,
+            }],
+            jobRequirements: {
+              jobTitle: formData.jobTitle,
+              city: formData.city,
+              skills: formData.skills,
+              experience: formData.experience,
+              industry: formData.industry,
+              description: (formData.description || "") + `\n\nجستجوی خودکار برای: ${searchQuery}`,
+              seniorityLevel: formData.seniorityLevel,
+            },
+            enableWebSearch: true,
+            autoMode: true,
+          },
         });
 
-        toast.success("کمپین ایجاد شد. هدهانتینگ خودکار هنوز فعال نیست.");
+        if (searchError) {
+          console.error("Auto headhunting error:", searchError);
+          toast.warning("جستجوی خودکار با مشکل مواجه شد. کمپین در وضعیت انتظار قرار گرفت.");
+          await updateCampaign(campaign.id, { status: "paused", progress: 0 });
+        } else {
+          await updateCampaign(campaign.id, { status: "processing", progress: 30 });
+          toast.success("کمپین هدهانتینگ خودکار ایجاد شد. برای افزودن کاندیدا فایل اکسل آپلود کنید یا منتظر نتایج AI بمانید.");
+        }
         
       } else if (parsedCandidates.length > 0) {
         toast.info("در حال تحلیل کاندیداها با هوش مصنوعی...");
@@ -478,7 +504,8 @@ const SmartHeadhunting = () => {
           name: c.name || null,
           email: c.email || null,
           phone: c.phone || null,
-          skills: c.skills || null,
+          // skills in DB is text, convert array to comma-separated string
+          skills: Array.isArray(c.skills) ? c.skills.join(", ") : (c.skills || null),
           experience: c.experience || null,
           education: c.education || null,
           last_company: c.lastCompany || null,
@@ -748,9 +775,17 @@ const SmartHeadhunting = () => {
                           هدهانتینگ خودکار با هوش مصنوعی
                         </label>
                         <p className="text-sm text-slate-400 mt-1">
-                          اگر لیست کاندیدا ندارید، ما با استفاده از هوش مصنوعی برای شما جستجو می‌کنیم.
-                          سیستم به Make.com وصل شده و به صورت خودکار کاندیداهای مناسب را پیدا می‌کند.
+                          سیستم با استفاده از Perplexity AI در اینترنت برای کاندیداهای مناسب جستجو می‌کند.
+                          برای نتایج بهتر، فایل اکسل آپلود کنید تا AI تحلیل عمیق‌تری انجام دهد.
                         </p>
+                        {autoHeadhunting && (
+                          <div className="mt-2 p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                            <p className="text-xs text-violet-300 flex items-center gap-1">
+                              <Zap className="w-3 h-3" />
+                              کمپین ایجاد می‌شود و می‌توانید بعداً فایل اکسل کاندیداها را آپلود کنید
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
