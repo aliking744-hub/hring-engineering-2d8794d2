@@ -234,7 +234,25 @@ export default function LearningPath() {
         @media print {
           body * { visibility: hidden !important; }
           #learning-path-result, #learning-path-result * { visibility: visible !important; }
-          #learning-path-result { position: fixed; top: 0; left: 0; width: 100%; background: white; color: black; padding: 2rem; }
+          #learning-path-result {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background: white !important;
+            color: black !important;
+            padding: 2rem;
+          }
+          #learning-path-result * {
+            color: black !important;
+            background: white !important;
+            border-color: #e2e8f0 !important;
+            box-shadow: none !important;
+          }
+          #learning-path-result .space-y-5 > * {
+            page-break-inside: avoid;
+          }
           .no-print { display: none !important; }
         }
       `}</style>
