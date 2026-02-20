@@ -443,40 +443,35 @@ const SmartHeadhunting = () => {
       setShowNewCampaignForm(false);
 
       if (autoHeadhunting) {
-        toast.info("در حال جستجوی کاندیداها با هوش مصنوعی...");
+        toast.info("در حال ارسال درخواست به سیستم هدهانتینگ خودکار...");
 
-        // Use Perplexity AI to search for candidates automatically
-        const searchQuery = `${formData.jobTitle} ${formData.city} ${formData.skills || ""} ${formData.industry || ""}`;
-        
-        const { data: searchData, error: searchError } = await supabase.functions.invoke("analyze-candidates", {
+        // ── Step 1+2+3 are handled inside the edge function ──
+        const { data: autoData, error: autoError } = await supabase.functions.invoke("auto-headhunt", {
           body: {
-            candidates: [{
-              name: "جستجوی خودکار",
-              skills: formData.skills || "",
-              experience: formData.experience || "",
-              location: formData.city,
-            }],
+            campaignId: campaign.id,
             jobRequirements: {
               jobTitle: formData.jobTitle,
               city: formData.city,
               skills: formData.skills,
               experience: formData.experience,
               industry: formData.industry,
-              description: (formData.description || "") + `\n\nجستجوی خودکار برای: ${searchQuery}`,
+              description: formData.description,
               seniorityLevel: formData.seniorityLevel,
             },
-            enableWebSearch: true,
-            autoMode: true,
           },
         });
 
-        if (searchError) {
-          console.error("Auto headhunting error:", searchError);
-          toast.warning("جستجوی خودکار با مشکل مواجه شد. کمپین در وضعیت انتظار قرار گرفت.");
+        if (autoError) {
+          console.error("Auto headhunting error:", autoError);
+          toast.warning("هدهانتینگ خودکار با مشکل مواجه شد. کمپین در وضعیت انتظار قرار گرفت.");
           await updateCampaign(campaign.id, { status: "paused", progress: 0 });
         } else {
-          await updateCampaign(campaign.id, { status: "processing", progress: 30 });
-          toast.success("کمپین هدهانتینگ خودکار ایجاد شد. برای افزودن کاندیدا فایل اکسل آپلود کنید یا منتظر نتایج AI بمانید.");
+          const stats = autoData?.stats;
+          toast.success(
+            stats
+              ? `هدهانتینگ خودکار کامل شد! ${stats.total} کاندیدا یافت شد (🔥${stats.hot} داغ | 🌡${stats.warm} گرم)`
+              : "کمپین هدهانتینگ خودکار با موفقیت راه‌اندازی شد."
+          );
         }
         
       } else if (parsedCandidates.length > 0) {

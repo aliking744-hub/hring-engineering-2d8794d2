@@ -95,3 +95,7 @@ verify_jwt = false
 
 [functions.track-funding]
 verify_jwt = false
+
+[functions.auto-headhunt]
+verify_jwt = false
+
