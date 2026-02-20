@@ -43,6 +43,7 @@ import SupportChatWidget from "./components/SupportChatWidget";
 import FAQ from "./pages/FAQ";
 import Admin from "./pages/Admin";
 import ProductCatalog from "./pages/ProductCatalog";
+import LearningPath from "./pages/LearningPath";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -271,6 +272,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <UnicornLab />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/learning-path" 
+                element={
+                  <ProtectedRoute>
+                    <LearningPath />
                   </ProtectedRoute>
                 } 
               />

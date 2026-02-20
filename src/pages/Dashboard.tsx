@@ -8,7 +8,7 @@ import {
   // Tier 1 - Smart Workspace
   Briefcase, Mic, Megaphone,
   // Tier 2 - HR & Operations
-  UserPlus, Users, Network,
+  UserPlus, Users, Network, GraduationCap,
   // Tier 3 - Command Center
   BarChart3, Calculator, Crosshair,
   // Tier 4 - Vision Deck
@@ -48,6 +48,7 @@ const TIERS = [
     icon: Users,
     modules: [
       { id: "success-architect", label: "برنامه موفقیت ۹۰ روزه", desc: "نقشه راه آنبوردینگ ۳۰-۶۰-۹۰ روزه", icon: UserPlus, path: "/onboarding" },
+      { id: "learning-path", label: "طراح مسیر یادگیری", desc: "نیازسنجی و تولید برنامه آموزشی هوشمند", icon: GraduationCap, path: "/learning-path" },
       { id: "profiles", label: "پروفایل‌ها", desc: "لیست پرسنل و پرونده دیجیتال", icon: Users, path: "/profile" },
       { id: "org-design", label: "طراحی سازمان", desc: "ساختار و چارت سازمانی", icon: Network, path: "/modules", comingSoon: true },
     ],
