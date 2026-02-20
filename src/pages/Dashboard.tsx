@@ -38,7 +38,7 @@ const TIERS = [
       { id: "job-engineering", label: "مهندسی مشاغل", desc: "تولید هوشمند شناسنامه شغلی و پروفایل موقعیت", icon: Briefcase, path: "/job-description" },
       { id: "interview-assistant", label: "دستیار مصاحبه", desc: "تولید راهنما، سؤالات تخصصی و کلیدهای ارزیابی", icon: Mic, path: "/interview-assistant" },
       { id: "smart-ad-writer", label: "آگهی‌نویس هوشمند", desc: "نوشتن آگهی‌های جذاب برای LinkedIn و سایت‌های کار", icon: Megaphone, path: "/smart-ad-generator" },
-      { id: "success-architect", label: "معمار موفقیت ۹۰ روزه", desc: "تحلیل هوشمند نقاط قوت و ضعف و مسیر رشد فردی", icon: TrendingUp, path: "/success-architect" },
+      { id: "smart-workspace-success-architect", label: "معمار موفقیت ۹۰ روزه", desc: "تحلیل هوشمند نقاط قوت و ضعف و مسیر رشد فردی", icon: TrendingUp, path: "/success-architect" },
     ],
   },
   {
