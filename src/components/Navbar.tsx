@@ -135,18 +135,20 @@ const Navbar = () => {
                   </motion.div>
                 ))}
                 
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="mt-4"
-                >
-                  <Link to="/auth" onClick={() => setIsOpen(false)}>
-                    <Button className="glow-button w-full text-foreground font-medium">
-                      ورود / ثبت‌نام
-                    </Button>
-                  </Link>
-                </motion.div>
+                {showLogin && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-4"
+                  >
+                    <Link to="/auth" onClick={() => setIsOpen(false)}>
+                      <Button className="glow-button w-full text-foreground font-medium">
+                        ورود / ثبت‌نام
+                      </Button>
+                    </Link>
+                  </motion.div>
+                )}
               </div>
             </motion.div>
           </>
