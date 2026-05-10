@@ -319,6 +319,12 @@ const CampaignDetail = () => {
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 lg:p-8 print:bg-white print:p-4" dir="rtl">
+        <Link to="/dashboard" className="fixed top-6 right-6 z-50 print:hidden">
+          <Button variant="outline" className="border-slate-700 bg-slate-800/80 backdrop-blur-sm shadow-lg gap-2 text-slate-200 hover:bg-slate-700">
+            <ArrowLeft className="w-4 h-4 rotate-180" />
+            بازگشت به داشبورد
+          </Button>
+        </Link>
         <div className="max-w-[1600px] mx-auto">
           {/* Print Header with Logo */}
           <div className="hidden print:flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-300">

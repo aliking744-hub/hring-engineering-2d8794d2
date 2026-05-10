@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { AnimatePresence, motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useSiteName } from "@/hooks/useSiteSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -253,6 +256,12 @@ const StrategicRadar = () => {
       </Helmet>
 
       <div className="min-h-screen bg-[#0a0f1a] relative overflow-hidden">
+        <Link to="/dashboard" className="fixed top-6 right-6 z-50">
+          <Button variant="outline" className="border-cyan-500/30 bg-slate-900/80 backdrop-blur-sm shadow-lg gap-2 text-cyan-100 hover:bg-slate-800/80">
+            <ArrowRight className="w-4 h-4" />
+            بازگشت به داشبورد
+          </Button>
+        </Link>
         {/* Background Effects */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#0a0f1a] to-[#0d1321]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-900/10 via-transparent to-transparent" />
