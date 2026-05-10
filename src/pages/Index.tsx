@@ -9,6 +9,7 @@ import LegalAdvisorSection from "@/components/landing/LegalAdvisorSection";
 import ShopTeaser from "@/components/landing/ShopTeaser";
 import FAQTeaser from "@/components/landing/FAQTeaser";
 import BlogTeaser from "@/components/landing/BlogTeaser";
+import PricingSection from "@/components/landing/PricingSection";
 import Footer from "@/components/landing/Footer";
 import { useSiteName, useSiteSettings } from "@/hooks/useSiteSettings";
 
