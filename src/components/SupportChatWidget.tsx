@@ -26,7 +26,7 @@ const SupportChatWidget = () => {
   const [hasReceivedReward, setHasReceivedReward] = useState(false);
   const [awaitingEndConfirmation, setAwaitingEndConfirmation] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const followUpTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const followUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesRef = useRef<Message[]>([]);
   const isTypingRef = useRef(false);
   const lastUserActivityRef = useRef<number>(Date.now());
