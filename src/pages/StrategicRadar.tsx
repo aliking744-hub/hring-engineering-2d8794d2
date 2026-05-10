@@ -257,7 +257,7 @@ const StrategicRadar = () => {
 
       <div className="min-h-screen bg-[#0a0f1a] relative overflow-hidden">
         <Link to="/dashboard" className="fixed top-6 right-6 z-50">
-          <Button variant="outline" className="border-cyan-500/30 bg-slate-900/80 backdrop-blur-sm shadow-lg gap-2 text-cyan-100 hover:bg-slate-800/80">
+          <Button variant="outline" className="border-cyan-500/30 bg-slate-900/80 backdrop-blur-sm shadow-lg gap-2 text-cyan-100 hover:bg-slate-800/80 mx-[1000px]">
             <ArrowRight className="w-4 h-4" />
             بازگشت به داشبورد
           </Button>
