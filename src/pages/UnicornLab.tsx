@@ -65,6 +65,12 @@ const UnicornLab = () => {
 
       <div className="min-h-screen bg-background" dir="rtl">
         <Navbar />
+        <Link to="/dashboard" className="fixed top-24 right-6 z-50">
+          <Button variant="outline" className="border-border bg-secondary/80 backdrop-blur-sm shadow-lg gap-2">
+            <ArrowRight className="w-4 h-4" />
+            بازگشت به داشبورد
+          </Button>
+        </Link>
         
         <main className="pt-20">
           <UnicornLabLayout />
