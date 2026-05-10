@@ -3,15 +3,15 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLogos, useFonts, useSiteName } from "@/hooks/useSiteSettings";
+import { useLogos, useFonts, useSiteName, useSiteSettings } from "@/hooks/useSiteSettings";
 import defaultLogo from "@/assets/logo.png";
 
-const navLinks = [
-  { href: "/", label: "خانه" },
-  { href: "/upgrade", label: "پلن‌ها" },
-  { href: "/shop", label: "فروشگاه" },
-  { href: "/blog", label: "بلاگ" },
-  { href: "/dashboard", label: "داشبورد" },
+const allNavLinks = [
+  { href: "/", label: "خانه", id: "nav_home" },
+  { href: "/upgrade", label: "پلن‌ها", id: "nav_plans" },
+  { href: "/shop", label: "فروشگاه", id: "nav_shop" },
+  { href: "/blog", label: "بلاگ", id: "nav_blog" },
+  { href: "/dashboard", label: "داشبورد", id: "nav_dashboard" },
 ];
 
 const Navbar = () => {
