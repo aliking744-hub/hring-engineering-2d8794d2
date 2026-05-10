@@ -91,6 +91,11 @@ const Dashboard = () => {
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
   const showUpgradeCta = useSectionVisible('dashboard_upgrade_cta');
+  const isVisibleSetting = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
+  const visibleTiers = TIERS
+    .filter(t => isVisibleSetting(`dash_tier_${t.id}`))
+    .map(t => ({ ...t, modules: t.modules.filter(m => isVisibleSetting(`dash_mod_${m.id}`)) }))
+    .filter(t => t.modules.length > 0);
 
   const creditLabel = getSetting('dashboard_credit_label', 'اعتبار شرکت');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
@@ -132,7 +137,7 @@ const Dashboard = () => {
     );
   }
 
-  const currentTier = TIERS.find(t => t.id === activeTier) || TIERS[0];
+  const currentTier = visibleTiers.find(t => t.id === activeTier) || visibleTiers[0] || TIERS[0];
 
   // Sidebar content (shared between mobile and desktop)
   const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
@@ -173,7 +178,7 @@ const Dashboard = () => {
 
       {/* 4-Tier Accordion Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto">
-        {TIERS.map((tier) => {
+        {visibleTiers.map((tier) => {
           const isOpen = openTiers.includes(tier.id);
           const isActive = activeTier === tier.id;
           return (
