@@ -265,14 +265,16 @@ const Dashboard = () => {
         )}
 
         {/* Upgrade */}
-        <Link 
-          to="/upgrade"
-          onClick={onNavigate}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all text-sm"
-        >
-          <Crown className="w-4 h-4" />
-          <span className="font-medium">ارتقای پلن</span>
-        </Link>
+        {showUpgradeCta && (
+          <Link 
+            to="/upgrade"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all text-sm"
+          >
+            <Crown className="w-4 h-4" />
+            <span className="font-medium">ارتقای پلن</span>
+          </Link>
+        )}
 
         {/* Logout */}
         <button 
