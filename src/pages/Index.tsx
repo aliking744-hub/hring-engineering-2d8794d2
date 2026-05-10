@@ -38,6 +38,7 @@ const Index = () => {
           {isVisible('bento') && <BentoGrid />}
           {isVisible('legal') && <LegalAdvisorSection />}
           {isVisible('shop') && <ShopTeaser />}
+          {isVisible('pricing_landing') && <PricingSection />}
           {isVisible('faq') && <FAQTeaser />}
           {isVisible('testimonials') && <TestimonialsSection />}
           {isVisible('blog') && <BlogTeaser />}
