@@ -25,6 +25,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useCredits } from "@/hooks/useCredits";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 import { useSiteSettings, useSiteName } from "@/hooks/useSiteSettings";
+import { useSectionVisible } from "@/hooks/useSectionVisible";
 import DashboardModuleCards from "@/components/dashboard/DashboardModuleCards";
 
 // 4-Tier sidebar structure
