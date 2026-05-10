@@ -1063,83 +1063,90 @@ const SiteSettingsManager = () => {
 
         {/* Visibility Tab */}
         <TabsContent value="visibility">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Eye className="w-5 h-5" />
-                نمایش/عدم نمایش بخش‌های صفحه اصلی
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                با کلیک روی آیکون چشم می‌توانید هر بخش از صفحه اصلی سایت را موقتاً مخفی یا نمایان کنید. تغییرات بلافاصله ذخیره می‌شوند.
+          <div className="space-y-6">
+            <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
+              <p className="text-sm text-muted-foreground">
+                با کلیک روی آیکون چشم می‌توانید هر بخش را موقتاً مخفی یا نمایان کنید. تغییرات بلافاصله در سراسر سایت اعمال می‌شوند.
               </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {LANDING_SECTIONS.map((section) => {
-                  const key = `section_visible_${section.id}`;
-                  const currentVal = editedValues[key] ?? getSettingByKey(key)?.value ?? 'true';
-                  const isVisible = currentVal !== 'false';
+            </div>
 
-                  const toggleVisibility = async () => {
-                    const newVal = isVisible ? 'false' : 'true';
-                    setEditedValues(prev => ({ ...prev, [key]: newVal }));
-                    const existing = getSettingByKey(key);
-                    setSaving(true);
-                    if (existing) {
-                      const { error } = await supabase
-                        .from('site_settings')
-                        .update({ value: newVal })
-                        .eq('id', existing.id);
-                      if (error) toast.error('خطا در ذخیره');
-                      else {
-                        toast.success(isVisible ? `«${section.label}» مخفی شد` : `«${section.label}» نمایان شد`);
-                        fetchSettings();
-                      }
-                    } else {
-                      const { error } = await supabase
-                        .from('site_settings')
-                        .insert({ key, label: `نمایش ${section.label}`, value: newVal });
-                      if (error) toast.error('خطا در ذخیره');
-                      else {
-                        toast.success(isVisible ? `«${section.label}» مخفی شد` : `«${section.label}» نمایان شد`);
-                        fetchSettings();
-                      }
-                    }
-                    setSaving(false);
-                  };
+            {ALL_VISIBILITY_GROUPS.map((group) => (
+              <Card key={group.title}>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Eye className="w-5 h-5" />
+                    {group.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {group.items.map((section) => {
+                      const key = `section_visible_${section.id}`;
+                      const currentVal = editedValues[key] ?? getSettingByKey(key)?.value ?? 'true';
+                      const isVisible = currentVal !== 'false';
 
-                  return (
-                    <div
-                      key={section.id}
-                      className={`p-4 rounded-lg border flex items-center justify-between transition-all ${
-                        isVisible ? 'border-border bg-card' : 'border-destructive/30 bg-destructive/5 opacity-70'
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{section.label}</p>
-                          <Badge variant={isVisible ? 'default' : 'destructive'} className="text-xs">
-                            {isVisible ? 'نمایان' : 'مخفی'}
-                          </Badge>
+                      const toggleVisibility = async () => {
+                        const newVal = isVisible ? 'false' : 'true';
+                        setEditedValues(prev => ({ ...prev, [key]: newVal }));
+                        const existing = getSettingByKey(key);
+                        setSaving(true);
+                        if (existing) {
+                          const { error } = await supabase
+                            .from('site_settings')
+                            .update({ value: newVal })
+                            .eq('id', existing.id);
+                          if (error) toast.error('خطا در ذخیره');
+                          else {
+                            toast.success(isVisible ? `«${section.label}» مخفی شد` : `«${section.label}» نمایان شد`);
+                            fetchSettings();
+                          }
+                        } else {
+                          const { error } = await supabase
+                            .from('site_settings')
+                            .insert({ key, label: `نمایش ${section.label}`, value: newVal });
+                          if (error) toast.error('خطا در ذخیره');
+                          else {
+                            toast.success(isVisible ? `«${section.label}» مخفی شد` : `«${section.label}» نمایان شد`);
+                            fetchSettings();
+                          }
+                        }
+                        setSaving(false);
+                      };
+
+                      return (
+                        <div
+                          key={section.id}
+                          className={`p-4 rounded-lg border flex items-center justify-between transition-all ${
+                            isVisible ? 'border-border bg-card' : 'border-destructive/30 bg-destructive/5 opacity-70'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm">{section.label}</p>
+                              <Badge variant={isVisible ? 'default' : 'destructive'} className="text-xs">
+                                {isVisible ? 'نمایان' : 'مخفی'}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleVisibility}
+                            disabled={saving}
+                            className={isVisible ? 'text-primary' : 'text-destructive'}
+                            title={isVisible ? 'مخفی کن' : 'نمایان کن'}
+                          >
+                            {isVisible ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                          </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={toggleVisibility}
-                        disabled={saving}
-                        className={isVisible ? 'text-primary' : 'text-destructive'}
-                        title={isVisible ? 'مخفی کن' : 'نمایان کن'}
-                      >
-                        {isVisible ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
 
