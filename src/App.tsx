@@ -80,7 +80,7 @@ const App = () => (
                 path="/shop" 
                 element={
                   <ProtectedRoute>
-                    <Shop />
+                    <PageVisibilityGate sectionId="page_shop"><Shop /></PageVisibilityGate>
                   </ProtectedRoute>
                 } 
               />
