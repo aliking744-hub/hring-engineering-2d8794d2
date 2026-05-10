@@ -559,7 +559,7 @@ const SiteSettingsManager = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="texts" className="gap-2">
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">متون</span>
@@ -571,6 +571,10 @@ const SiteSettingsManager = () => {
           <TabsTrigger value="logos" className="gap-2">
             <Image className="w-4 h-4" />
             <span className="hidden sm:inline">لوگوها</span>
+          </TabsTrigger>
+          <TabsTrigger value="visibility" className="gap-2">
+            <Eye className="w-4 h-4" />
+            <span className="hidden sm:inline">نمایش بخش‌ها</span>
           </TabsTrigger>
         </TabsList>
 
