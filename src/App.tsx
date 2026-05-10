@@ -40,6 +40,13 @@ import PaymentHistory from "./pages/PaymentHistory";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import SupportChatWidget from "./components/SupportChatWidget";
+import PageVisibilityGate from "./components/PageVisibilityGate";
+import { useSectionVisible } from "./hooks/useSectionVisible";
+
+const GatedSupportChat = () => {
+  const visible = useSectionVisible('support_chat');
+  return visible ? <SupportChatWidget /> : null;
+};
 import FAQ from "./pages/FAQ";
 import Admin from "./pages/Admin";
 import ProductCatalog from "./pages/ProductCatalog";
