@@ -44,6 +44,35 @@ const PAGE_SECTIONS = [
   { id: 'dashboard_upgrade_cta', label: 'دکمه ارتقا در داشبورد', description: 'CTA ارتقای پلن در داشبورد کاربر' },
 ];
 
+const DASHBOARD_TIER_SECTIONS = [
+  { id: 'dash_tier_smart-workspace', label: 'تب: میزکار هوشمند', description: 'کل تب میزکار هوشمند در داشبورد' },
+  { id: 'dash_tier_hr-operations', label: 'تب: سرمایه انسانی و عملیات', description: 'کل تب HR و عملیات' },
+  { id: 'dash_tier_command-center', label: 'تب: پنل راهبری', description: 'کل تب Command Center' },
+  { id: 'dash_tier_vision-deck', label: 'تب: اتاق فرماندهی', description: 'کل تب Vision Deck' },
+];
+
+const DASHBOARD_MODULE_SECTIONS = [
+  // Smart Workspace
+  { id: 'dash_mod_job-engineering', label: 'مهندسی مشاغل', description: 'ماژول job-description' },
+  { id: 'dash_mod_interview-assistant', label: 'دستیار مصاحبه', description: 'ماژول interview-assistant' },
+  { id: 'dash_mod_smart-ad-writer', label: 'آگهی‌نویس هوشمند', description: 'ماژول smart-ad-generator' },
+  { id: 'dash_mod_smart-workspace-success-architect', label: 'معمار موفقیت ۹۰ روزه (میزکار)', description: 'success-architect در میزکار' },
+  // HR & Operations
+  { id: 'dash_mod_success-architect', label: 'برنامه موفقیت ۹۰ روزه (آنبوردینگ)', description: 'ماژول onboarding' },
+  { id: 'dash_mod_learning-path', label: 'طراح مسیر یادگیری', description: 'ماژول learning-path' },
+  { id: 'dash_mod_profiles', label: 'پروفایل‌ها', description: 'لیست پرسنل' },
+  { id: 'dash_mod_org-design', label: 'طراحی سازمان', description: 'ماژول org chart' },
+  // Command Center
+  { id: 'dash_mod_hr-dashboard', label: 'داشبورد منابع انسانی', description: 'HR Dashboard' },
+  { id: 'dash_mod_costing', label: 'بهای تمام شده', description: 'cost-calculator' },
+  { id: 'dash_mod_headhunting', label: 'شکار مدیران', description: 'smart-headhunting' },
+  { id: 'dash_mod_performance-eval', label: 'ارزیابی عملکرد', description: 'ماژول ارزیابی' },
+  // Vision Deck
+  { id: 'dash_mod_strategic-compass', label: 'قطب‌نمای استراتژی', description: 'strategic-compass' },
+  { id: 'dash_mod_legal-advisor', label: 'مشاور حقوقی (داشبورد)', description: 'کارت مشاور حقوقی در داشبورد' },
+  { id: 'dash_mod_macro-analytics', label: 'گزارش‌های کلان', description: 'macro analytics' },
+];
+
 const ALL_VISIBILITY_GROUPS = [
   { title: 'بخش‌های صفحه اصلی', items: LANDING_SECTIONS },
   { title: 'منوی ناوبری (Navbar)', items: NAV_SECTIONS },
