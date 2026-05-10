@@ -136,6 +136,17 @@ export default function PaymentHistory() {
                     مشاهده تمام تراکنش‌ها و فاکتورهای شما
                   </p>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" asChild>
+                    <Link to="/dashboard" className="gap-2">
+                      <ArrowRight className="w-4 h-4" />
+                      بازگشت به داشبورد
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+              <div className="hidden">{/* spacer */}</div>
+              <div className="mt-2">
                 <Button variant="outline" asChild>
                   <Link to="/upgrade">
                     <CreditCard className="h-4 w-4 ml-2" />
