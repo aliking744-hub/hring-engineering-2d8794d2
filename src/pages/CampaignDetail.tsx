@@ -320,7 +320,7 @@ const CampaignDetail = () => {
 
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 lg:p-8 print:bg-white print:p-4" dir="rtl">
         <Link to="/dashboard" className="fixed top-6 right-6 z-50 print:hidden">
-          <Button variant="outline" className="border-slate-700 bg-slate-800/80 backdrop-blur-sm shadow-lg gap-2 text-slate-200 hover:bg-slate-700">
+          <Button variant="outline" className="border-slate-700 bg-slate-800/80 backdrop-blur-sm shadow-lg gap-2 text-slate-200 hover:bg-slate-700 mx-[1000px]">
             <ArrowLeft className="w-4 h-4 rotate-180" />
             بازگشت به داشبورد
           </Button>
