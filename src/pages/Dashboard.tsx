@@ -90,6 +90,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
+  const showUpgradeCta = useSectionVisible('dashboard_upgrade_cta');
 
   const creditLabel = getSetting('dashboard_credit_label', 'اعتبار شرکت');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
