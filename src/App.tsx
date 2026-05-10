@@ -252,11 +252,11 @@ const App = () => (
                 path="/legal-advisor" 
                 element={
                   <ProtectedRoute>
-                    <LegalAdvisor />
+                    <PageVisibilityGate sectionId="page_legal"><LegalAdvisor /></PageVisibilityGate>
                   </ProtectedRoute>
                 } 
               />
-              <Route path="/faq" element={<FAQ />} />
+              <Route path="/faq" element={<PageVisibilityGate sectionId="page_faq"><FAQ /></PageVisibilityGate>} />
               <Route path="/product-catalog" element={<ProductCatalog />} />
               <Route 
                 path="/admin" 
