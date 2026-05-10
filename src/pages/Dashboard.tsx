@@ -91,6 +91,11 @@ const Dashboard = () => {
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
   const showUpgradeCta = useSectionVisible('dashboard_upgrade_cta');
+  const isVisibleSetting = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
+  const visibleTiers = TIERS
+    .filter(t => isVisibleSetting(`dash_tier_${t.id}`))
+    .map(t => ({ ...t, modules: t.modules.filter(m => isVisibleSetting(`dash_mod_${m.id}`)) }))
+    .filter(t => t.modules.length > 0);
 
   const creditLabel = getSetting('dashboard_credit_label', 'اعتبار شرکت');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
