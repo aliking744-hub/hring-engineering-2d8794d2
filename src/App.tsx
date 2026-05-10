@@ -216,7 +216,7 @@ const App = () => (
                 path="/upgrade" 
                 element={
                   <ProtectedRoute>
-                    <Upgrade />
+                    <PageVisibilityGate sectionId="page_upgrade"><Upgrade /></PageVisibilityGate>
                   </ProtectedRoute>
                 } 
               />
