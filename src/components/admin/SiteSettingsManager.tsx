@@ -29,6 +29,50 @@ export const isSectionVisible = (settings: Record<string, string>, sectionId: st
   return v !== 'false'; // default visible
 };
 
+// Landing page sections that can be toggled visible/hidden
+const LANDING_SECTIONS = [
+  { id: 'hero', label: 'بخش هیرو (Hero)', description: 'بخش اصلی بالای صفحه اول' },
+  { id: 'dashboard_preview', label: 'پیش‌نمایش داشبورد', description: 'تصویر/پیش‌نمایش داشبورد در صفحه اصلی' },
+  { id: 'bento', label: 'گرید بنتو (قابلیت‌ها)', description: 'بخش معرفی قابلیت‌ها' },
+  { id: 'legal', label: 'بخش مشاور حقوقی', description: 'معرفی ابزار حقوقی در صفحه اصلی' },
+  { id: 'shop', label: 'تیزر فروشگاه', description: 'بخش معرفی فروشگاه' },
+  { id: 'pricing_landing', label: 'پلن‌ها در صفحه اصلی', description: 'نمایش پلن‌های قیمت‌گذاری در landing' },
+  { id: 'faq', label: 'سوالات متداول', description: 'تیزر FAQ در صفحه اصلی' },
+  { id: 'testimonials', label: 'نظرات کاربران', description: 'بخش testimonials' },
+  { id: 'blog', label: 'تیزر وبلاگ', description: 'آخرین مقالات وبلاگ در صفحه اصلی' },
+  { id: 'footer', label: 'فوتر', description: 'پایین صفحه' },
+];
+
+const NAV_SECTIONS = [
+  { id: 'nav_home', label: 'منو: خانه', description: 'لینک «خانه» در نوبار' },
+  { id: 'nav_plans', label: 'منو: پلن‌ها', description: 'لینک «پلن‌ها» در نوبار' },
+  { id: 'nav_shop', label: 'منو: فروشگاه', description: 'لینک «فروشگاه» در نوبار' },
+  { id: 'nav_blog', label: 'منو: بلاگ', description: 'لینک «بلاگ» در نوبار' },
+  { id: 'nav_dashboard', label: 'منو: داشبورد', description: 'لینک «داشبورد» در نوبار' },
+  { id: 'nav_login', label: 'منو: دکمه ورود', description: 'دکمه ورود در نوبار' },
+];
+
+const PAGE_SECTIONS = [
+  { id: 'page_upgrade', label: 'صفحه ارتقای پلن', description: 'صفحه /upgrade برای کاربران' },
+  { id: 'page_shop', label: 'صفحه فروشگاه', description: 'صفحه /shop' },
+  { id: 'page_blog', label: 'صفحه بلاگ', description: 'صفحه /blog' },
+  { id: 'page_faq', label: 'صفحه FAQ', description: 'صفحه سوالات متداول' },
+  { id: 'page_legal', label: 'صفحه مشاور حقوقی', description: 'صفحه /legal-advisor' },
+  { id: 'support_chat', label: 'ویجت چت پشتیبانی', description: 'دکمه شناور پشتیبانی در گوشه صفحه' },
+  { id: 'dashboard_upgrade_cta', label: 'دکمه ارتقا در داشبورد', description: 'CTA ارتقای پلن در داشبورد کاربر' },
+];
+
+const ALL_VISIBILITY_GROUPS = [
+  { title: 'بخش‌های صفحه اصلی', items: LANDING_SECTIONS },
+  { title: 'منوی ناوبری (Navbar)', items: NAV_SECTIONS },
+  { title: 'صفحات و ویجت‌ها', items: PAGE_SECTIONS },
+];
+
+export const isSectionVisible = (settings: Record<string, string>, sectionId: string): boolean => {
+  const v = settings[`section_visible_${sectionId}`];
+  return v !== 'false'; // default visible
+};
+
 // Text settings groups configuration
 const TEXT_GROUPS = [
   { 
