@@ -95,7 +95,7 @@ const LegalSearch = () => {
     // First escape the content to prevent XSS
     const escapedText = escapeHtml(text);
     if (!query.trim()) return escapedText;
-    
+
     const words = query.split(/\s+/).filter(w => w.length > 2);
     let highlighted = escapedText;
     words.forEach(word => {
@@ -104,7 +104,11 @@ const LegalSearch = () => {
       const regex = new RegExp(`(${escapedWord})`, 'gi');
       highlighted = highlighted.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded">$1</mark>');
     });
-    return highlighted;
+    // Final defense-in-depth sanitization
+    return DOMPurify.sanitize(highlighted, {
+      ALLOWED_TAGS: ['mark'],
+      ALLOWED_ATTR: ['class'],
+    });
   };
 
   return (
