@@ -259,6 +259,12 @@ export default function LearningPath() {
 
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />
+        <a href="/dashboard" className="fixed top-6 right-6 z-50 no-print">
+          <Button variant="outline" className="border-border bg-secondary/80 backdrop-blur-sm shadow-lg gap-2">
+            <ArrowRight className="w-4 h-4" />
+            بازگشت به داشبورد
+          </Button>
+        </a>
         <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
 
           {/* Header */}
