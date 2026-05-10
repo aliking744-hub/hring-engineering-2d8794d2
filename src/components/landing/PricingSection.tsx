@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Diamond, Crown, Zap, Building2, Users, Briefcase } from "lucide-react";
+import { useSectionVisible } from "@/hooks/useSectionVisible";
 
 const individualPlans = [
   {
@@ -105,6 +106,8 @@ const corporatePlans = [
 ];
 
 const PricingSection = () => {
+  const showIndividual = useSectionVisible('pricing_individual');
+  const showCorporate = useSectionVisible('pricing_corporate');
   return (
     <section id="pricing" className="py-20 px-4" dir="rtl">
       <div className="container mx-auto">
@@ -124,6 +127,7 @@ const PricingSection = () => {
         </motion.div>
 
         {/* Individual Plans */}
+        {showIndividual && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -197,8 +201,10 @@ const PricingSection = () => {
             ))}
           </div>
         </motion.div>
+        )}
 
         {/* Corporate Plans */}
+        {showCorporate && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -257,6 +263,7 @@ const PricingSection = () => {
             ))}
           </div>
         </motion.div>
+        )}
 
         {/* Diamond Economy Info */}
         <motion.div
