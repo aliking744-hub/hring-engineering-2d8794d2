@@ -9,7 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { Loader2, Save, Plus, Trash2, Type, Image, FileText, Upload, ChevronDown, Home, LogIn, LayoutDashboard, User, FolderOpen, Settings, Search } from 'lucide-react';
+import { Loader2, Save, Plus, Trash2, Type, Image, FileText, Upload, ChevronDown, Home, LogIn, LayoutDashboard, User, FolderOpen, Settings, Search, Eye, EyeOff } from 'lucide-react';
+
+// Landing page sections that can be toggled visible/hidden
+const LANDING_SECTIONS = [
+  { id: 'hero', label: 'بخش هیرو (Hero)', description: 'بخش اصلی بالای صفحه اول' },
+  { id: 'dashboard_preview', label: 'پیش‌نمایش داشبورد', description: 'تصویر/پیش‌نمایش داشبورد' },
+  { id: 'bento', label: 'گرید بنتو (قابلیت‌ها)', description: 'بخش معرفی قابلیت‌ها' },
+  { id: 'legal', label: 'بخش مشاور حقوقی', description: 'معرفی ابزار حقوقی' },
+  { id: 'shop', label: 'تیزر فروشگاه', description: 'بخش معرفی فروشگاه' },
+  { id: 'faq', label: 'سوالات متداول', description: 'تیزر FAQ' },
+  { id: 'testimonials', label: 'نظرات کاربران', description: 'بخش testimonials' },
+  { id: 'blog', label: 'تیزر وبلاگ', description: 'آخرین مقالات وبلاگ' },
+  { id: 'footer', label: 'فوتر', description: 'پایین صفحه' },
+];
+
+export const isSectionVisible = (settings: Record<string, string>, sectionId: string): boolean => {
+  const v = settings[`section_visible_${sectionId}`];
+  return v !== 'false'; // default visible
+};
 
 // Text settings groups configuration
 const TEXT_GROUPS = [
@@ -541,7 +559,7 @@ const SiteSettingsManager = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="texts" className="gap-2">
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">متون</span>
@@ -553,6 +571,10 @@ const SiteSettingsManager = () => {
           <TabsTrigger value="logos" className="gap-2">
             <Image className="w-4 h-4" />
             <span className="hidden sm:inline">لوگوها</span>
+          </TabsTrigger>
+          <TabsTrigger value="visibility" className="gap-2">
+            <Eye className="w-4 h-4" />
+            <span className="hidden sm:inline">نمایش بخش‌ها</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1005,6 +1027,87 @@ const SiteSettingsManager = () => {
                           </Button>
                         </div>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Visibility Tab */}
+        <TabsContent value="visibility">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="w-5 h-5" />
+                نمایش/عدم نمایش بخش‌های صفحه اصلی
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                با کلیک روی آیکون چشم می‌توانید هر بخش از صفحه اصلی سایت را موقتاً مخفی یا نمایان کنید. تغییرات بلافاصله ذخیره می‌شوند.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {LANDING_SECTIONS.map((section) => {
+                  const key = `section_visible_${section.id}`;
+                  const currentVal = editedValues[key] ?? getSettingByKey(key)?.value ?? 'true';
+                  const isVisible = currentVal !== 'false';
+
+                  const toggleVisibility = async () => {
+                    const newVal = isVisible ? 'false' : 'true';
+                    setEditedValues(prev => ({ ...prev, [key]: newVal }));
+                    const existing = getSettingByKey(key);
+                    setSaving(true);
+                    if (existing) {
+                      const { error } = await supabase
+                        .from('site_settings')
+                        .update({ value: newVal })
+                        .eq('id', existing.id);
+                      if (error) toast.error('خطا در ذخیره');
+                      else {
+                        toast.success(isVisible ? `«${section.label}» مخفی شد` : `«${section.label}» نمایان شد`);
+                        fetchSettings();
+                      }
+                    } else {
+                      const { error } = await supabase
+                        .from('site_settings')
+                        .insert({ key, label: `نمایش ${section.label}`, value: newVal });
+                      if (error) toast.error('خطا در ذخیره');
+                      else {
+                        toast.success(isVisible ? `«${section.label}» مخفی شد` : `«${section.label}» نمایان شد`);
+                        fetchSettings();
+                      }
+                    }
+                    setSaving(false);
+                  };
+
+                  return (
+                    <div
+                      key={section.id}
+                      className={`p-4 rounded-lg border flex items-center justify-between transition-all ${
+                        isVisible ? 'border-border bg-card' : 'border-destructive/30 bg-destructive/5 opacity-70'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{section.label}</p>
+                          <Badge variant={isVisible ? 'default' : 'destructive'} className="text-xs">
+                            {isVisible ? 'نمایان' : 'مخفی'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{section.description}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={toggleVisibility}
+                        disabled={saving}
+                        className={isVisible ? 'text-primary' : 'text-destructive'}
+                        title={isVisible ? 'مخفی کن' : 'نمایان کن'}
+                      >
+                        {isVisible ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                      </Button>
                     </div>
                   );
                 })}
