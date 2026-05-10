@@ -77,6 +77,8 @@ const ALL_VISIBILITY_GROUPS = [
   { title: 'بخش‌های صفحه اصلی', items: LANDING_SECTIONS },
   { title: 'منوی ناوبری (Navbar)', items: NAV_SECTIONS },
   { title: 'صفحات و ویجت‌ها', items: PAGE_SECTIONS },
+  { title: 'تب‌های داشبورد کاربر', items: DASHBOARD_TIER_SECTIONS },
+  { title: 'ماژول‌های داشبورد کاربر', items: DASHBOARD_MODULE_SECTIONS },
 ];
 
 export const isSectionVisible = (settings: Record<string, string>, sectionId: string): boolean => {
