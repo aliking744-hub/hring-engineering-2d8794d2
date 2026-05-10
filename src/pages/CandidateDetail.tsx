@@ -297,6 +297,12 @@ const CandidateDetail = () => {
                     <ArrowRight className="w-5 h-5 text-slate-300" />
                   </Button>
                 </Link>
+                <Link to="/dashboard">
+                  <Button variant="outline" className="border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-200 gap-2">
+                    <ArrowRight className="w-4 h-4" />
+                    بازگشت به داشبورد
+                  </Button>
+                </Link>
                 <div>
                   <p className="text-sm text-slate-400">{campaign?.name}</p>
                   <h1 className="text-xl font-bold text-white">{candidate.name}</h1>
