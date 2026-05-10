@@ -66,8 +66,8 @@ const App = () => (
                 <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/blog" element={<Blog />} />
-              <Route path="/blog/:slug" element={<BlogPost />} />
+              <Route path="/blog" element={<PageVisibilityGate sectionId="page_blog"><Blog /></PageVisibilityGate>} />
+              <Route path="/blog/:slug" element={<PageVisibilityGate sectionId="page_blog"><BlogPost /></PageVisibilityGate>} />
               <Route 
                 path="/dashboard" 
                 element={
