@@ -193,7 +193,7 @@ const AnalyticsHub = () => {
 
       {/* Back to Dashboard */}
       <Link to="/dashboard" className="hidden lg:block fixed top-4 right-4 z-50">
-        <Button variant="outline" className="border-border bg-secondary/80 backdrop-blur-sm shadow-lg gap-2 mx-[1000px]">
+        <Button variant="outline" className="border-border bg-secondary/80 backdrop-blur-sm shadow-lg gap-2">
           <Home className="w-4 h-4" />
           بازگشت به داشبورد
         </Button>

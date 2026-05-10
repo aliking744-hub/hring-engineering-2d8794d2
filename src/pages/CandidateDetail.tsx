@@ -298,7 +298,7 @@ const CandidateDetail = () => {
                   </Button>
                 </Link>
                 <Link to="/dashboard">
-                  <Button variant="outline" className="border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-200 gap-2 mx-[1000px]">
+                  <Button variant="outline" className="border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-200 gap-2">
                     <ArrowRight className="w-4 h-4" />
                     بازگشت به داشبورد
                   </Button>
