@@ -137,7 +137,7 @@ const Dashboard = () => {
     );
   }
 
-  const currentTier = TIERS.find(t => t.id === activeTier) || TIERS[0];
+  const currentTier = visibleTiers.find(t => t.id === activeTier) || visibleTiers[0] || TIERS[0];
 
   // Sidebar content (shared between mobile and desktop)
   const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
