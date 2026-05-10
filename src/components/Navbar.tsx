@@ -3,15 +3,15 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLogos, useFonts, useSiteName } from "@/hooks/useSiteSettings";
+import { useLogos, useFonts, useSiteName, useSiteSettings } from "@/hooks/useSiteSettings";
 import defaultLogo from "@/assets/logo.png";
 
-const navLinks = [
-  { href: "/", label: "خانه" },
-  { href: "/upgrade", label: "پلن‌ها" },
-  { href: "/shop", label: "فروشگاه" },
-  { href: "/blog", label: "بلاگ" },
-  { href: "/dashboard", label: "داشبورد" },
+const allNavLinks = [
+  { href: "/", label: "خانه", id: "nav_home" },
+  { href: "/upgrade", label: "پلن‌ها", id: "nav_plans" },
+  { href: "/shop", label: "فروشگاه", id: "nav_shop" },
+  { href: "/blog", label: "بلاگ", id: "nav_blog" },
+  { href: "/dashboard", label: "داشبورد", id: "nav_dashboard" },
 ];
 
 const Navbar = () => {
@@ -19,7 +19,11 @@ const Navbar = () => {
   const logos = useLogos();
   const fonts = useFonts();
   const siteName = useSiteName();
-  
+  const { getSetting } = useSiteSettings();
+  const isVisible = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
+  const navLinks = allNavLinks.filter((l) => isVisible(l.id));
+  const showLogin = isVisible('nav_login');
+
   // Use dynamic logo or fallback to default
   const logo = logos.main || defaultLogo;
 
@@ -60,11 +64,13 @@ const Navbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/auth">
-              <Button className="glow-button text-foreground font-medium px-6">
-                ورود
-              </Button>
-            </Link>
+            {showLogin && (
+              <Link to="/auth">
+                <Button className="glow-button text-foreground font-medium px-6">
+                  ورود
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -129,18 +135,20 @@ const Navbar = () => {
                   </motion.div>
                 ))}
                 
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="mt-4"
-                >
-                  <Link to="/auth" onClick={() => setIsOpen(false)}>
-                    <Button className="glow-button w-full text-foreground font-medium">
-                      ورود / ثبت‌نام
-                    </Button>
-                  </Link>
-                </motion.div>
+                {showLogin && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-4"
+                  >
+                    <Link to="/auth" onClick={() => setIsOpen(false)}>
+                      <Button className="glow-button w-full text-foreground font-medium">
+                        ورود / ثبت‌نام
+                      </Button>
+                    </Link>
+                  </motion.div>
+                )}
               </div>
             </motion.div>
           </>

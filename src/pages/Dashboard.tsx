@@ -25,6 +25,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useCredits } from "@/hooks/useCredits";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 import { useSiteSettings, useSiteName } from "@/hooks/useSiteSettings";
+import { useSectionVisible } from "@/hooks/useSectionVisible";
 import DashboardModuleCards from "@/components/dashboard/DashboardModuleCards";
 
 // 4-Tier sidebar structure
@@ -89,6 +90,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
+  const showUpgradeCta = useSectionVisible('dashboard_upgrade_cta');
 
   const creditLabel = getSetting('dashboard_credit_label', 'اعتبار شرکت');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
@@ -263,14 +265,16 @@ const Dashboard = () => {
         )}
 
         {/* Upgrade */}
-        <Link 
-          to="/upgrade"
-          onClick={onNavigate}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all text-sm"
-        >
-          <Crown className="w-4 h-4" />
-          <span className="font-medium">ارتقای پلن</span>
-        </Link>
+        {showUpgradeCta && (
+          <Link 
+            to="/upgrade"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-l from-primary/20 to-primary/10 text-primary border border-primary/30 hover:from-primary/30 hover:to-primary/20 transition-all text-sm"
+          >
+            <Crown className="w-4 h-4" />
+            <span className="font-medium">ارتقای پلن</span>
+          </Link>
+        )}
 
         {/* Logout */}
         <button 
