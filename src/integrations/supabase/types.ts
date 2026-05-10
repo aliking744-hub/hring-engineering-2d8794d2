@@ -1485,7 +1485,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      deduct_credits: { Args: { amount: number }; Returns: boolean }
+      deduct_credits:
+        | { Args: { amount: number }; Returns: boolean }
+        | {
+            Args: { amount: number; description?: string; feature_key?: string }
+            Returns: boolean
+          }
       get_company_role: {
         Args: { _company_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["company_role"]
