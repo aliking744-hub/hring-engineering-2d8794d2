@@ -19,7 +19,11 @@ const Navbar = () => {
   const logos = useLogos();
   const fonts = useFonts();
   const siteName = useSiteName();
-  
+  const { getSetting } = useSiteSettings();
+  const isVisible = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
+  const navLinks = allNavLinks.filter((l) => isVisible(l.id));
+  const showLogin = isVisible('nav_login');
+
   // Use dynamic logo or fallback to default
   const logo = logos.main || defaultLogo;
 
