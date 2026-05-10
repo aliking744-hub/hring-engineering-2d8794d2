@@ -64,11 +64,13 @@ const Navbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Link to="/auth">
-              <Button className="glow-button text-foreground font-medium px-6">
-                ورود
-              </Button>
-            </Link>
+            {showLogin && (
+              <Link to="/auth">
+                <Button className="glow-button text-foreground font-medium px-6">
+                  ورود
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
