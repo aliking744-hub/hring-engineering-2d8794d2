@@ -143,16 +143,13 @@ export default function PaymentHistory() {
                       بازگشت به داشبورد
                     </Link>
                   </Button>
+                  <Button variant="outline" asChild>
+                    <Link to="/upgrade">
+                      <CreditCard className="h-4 w-4 ml-2" />
+                      ارتقای پلن
+                    </Link>
+                  </Button>
                 </div>
-              </div>
-              <div className="hidden">{/* spacer */}</div>
-              <div className="mt-2">
-                <Button variant="outline" asChild>
-                  <Link to="/upgrade">
-                    <CreditCard className="h-4 w-4 ml-2" />
-                    ارتقای پلن
-                  </Link>
-                </Button>
               </div>
             </motion.div>
 
