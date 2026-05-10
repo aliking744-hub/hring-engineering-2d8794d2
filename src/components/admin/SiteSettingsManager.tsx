@@ -9,7 +9,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { Loader2, Save, Plus, Trash2, Type, Image, FileText, Upload, ChevronDown, Home, LogIn, LayoutDashboard, User, FolderOpen, Settings, Search } from 'lucide-react';
+import { Loader2, Save, Plus, Trash2, Type, Image, FileText, Upload, ChevronDown, Home, LogIn, LayoutDashboard, User, FolderOpen, Settings, Search, Eye, EyeOff } from 'lucide-react';
+
+// Landing page sections that can be toggled visible/hidden
+const LANDING_SECTIONS = [
+  { id: 'hero', label: 'بخش هیرو (Hero)', description: 'بخش اصلی بالای صفحه اول' },
+  { id: 'dashboard_preview', label: 'پیش‌نمایش داشبورد', description: 'تصویر/پیش‌نمایش داشبورد' },
+  { id: 'bento', label: 'گرید بنتو (قابلیت‌ها)', description: 'بخش معرفی قابلیت‌ها' },
+  { id: 'legal', label: 'بخش مشاور حقوقی', description: 'معرفی ابزار حقوقی' },
+  { id: 'shop', label: 'تیزر فروشگاه', description: 'بخش معرفی فروشگاه' },
+  { id: 'faq', label: 'سوالات متداول', description: 'تیزر FAQ' },
+  { id: 'testimonials', label: 'نظرات کاربران', description: 'بخش testimonials' },
+  { id: 'blog', label: 'تیزر وبلاگ', description: 'آخرین مقالات وبلاگ' },
+  { id: 'footer', label: 'فوتر', description: 'پایین صفحه' },
+];
+
+export const isSectionVisible = (settings: Record<string, string>, sectionId: string): boolean => {
+  const v = settings[`section_visible_${sectionId}`];
+  return v !== 'false'; // default visible
+};
 
 // Text settings groups configuration
 const TEXT_GROUPS = [
