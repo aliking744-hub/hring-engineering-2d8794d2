@@ -1,9 +1,19 @@
-// TEMPORARY: Auth disabled for testing — remove before production!
+import { useAuth } from './useAuth';
+
+// Super Admin / Father Admin email
+const SUPER_ADMIN_EMAIL = 'ali_king744@yahoo.com';
+
 export const useSuperAdmin = () => {
+  const { user, loading } = useAuth();
+
+  const isSuperAdmin = !loading && user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  const isFatherAdmin = isSuperAdmin; // Father Admin is the same user with bypass privileges
+
   return { 
-    isSuperAdmin: true, 
-    isFatherAdmin: true,
-    loading: false,
-    shouldBypassRestrictions: true,
+    isSuperAdmin, 
+    isFatherAdmin,
+    loading,
+    // Helper to check if credits/plans should be bypassed
+    shouldBypassRestrictions: isFatherAdmin,
   };
 };

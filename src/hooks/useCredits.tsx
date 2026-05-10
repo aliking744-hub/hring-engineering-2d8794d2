@@ -58,8 +58,8 @@ export const useCredits = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  // TEMPORARY: Testing mode — bypass credit restrictions
-  const isFatherAdmin = true;
+  // Check if current user is Father Admin (bypasses all credit restrictions)
+  const isFatherAdmin = user?.email?.toLowerCase() === FATHER_ADMIN_EMAIL.toLowerCase();
 
   const fetchCredits = async () => {
     if (!user) {
