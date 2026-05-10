@@ -10,10 +10,12 @@ import ShopTeaser from "@/components/landing/ShopTeaser";
 import FAQTeaser from "@/components/landing/FAQTeaser";
 import BlogTeaser from "@/components/landing/BlogTeaser";
 import Footer from "@/components/landing/Footer";
-import { useSiteName } from "@/hooks/useSiteSettings";
+import { useSiteName, useSiteSettings } from "@/hooks/useSiteSettings";
 
 const Index = () => {
   const siteName = useSiteName();
+  const { getSetting } = useSiteSettings();
+  const isVisible = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
 
   return (
     <>
@@ -30,16 +32,16 @@ const Index = () => {
         <AuroraBackground />
         <Navbar />
         <main className="max-w-[1920px] mx-auto">
-          <HeroSection />
-          <DashboardPreview />
-          <BentoGrid />
-          <LegalAdvisorSection />
-          <ShopTeaser />
-          <FAQTeaser />
-          <TestimonialsSection />
-          <BlogTeaser />
+          {isVisible('hero') && <HeroSection />}
+          {isVisible('dashboard_preview') && <DashboardPreview />}
+          {isVisible('bento') && <BentoGrid />}
+          {isVisible('legal') && <LegalAdvisorSection />}
+          {isVisible('shop') && <ShopTeaser />}
+          {isVisible('faq') && <FAQTeaser />}
+          {isVisible('testimonials') && <TestimonialsSection />}
+          {isVisible('blog') && <BlogTeaser />}
         </main>
-        <Footer />
+        {isVisible('footer') && <Footer />}
       </div>
     </>
   );
