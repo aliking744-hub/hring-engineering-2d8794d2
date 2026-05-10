@@ -64,26 +64,10 @@ const Auth = () => {
       
       setInviteLoading(true);
       try {
-        // Fetch invite with company info
-        const { data: invite, error } = await supabase
-          .from('company_invites')
-          .select(`
-            id,
-            invite_code,
-            role,
-            company_id,
-            max_uses,
-            used_count,
-            expires_at,
-            is_active,
-            companies (
-              name,
-              status
-            )
-          `)
-          .eq('invite_code', inviteCode)
-          .eq('is_active', true)
-          .single();
+        const { data: invite, error } = await supabase.functions.invoke(
+          "validate-invite-code",
+          { body: { inviteCode } },
+        );
 
         if (error || !invite) {
           setInviteInfo({
@@ -98,60 +82,21 @@ const Auth = () => {
           return;
         }
 
-        // Check if expired
-        if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-          setInviteInfo({
-            id: invite.id,
-            invite_code: inviteCode,
-            role: invite.role,
-            company_id: invite.company_id,
-            company_name: (invite.companies as any)?.name || '',
-            is_valid: false,
-            error: 'کد دعوت منقضی شده است'
-          });
-          return;
-        }
-
-        // Check max uses
-        if (invite.max_uses && invite.used_count >= invite.max_uses) {
-          setInviteInfo({
-            id: invite.id,
-            invite_code: inviteCode,
-            role: invite.role,
-            company_id: invite.company_id,
-            company_name: (invite.companies as any)?.name || '',
-            is_valid: false,
-            error: 'ظرفیت استفاده از این کد دعوت پر شده است'
-          });
-          return;
-        }
-
-        // Check company status
-        if ((invite.companies as any)?.status === 'suspended') {
-          setInviteInfo({
-            id: invite.id,
-            invite_code: inviteCode,
-            role: invite.role,
-            company_id: invite.company_id,
-            company_name: (invite.companies as any)?.name || '',
-            is_valid: false,
-            error: 'این شرکت در حال حاضر غیرفعال است'
-          });
-          return;
-        }
-
         setInviteInfo({
-          id: invite.id,
+          id: invite.id || '',
           invite_code: inviteCode,
-          role: invite.role,
-          company_id: invite.company_id,
-          company_name: (invite.companies as any)?.name || '',
-          is_valid: true
+          role: invite.role || 'employee',
+          company_id: invite.company_id || '',
+          company_name: invite.company_name || '',
+          is_valid: !!invite.is_valid,
+          error: invite.error,
         });
 
-        // Force signup mode for invite
-        setIsLogin(false);
-        setAccountType('company');
+        if (invite.is_valid) {
+          // Force signup mode for invite
+          setIsLogin(false);
+          setAccountType('company');
+        }
       } catch (err) {
         console.error('Error fetching invite:', err);
         setInviteInfo({

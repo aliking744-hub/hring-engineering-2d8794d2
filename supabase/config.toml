@@ -99,3 +99,6 @@ verify_jwt = false
 [functions.auto-headhunt]
 verify_jwt = false
 
+
+[functions.validate-invite-code]
+verify_jwt = false
