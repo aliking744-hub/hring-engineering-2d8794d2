@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useSiteSettings, useSiteName } from "@/hooks/useSiteSettings";
+import { useSectionVisible } from "@/hooks/useSectionVisible";
 
 const HeroSection = () => {
   const { fonts, getSetting } = useSiteSettings();
+  const showCtaSecondary = useSectionVisible('hero_cta_secondary');
   const siteName = useSiteName();
   
   // Get dynamic texts or use defaults (using siteName as fallback prefix)
@@ -70,15 +72,17 @@ const HeroSection = () => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <Link to="/upgrade">
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="border-primary/50 bg-primary/10 hover:bg-primary/20 text-foreground font-medium px-8 py-6 text-lg shadow-[0_0_15px_hsl(var(--primary)/0.3)] hover:shadow-[0_0_25px_hsl(var(--primary)/0.5)] transition-all duration-500"
-              >
-                {ctaSecondary}
-              </Button>
-            </Link>
+            {showCtaSecondary && (
+              <Link to="/upgrade">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="border-primary/50 bg-primary/10 hover:bg-primary/20 text-foreground font-medium px-8 py-6 text-lg shadow-[0_0_15px_hsl(var(--primary)/0.3)] hover:shadow-[0_0_25px_hsl(var(--primary)/0.5)] transition-all duration-500"
+                >
+                  {ctaSecondary}
+                </Button>
+              </Link>
+            )}
           </motion.div>
         </motion.div>
 

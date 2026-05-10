@@ -14,11 +14,14 @@ import { Loader2, Save, Plus, Trash2, Type, Image, FileText, Upload, ChevronDown
 // Landing page sections that can be toggled visible/hidden
 const LANDING_SECTIONS = [
   { id: 'hero', label: 'بخش هیرو (Hero)', description: 'بخش اصلی بالای صفحه اول' },
+  { id: 'hero_cta_secondary', label: 'دکمه «مشاهده پلن‌ها» در هیرو', description: 'دکمه ثانویه هیرو که به صفحه پلن‌ها می‌رود' },
   { id: 'dashboard_preview', label: 'پیش‌نمایش داشبورد', description: 'تصویر/پیش‌نمایش داشبورد در صفحه اصلی' },
   { id: 'bento', label: 'گرید بنتو (قابلیت‌ها)', description: 'بخش معرفی قابلیت‌ها' },
   { id: 'legal', label: 'بخش مشاور حقوقی', description: 'معرفی ابزار حقوقی در صفحه اصلی' },
   { id: 'shop', label: 'تیزر فروشگاه', description: 'بخش معرفی فروشگاه' },
-  { id: 'pricing_landing', label: 'پلن‌ها در صفحه اصلی', description: 'نمایش پلن‌های قیمت‌گذاری در landing' },
+  { id: 'pricing_landing', label: 'پلن‌ها در صفحه اصلی (کل بخش)', description: 'نمایش کل بخش پلن‌های قیمت‌گذاری در landing' },
+  { id: 'pricing_individual', label: 'پلن‌های فردی', description: 'گرید پلن‌های فردی داخل بخش قیمت‌گذاری' },
+  { id: 'pricing_corporate', label: 'پلن‌های سازمانی', description: 'گرید پلن‌های سازمانی داخل بخش قیمت‌گذاری' },
   { id: 'faq', label: 'سوالات متداول', description: 'تیزر FAQ در صفحه اصلی' },
   { id: 'testimonials', label: 'نظرات کاربران', description: 'بخش testimonials' },
   { id: 'blog', label: 'تیزر وبلاگ', description: 'آخرین مقالات وبلاگ در صفحه اصلی' },
