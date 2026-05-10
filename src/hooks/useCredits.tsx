@@ -92,23 +92,18 @@ export const useCredits = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('deduct_credits', { amount });
-      
+      const { data, error } = await supabase.rpc('deduct_credits', {
+        amount,
+        feature_key: featureKey || null,
+        description: featureKey ? DIAMOND_COST_LABELS[featureKey as CreditOperation] : null,
+      } as any);
+
       if (error) throw error;
-      
+
       if (data && user) {
-        // Log the transaction with feature_key for analytics
-        await supabase.from('credit_transactions').insert({
-          user_id: user.id,
-          amount: -amount,
-          transaction_type: 'deduction',
-          feature_key: featureKey || null,
-          description: featureKey ? DIAMOND_COST_LABELS[featureKey as CreditOperation] : null,
-        });
-        
-        await fetchCredits(); // Refresh credits after deduction
+        await fetchCredits();
       }
-      
+
       return data ?? false;
     } catch (error) {
       console.error('Error deducting credits:', error);
