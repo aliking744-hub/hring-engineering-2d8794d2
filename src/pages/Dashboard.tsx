@@ -178,7 +178,7 @@ const Dashboard = () => {
 
       {/* 4-Tier Accordion Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto">
-        {TIERS.map((tier) => {
+        {visibleTiers.map((tier) => {
           const isOpen = openTiers.includes(tier.id);
           const isActive = activeTier === tier.id;
           return (
