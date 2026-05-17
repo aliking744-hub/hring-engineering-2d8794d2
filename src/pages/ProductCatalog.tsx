@@ -15,7 +15,22 @@ const ProductCatalog = () => {
   return (
     <>
       <Helmet>
-        <title>hring - کاتالوگ محصول</title>
+        <title>کاتالوگ محصول hring — راهنمای کامل ماژول‌های منابع انسانی</title>
+        <meta name="description" content="کاتالوگ کامل محصول hring: معماری ۴ لایه‌ای منابع انسانی شامل میزکار هوشمند، عملیات HR، پنل راهبری و مشاوره حقوقی با هوش مصنوعی." />
+        <link rel="canonical" href="https://hring-app.lovable.app/product-catalog" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://hring-app.lovable.app/product-catalog" />
+        <meta property="og:title" content="کاتالوگ محصول hring" />
+        <meta property="og:description" content="معماری ۴ لایه‌ای hring برای مدیریت کامل منابع انسانی مبتنی بر هوش مصنوعی." />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: 'کاتالوگ محصول hring',
+            description: 'معماری ۴ لایه‌ای hring شامل میزکار هوشمند، عملیات HR، پنل راهبری و مشاوره حقوقی.',
+            url: 'https://hring-app.lovable.app/product-catalog',
+          })}
+        </script>
         <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
       </Helmet>
       <div dir="rtl" style={{ fontFamily: "'Vazirmatn', sans-serif", background: '#0a0e1a', color: '#e2e8f0', lineHeight: 1.8, minHeight: '100vh' }}>

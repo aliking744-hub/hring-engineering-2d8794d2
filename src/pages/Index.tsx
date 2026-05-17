@@ -22,12 +22,16 @@ const Index = () => {
     <>
       <Helmet>
         <title>{siteName} - نرم افزار جامع منابع انسانی</title>
-        <meta 
-          name="description" 
+        <meta
+          name="description"
           content={`${siteName} سیستم مدیریت منابع انسانی نسل جدید. استخدام هوشمند، مصاحبه خودکار و آنبوردینگ حرفه‌ای با قدرت هوش مصنوعی. راهکار یکپارچه برای تیم‌های HR.`}
         />
         <meta name="keywords" content="منابع انسانی, استخدام, مصاحبه, آنبوردینگ, HR, هوش مصنوعی, نرم افزار منابع انسانی" />
-        <link rel="canonical" href="https://hring.ir/" />
+        <link rel="canonical" href="https://hring-app.lovable.app/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://hring-app.lovable.app/" />
+        <meta property="og:title" content={`${siteName} - نرم افزار جامع منابع انسانی`} />
+        <meta property="og:description" content={`${siteName} سیستم مدیریت منابع انسانی نسل جدید با قدرت هوش مصنوعی.`} />
       </Helmet>
       <div className="relative min-h-screen overflow-x-hidden">
         <AuroraBackground />
