@@ -55,7 +55,38 @@ const BlogPost = () => {
     <>
       <Helmet>
         <title>{post?.title || 'بلاگ'} - HRing</title>
-        <meta name="description" content={post?.content?.substring(0, 160) || 'مقاله بلاگ'} />
+        <meta
+          name="description"
+          content={
+            post?.content?.replace(/[#*_`>\-\n]/g, ' ').trim().substring(0, 160) ||
+            `مقاله‌ای از بلاگ HRing درباره منابع انسانی، استخدام و رهبری سازمان. برای مطالعه کامل به صفحه مقاله مراجعه کنید.`
+          }
+        />
+        <link rel="canonical" href={`https://hring-app.lovable.app/blog/${slug}`} />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content={`https://hring-app.lovable.app/blog/${slug}`} />
+        <meta property="og:title" content={`${post?.title || 'بلاگ'} - HRing`} />
+        <meta
+          property="og:description"
+          content={
+            post?.content?.replace(/[#*_`>\-\n]/g, ' ').trim().substring(0, 160) ||
+            'مقاله‌ای از بلاگ HRing درباره منابع انسانی و رهبری سازمان.'
+          }
+        />
+        {post?.image_url && <meta property="og:image" content={post.image_url} />}
+        {post && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Article',
+              headline: post.title,
+              image: post.image_url ? [post.image_url] : undefined,
+              datePublished: post.created_at,
+              dateModified: post.updated_at || post.created_at,
+              mainEntityOfPage: `https://hring-app.lovable.app/blog/${slug}`,
+            })}
+          </script>
+        )}
       </Helmet>
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />

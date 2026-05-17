@@ -297,7 +297,9 @@ const Dashboard = () => {
     <>
       <Helmet>
         <title>داشبورد | {siteName} - پنل مدیریت منابع انسانی</title>
-        <meta name="description" content={`پنل مدیریت منابع انسانی ${siteName}`} />
+        <meta name="description" content={`پنل کاربری ${siteName} برای مدیریت منابع انسانی، استخدام، آنبوردینگ، تحلیل پرسنل و دسترسی به ابزارهای هوش مصنوعی.`} />
+        <meta name="robots" content="noindex, nofollow" />
+        <link rel="canonical" href="https://hring-app.lovable.app/dashboard" />
       </Helmet>
       <div className="relative min-h-screen flex" dir="rtl">
         <AuroraBackground />

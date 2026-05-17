@@ -258,6 +258,22 @@ const FAQ = () => {
       <Helmet>
         <title>سوالات متداول | {siteName}</title>
         <meta name="description" content={`راهنمای کامل پلن‌ها، قیمت‌گذاری و دسترسی‌های ${siteName}. پاسخ به سوالات متداول درباره اشتراک‌ها و امکانات.`} />
+        <link rel="canonical" href="https://hring-app.lovable.app/faq" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://hring-app.lovable.app/faq" />
+        <meta property="og:title" content={`سوالات متداول | ${siteName}`} />
+        <meta property="og:description" content={`راهنمای پلن‌ها، نقش‌ها و امکانات ${siteName} در یک نگاه.`} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: faqs.flatMap(cat => cat.questions.map(q => ({
+              '@type': 'Question',
+              name: q.q,
+              acceptedAnswer: { '@type': 'Answer', text: q.a },
+            }))),
+          })}
+        </script>
       </Helmet>
 
       <div className="relative min-h-screen" dir="rtl">

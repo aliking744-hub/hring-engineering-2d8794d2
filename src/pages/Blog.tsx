@@ -38,7 +38,12 @@ const Blog = () => {
     <>
       <Helmet>
         <title>بلاگ - HRing</title>
-        <meta name="description" content="آخرین مقالات و مطالب تخصصی منابع انسانی" />
+        <meta name="description" content="آخرین مقالات و مطالب تخصصی منابع انسانی، استخدام، آنبوردینگ، رهبری سازمان و قانون کار ایران در بلاگ HRing." />
+        <link rel="canonical" href="https://hring-app.lovable.app/blog" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://hring-app.lovable.app/blog" />
+        <meta property="og:title" content="بلاگ HRing — مقالات تخصصی منابع انسانی" />
+        <meta property="og:description" content="آخرین مقالات تخصصی منابع انسانی، استخدام و رهبری سازمان در HRing." />
       </Helmet>
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />
