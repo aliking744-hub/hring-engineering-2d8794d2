@@ -3,10 +3,12 @@ import { KPICard } from './KPICard';
 import { ChartCard } from './ChartCard';
 import { PrintButton, printOverviewPDF } from './PrintButton';
 import { Users, Building2, Banknote, Clock, Calendar } from 'lucide-react';
+import { useCompany } from '@/hooks/useCompany';
 import {
   PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Area, AreaChart
 } from 'recharts';
+
 
 interface OverviewTabProps {
   data: Employee[];
