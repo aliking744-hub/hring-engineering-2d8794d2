@@ -148,8 +148,10 @@ export function OverviewTab({ data }: OverviewTabProps) {
     <div className="space-y-4 md:space-y-6 print-area">
       {/* Print Button */}
       <div className="flex justify-end">
-        <PrintButton title="گزارش نمای کلی" onPrint={() => printOverviewPDF(data)} />
+        <PrintButton title="گزارش نمای کلی" onPrint={() => printOverviewPDF('overview-pdf-root')} />
       </div>
+      <div id="overview-pdf-root" className="space-y-4 md:space-y-6 bg-background p-2">
+
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
@@ -292,6 +294,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
+      </div>
       </div>
     </div>
   );
