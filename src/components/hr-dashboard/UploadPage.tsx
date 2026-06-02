@@ -9,10 +9,11 @@ import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
 
 interface UploadPageProps {
-  onDataLoaded: (data: Employee[]) => void;
+  onDataLoaded: (data: Employee[], name: string) => void;
+  historySlot?: React.ReactNode;
 }
 
-export function UploadPage({ onDataLoaded }: UploadPageProps) {
+export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
