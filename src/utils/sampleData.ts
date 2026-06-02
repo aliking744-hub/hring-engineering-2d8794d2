@@ -152,6 +152,18 @@ function deriveAgeGroup(birthDate: string): string {
   return '50+';
 }
 
+function normalizeEducationLevel(raw: string): string {
+  const value = cleanString(raw).replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک');
+  const compact = normalizeHeader(value);
+  if (!compact) return '';
+  if (compact.includes('دکتری') || compact.includes('دکترا') || compact.includes('phd')) return 'دکتری';
+  if (compact.includes('فوقلیسانس') || compact.includes('کارشناسیارشد') || compact.includes('ارشد') || compact.includes('master')) return 'کارشناسی ارشد';
+  if (compact.includes('لیسانس') || compact.includes('کارشناسی') || compact.includes('bachelor')) return 'کارشناسی';
+  if (compact.includes('فوق دیپلم') || compact.includes('فوقدیپلم') || compact.includes('کاردانی')) return 'کاردانی';
+  if (compact.includes('دیپلم') || compact.includes('زیردیپلم') || compact.includes('سیکل')) return 'دیپلم و زیردیپلم';
+  return value;
+}
+
 export function parseExcelData(data: any[]): Employee[] {
   return data.map((row, index) => {
     const name = cleanString(getCell(row, ['نام', 'name', 'firstName'])) || undefined;
@@ -173,7 +185,7 @@ export function parseExcelData(data: any[]): Employee[] {
       gender: (cleanString(getCell(row, ['جنسیت', 'gender'])) === 'زن' ? 'زن' : 'مرد'),
       birthDate,
       birthMonth,
-      education: cleanString(getCell(row, ['مدرک تحصیلی', 'مقطع تحصیلی', 'تحصیلات', 'سطح تحصیلات', 'میزان تحصیلات', 'آخرین مدرک تحصیلی', 'مدرک', 'education', 'degree'])),
+      education: normalizeEducationLevel(getCell(row, ['مدرک تحصیلی', 'مقطع تحصیلی', 'تحصیلات', 'سطح تحصیلات', 'میزان تحصیلات', 'آخرین مدرک تحصیلی', 'مدرک', 'education', 'degree'])),
       educationField: cleanString(getCell(row, ['رشته تحصیلی', 'رشته', 'گرایش', 'educationField', 'field'])),
       maritalStatus: cleanString(getCell(row, ['وضعیت تاهل', 'وضعیت تأهل', 'تاهل', 'maritalStatus'])),
       childrenCount: parseInt(getCell(row, ['تعداد فرزندان', 'فرزند', 'childrenCount']) || '0') || 0,
