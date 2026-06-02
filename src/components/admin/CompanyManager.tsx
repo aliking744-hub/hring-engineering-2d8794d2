@@ -29,7 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Building2, Trash2, Edit2, Search, Filter, Download, CheckCircle, Clock, XCircle } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@e965/xlsx';
 import { TIER_NAMES, STATUS_NAMES } from '@/types/multiTenant';
 import type { Company, SubscriptionTier, CompanyStatus } from '@/types/multiTenant';
 
