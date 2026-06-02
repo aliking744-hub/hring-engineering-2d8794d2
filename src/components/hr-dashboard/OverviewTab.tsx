@@ -215,6 +215,8 @@ export function OverviewTab({ data }: OverviewTabProps) {
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
+              <Legend wrapperStyle={{ fontSize: '10px' }} />
+
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -237,6 +239,8 @@ export function OverviewTab({ data }: OverviewTabProps) {
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
+              <Legend wrapperStyle={{ fontSize: '10px' }} />
+
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -259,6 +263,8 @@ export function OverviewTab({ data }: OverviewTabProps) {
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
+              <Legend wrapperStyle={{ fontSize: '10px' }} />
+
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
