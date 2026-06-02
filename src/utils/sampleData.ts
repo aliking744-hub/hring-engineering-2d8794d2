@@ -104,20 +104,27 @@ function normalizeHeader(v: string): string {
     .toLowerCase();
 }
 
-function getCell(row: Record<string, any>, aliases: string[]): any {
+function getCell(row: Record<string, any>, aliases: string[], keywords: string[] = []): any {
   for (const alias of aliases) {
     const value = row[alias];
     if (cleanString(value)) return value;
   }
 
-  const normalizedRow: Record<string, any> = {};
-  Object.entries(row).forEach(([key, value]) => {
-    normalizedRow[normalizeHeader(key)] = value;
-  });
+  const normalizedEntries: Array<[string, any]> = Object.entries(row).map(([key, value]) => [normalizeHeader(key), value]);
+  const normalizedRow: Record<string, any> = Object.fromEntries(normalizedEntries);
 
   for (const alias of aliases) {
     const value = normalizedRow[normalizeHeader(alias)];
     if (cleanString(value)) return value;
+  }
+
+  // Substring fallback: match any column header that contains one of the keywords
+  const normalizedKeywords = keywords.map(normalizeHeader).filter(Boolean);
+  if (normalizedKeywords.length) {
+    for (const [normKey, value] of normalizedEntries) {
+      if (!cleanString(value)) continue;
+      if (normalizedKeywords.some(kw => normKey.includes(kw))) return value;
+    }
   }
 
   return '';
