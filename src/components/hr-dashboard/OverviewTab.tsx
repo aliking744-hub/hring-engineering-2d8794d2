@@ -287,7 +287,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
             <BarChart data={posData} layout="vertical">
               <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} />
               <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={50} />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Bar dataKey="value" fill={COLORS.pink} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
