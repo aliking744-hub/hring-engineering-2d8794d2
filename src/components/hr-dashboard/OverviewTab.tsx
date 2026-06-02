@@ -173,7 +173,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
               </defs>
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 9 }} width={25} />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Area type="monotone" dataKey="value" stroke={COLORS.cyan} fillOpacity={1} fill="url(#colorAge)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -196,7 +196,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -218,7 +218,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
