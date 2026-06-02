@@ -184,60 +184,50 @@ function pieTable(items: { name: string; value: number }[]) {
 // ─── Tab-specific PDF generators ──────────────────────────────────────────────
 
 import type { Employee } from '@/types/employee';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
-export function printOverviewPDF(data: Employee[]) {
-  const fmt = (n: number) => new Intl.NumberFormat('fa-IR').format(n);
-  const totalStaff = data.length;
-  const departments = [...new Set(data.map(e => e.department))].length;
-  const avgSalary = totalStaff > 0 ? Math.round(data.reduce((s, e) => s + e.salary, 0) / totalStaff) : 0;
+export async function printOverviewPDF(elementId: string) {
+  const el = document.getElementById(elementId);
+  if (!el) {
+    console.error('Overview PDF root element not found');
+    return;
+  }
 
-  const genderCounts = { مرد: 0, زن: 0 } as Record<string, number>;
-  const deptCounts: Record<string, number> = {};
-  const eduCounts: Record<string, number> = {};
-  const maritalCounts: Record<string, number> = {};
-  const ageCounts: Record<string, number> = {};
-
-  data.forEach(e => {
-    genderCounts[e.gender] = (genderCounts[e.gender] || 0) + 1;
-    deptCounts[e.department] = (deptCounts[e.department] || 0) + 1;
-    eduCounts[e.education] = (eduCounts[e.education] || 0) + 1;
-    maritalCounts[e.maritalStatus] = (maritalCounts[e.maritalStatus] || 0) + 1;
-    const ag = e.ageGroup || '';
-    ageCounts[ag] = (ageCounts[ag] || 0) + 1;
+  // Capture the dashboard exactly as it appears
+  const canvas = await html2canvas(el, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: getComputedStyle(document.body).backgroundColor || '#0b1020',
+    windowWidth: el.scrollWidth,
+    windowHeight: el.scrollHeight,
   });
 
-  const body = `
-    <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-value">${fmt(totalStaff)}</div><div class="kpi-label">تعداد پرسنل</div></div>
-      <div class="kpi-card"><div class="kpi-value">${fmt(departments)}</div><div class="kpi-label">تعداد معاونت</div></div>
-      <div class="kpi-card"><div class="kpi-value">${fmt(genderCounts['مرد'] || 0)}</div><div class="kpi-label">پرسنل مرد</div></div>
-      <div class="kpi-card"><div class="kpi-value">${fmt(genderCounts['زن'] || 0)}</div><div class="kpi-label">پرسنل زن</div></div>
-      <div class="kpi-card"><div class="kpi-value">${fmt(avgSalary)}</div><div class="kpi-label">میانگین حقوق</div></div>
-    </div>
+  // Landscape A4: 297 x 210 mm
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = 297;
+  const pageH = 210;
+  const margin = 6;
+  const availW = pageW - margin * 2;
+  const availH = pageH - margin * 2;
 
-    <div class="chart-grid">
-      <div class="chart-box">
-        <h3>توزیع جنسیت</h3>
-        ${pieTable(Object.entries(genderCounts).map(([name, value]) => ({ name, value })))}
-      </div>
-      <div class="chart-box">
-        <h3>وضعیت تاهل</h3>
-        ${pieTable(Object.entries(maritalCounts).map(([name, value]) => ({ name, value })))}
-      </div>
-    </div>
+  // Scale image to fit entirely on one page preserving aspect ratio
+  const imgRatio = canvas.width / canvas.height;
+  let drawW = availW;
+  let drawH = drawW / imgRatio;
+  if (drawH > availH) {
+    drawH = availH;
+    drawW = drawH * imgRatio;
+  }
+  const offsetX = (pageW - drawW) / 2;
+  const offsetY = (pageH - drawH) / 2;
 
-    <div class="section-title">توزیع پرسنل در معاونت‌ها</div>
-    ${barChart(Object.entries(deptCounts).sort((a,b) => b[1]-a[1]).map(([name, value]) => ({ name, value })))}
-
-    <div class="section-title">توزیع تحصیلی</div>
-    ${barChart(Object.entries(eduCounts).sort((a,b) => b[1]-a[1]).map(([name, value]) => ({ name, value })))}
-
-    <div class="section-title">رده‌های سنی</div>
-    ${barChart(Object.entries(ageCounts).filter(([k]) => k && k !== 'blank').map(([name, value]) => ({ name, value })))}
-  `;
-
-  openPrintWindow('گزارش نمای کلی منابع انسانی', body);
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+  pdf.addImage(imgData, 'JPEG', offsetX, offsetY, drawW, drawH);
+  pdf.save(`گزارش-نمای-کلی-${new Date().toLocaleDateString('fa-IR')}.pdf`);
 }
+
+
 
 export function printBirthdaysPDF(data: Employee[]) {
   const fmt = (n: number) => new Intl.NumberFormat('fa-IR').format(n);
