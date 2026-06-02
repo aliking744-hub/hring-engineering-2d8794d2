@@ -43,7 +43,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
         description: `${employees.length} رکورد با موفقیت بارگذاری شد`,
       });
 
-      onDataLoaded(employees);
+      onDataLoaded(employees, file.name);
     } catch (error) {
       toast({
         title: 'خطا',
@@ -82,7 +82,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
       title: 'داده نمونه',
       description: '78 رکورد نمونه بارگذاری شد',
     });
-    onDataLoaded(sampleData);
+    onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
   }, [onDataLoaded]);
 
   const handleDownloadTemplate = useCallback(() => {
