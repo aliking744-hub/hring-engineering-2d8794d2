@@ -63,12 +63,12 @@ export default function HRDashboard() {
     if (!user) return null;
     const { data: row, error } = await supabase
       .from('hr_uploads')
-      .insert({
+      .insert([{
         user_id: user.id,
         name,
         employee_count: employees.length,
-        data: employees as unknown as object,
-      })
+        data: employees as never,
+      }])
       .select('id')
       .single();
     if (error) {
