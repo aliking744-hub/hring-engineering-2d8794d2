@@ -50,6 +50,9 @@
     --muted: 228 20% 12%;
     --muted-foreground: 215 20% 55%;
 
+    --chart-tooltip-bg: 0 0% 100%;
+    --chart-tooltip-foreground: 222 47% 11%;
+
     --accent: 280 70% 60%;
     --accent-foreground: 210 40% 98%;
 
