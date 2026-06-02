@@ -285,8 +285,8 @@ export function OverviewTab({ data }: OverviewTabProps) {
         <ChartCard title="پرسنل به تفکیک جایگاه شغلی">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={posData} layout="vertical">
-              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} />
-              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={50} />
+              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={105} interval={0} />
               <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Bar dataKey="value" fill={COLORS.pink} radius={[0, 4, 4, 0]} />
             </BarChart>
