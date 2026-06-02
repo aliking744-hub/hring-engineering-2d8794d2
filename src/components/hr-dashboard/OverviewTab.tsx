@@ -74,6 +74,9 @@ function countByValue(values: string[]): Record<string, number> {
 }
 
 export function OverviewTab({ data }: OverviewTabProps) {
+  const { company } = useCompany();
+  const companyName = company?.name || '';
+
   const totalStaff = data.length;
   const departments = [...new Set(data.map(e => e.department))].length;
   const avgSalary = Math.round(data.reduce((sum, e) => sum + e.salary, 0) / totalStaff);
@@ -152,7 +155,18 @@ export function OverviewTab({ data }: OverviewTabProps) {
       <div className="flex justify-end">
         <PrintButton title="گزارش نمای کلی" onPrint={() => printOverviewPDF('overview-pdf-root')} />
       </div>
-      <div id="overview-pdf-root" className="space-y-4 md:space-y-6 bg-background p-2">
+      <div id="overview-pdf-root" className="space-y-4 md:space-y-6 bg-background p-3">
+        {/* Report header (company name) */}
+        <div className="flex items-center justify-between border-b border-border pb-2">
+          <div className="text-lg md:text-xl font-bold text-foreground">
+            {companyName ? `گزارش منابع انسانی — ${companyName}` : 'گزارش منابع انسانی'}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            تاریخ تهیه: {new Date().toLocaleDateString('fa-IR')}
+          </div>
+        </div>
+
+
 
 
       {/* KPI Cards */}
