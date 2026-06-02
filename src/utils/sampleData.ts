@@ -92,7 +92,7 @@ const persianDigitsToEnglish = (str: string) =>
 
 function cleanString(v: any): string {
   if (v === null || v === undefined) return '';
-  return String(v).replace(/\s+/g, ' ').trim();
+  return String(v).replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک').replace(/\s+/g, ' ').trim();
 }
 
 function normalizeHeader(v: string): string {
