@@ -22,6 +22,16 @@ const COLORS = {
   blue: '#3b82f6',
 };
 
+const tooltipContentStyle = {
+  backgroundColor: 'hsl(var(--chart-tooltip-bg))',
+  color: 'hsl(var(--chart-tooltip-foreground))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: '8px',
+  direction: 'rtl' as const,
+};
+
+const tooltipTextStyle = { color: 'hsl(var(--chart-tooltip-foreground))' };
+
 const CURRENT_PERSIAN_YEAR = 1403;
 
 const persianToEnglish = (str: string) => str.replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)]);
@@ -46,6 +56,19 @@ function calculateTenureFromPersianDate(hireDate: string): number | null {
   if (isNaN(hireYear) || hireYear < 1350 || hireYear > CURRENT_PERSIAN_YEAR) return null;
   const tenure = CURRENT_PERSIAN_YEAR - hireYear;
   return tenure >= 0 && tenure < 60 ? tenure : null;
+}
+
+function cleanChartLabel(value: string): string {
+  return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+function countByValue(values: string[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    const label = cleanChartLabel(value);
+    if (!label) return counts;
+    counts[label] = (counts[label] || 0) + 1;
+    return counts;
+  }, {});
 }
 
 export function OverviewTab({ data }: OverviewTabProps) {
