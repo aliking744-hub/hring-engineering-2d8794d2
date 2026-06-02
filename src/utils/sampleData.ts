@@ -104,20 +104,27 @@ function normalizeHeader(v: string): string {
     .toLowerCase();
 }
 
-function getCell(row: Record<string, any>, aliases: string[]): any {
+function getCell(row: Record<string, any>, aliases: string[], keywords: string[] = []): any {
   for (const alias of aliases) {
     const value = row[alias];
     if (cleanString(value)) return value;
   }
 
-  const normalizedRow: Record<string, any> = {};
-  Object.entries(row).forEach(([key, value]) => {
-    normalizedRow[normalizeHeader(key)] = value;
-  });
+  const normalizedEntries: Array<[string, any]> = Object.entries(row).map(([key, value]) => [normalizeHeader(key), value]);
+  const normalizedRow: Record<string, any> = Object.fromEntries(normalizedEntries);
 
   for (const alias of aliases) {
     const value = normalizedRow[normalizeHeader(alias)];
     if (cleanString(value)) return value;
+  }
+
+  // Substring fallback: match any column header that contains one of the keywords
+  const normalizedKeywords = keywords.map(normalizeHeader).filter(Boolean);
+  if (normalizedKeywords.length) {
+    for (const [normKey, value] of normalizedEntries) {
+      if (!cleanString(value)) continue;
+      if (normalizedKeywords.some(kw => normKey.includes(kw))) return value;
+    }
   }
 
   return '';
@@ -185,15 +192,15 @@ export function parseExcelData(data: any[]): Employee[] {
       gender: (cleanString(getCell(row, ['جنسیت', 'gender'])) === 'زن' ? 'زن' : 'مرد'),
       birthDate,
       birthMonth,
-      education: normalizeEducationLevel(getCell(row, ['مدرک تحصیلی', 'مقطع تحصیلی', 'تحصیلات', 'سطح تحصیلات', 'میزان تحصیلات', 'آخرین مدرک تحصیلی', 'مدرک', 'education', 'degree'])),
-      educationField: cleanString(getCell(row, ['رشته تحصیلی', 'رشته', 'گرایش', 'educationField', 'field'])),
-      maritalStatus: cleanString(getCell(row, ['وضعیت تاهل', 'وضعیت تأهل', 'تاهل', 'maritalStatus'])),
+      education: normalizeEducationLevel(getCell(row, ['مدرک تحصیلی', 'مقطع تحصیلی', 'تحصیلات', 'سطح تحصیلات', 'میزان تحصیلات', 'آخرین مدرک تحصیلی', 'مدرک', 'education', 'degree'], ['مدرک', 'تحصیل', 'مقطع'])),
+      educationField: cleanString(getCell(row, ['رشته تحصیلی', 'رشته', 'گرایش', 'educationField', 'field'], ['رشته', 'گرایش'])),
+      maritalStatus: cleanString(getCell(row, ['وضعیت تاهل', 'وضعیت تأهل', 'تاهل', 'maritalStatus'], ['تاهل', 'تأهل'])),
       childrenCount: parseInt(getCell(row, ['تعداد فرزندان', 'فرزند', 'childrenCount']) || '0') || 0,
-      department: cleanString(getCell(row, ['معاونت', 'واحد سازمانی', 'واحد', 'دپارتمان', 'بخش', 'department'])),
-      position: cleanString(getCell(row, ['جایگاه شغلی', 'سمت', 'عنوان شغلی', 'پست سازمانی', 'شغل', 'موقعیت شغلی', 'رده شغلی', 'position', 'jobTitle'])),
-      employmentType: cleanString(getCell(row, ['نوع استخدام', 'نوع همکاری', 'employmentType'])),
-      employmentDate: cleanString(getCell(row, ['تاریخ استخدام', 'تاریخ شروع همکاری', 'employmentDate'])),
-      location: cleanString(getCell(row, ['محل فعالیت', 'محل خدمت', 'محل کار', 'شرکت', 'نام شرکت', 'location', 'company'])),
+      department: cleanString(getCell(row, ['معاونت', 'واحد سازمانی', 'واحد', 'دپارتمان', 'بخش', 'گروه', 'دایره', 'اداره', 'قسمت', 'department', 'division'], ['معاونت', 'دپارتمان', 'واحد', 'بخش', 'دایره', 'اداره'])),
+      position: cleanString(getCell(row, ['جایگاه شغلی', 'سمت', 'عنوان شغلی', 'پست سازمانی', 'شغل', 'موقعیت شغلی', 'رده شغلی', 'position', 'jobTitle'], ['سمت', 'شغل', 'جایگاه', 'پست'])),
+      employmentType: cleanString(getCell(row, ['نوع استخدام', 'نوع همکاری', 'employmentType'], ['استخدام', 'همکاری'])),
+      employmentDate: cleanString(getCell(row, ['تاریخ استخدام', 'تاریخ شروع همکاری', 'employmentDate'], ['استخدام', 'شروعهمکاری'])),
+      location: cleanString(getCell(row, ['محل فعالیت', 'محل خدمت', 'محل کار', 'شرکت', 'نام شرکت', 'location', 'company'], ['محلفعالیت', 'محلخدمت', 'محلکار', 'شرکت'])),
       region: parseInt(getCell(row, ['منطقه', 'region']) || '1') || 1,
       salary: parseFloat(getCell(row, ['حقوق پرداختی', 'حقوق', 'salary']) || '0') || 0,
       contractSalary: parseFloat(getCell(row, ['حقوق قراردادی', 'contractSalary']) || '0') || 0,
