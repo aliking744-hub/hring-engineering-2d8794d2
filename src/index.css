@@ -50,6 +50,9 @@
     --muted: 228 20% 12%;
     --muted-foreground: 215 20% 55%;
 
+    --chart-tooltip-bg: 0 0% 100%;
+    --chart-tooltip-foreground: 222 47% 11%;
+
     --accent: 280 70% 60%;
     --accent-foreground: 210 40% 98%;
 
@@ -101,6 +104,22 @@
     font-family: 'IRANSans', 'BNazanin', 'Inter', system-ui, sans-serif;
     /* Prevent horizontal overflow on mobile */
     overflow-x: hidden;
+  }
+
+  .recharts-default-tooltip {
+    background: hsl(var(--chart-tooltip-bg)) !important;
+    color: hsl(var(--chart-tooltip-foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 8px !important;
+    direction: rtl;
+  }
+
+  .recharts-tooltip-label,
+  .recharts-tooltip-item,
+  .recharts-tooltip-item-name,
+  .recharts-tooltip-item-value,
+  .recharts-tooltip-item-separator {
+    color: hsl(var(--chart-tooltip-foreground)) !important;
   }
 
   /* Safe area padding for mobile devices */

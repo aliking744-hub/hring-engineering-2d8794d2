@@ -22,6 +22,16 @@ const COLORS = {
   blue: '#3b82f6',
 };
 
+const tooltipContentStyle = {
+  backgroundColor: 'hsl(var(--chart-tooltip-bg))',
+  color: 'hsl(var(--chart-tooltip-foreground))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: '8px',
+  direction: 'rtl' as const,
+};
+
+const tooltipTextStyle = { color: 'hsl(var(--chart-tooltip-foreground))' };
+
 const CURRENT_PERSIAN_YEAR = 1403;
 
 const persianToEnglish = (str: string) => str.replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)]);
@@ -46,6 +56,19 @@ function calculateTenureFromPersianDate(hireDate: string): number | null {
   if (isNaN(hireYear) || hireYear < 1350 || hireYear > CURRENT_PERSIAN_YEAR) return null;
   const tenure = CURRENT_PERSIAN_YEAR - hireYear;
   return tenure >= 0 && tenure < 60 ? tenure : null;
+}
+
+function cleanChartLabel(value: string): string {
+  return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+function countByValue(values: string[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    const label = cleanChartLabel(value);
+    if (!label) return counts;
+    counts[label] = (counts[label] || 0) + 1;
+    return counts;
+  }, {});
 }
 
 export function OverviewTab({ data }: OverviewTabProps) {
@@ -88,10 +111,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
     color: locationPalette[i % locationPalette.length],
   }));
 
-  const educationCounts: Record<string, number> = {};
-  data.forEach(e => {
-    educationCounts[e.education] = (educationCounts[e.education] || 0) + 1;
-  });
+  const educationCounts = countByValue(data.map(e => e.education));
   const educationData = Object.entries(educationCounts).map(([name, value], i) => ({
     name,
     value,
@@ -114,16 +134,10 @@ export function OverviewTab({ data }: OverviewTabProps) {
   });
   const ageData = ageGroupOrder.map(group => ({ name: group, value: ageCounts[group] || 0 }));
 
-  const deptCounts: Record<string, number> = {};
-  data.forEach(e => {
-    deptCounts[e.department] = (deptCounts[e.department] || 0) + 1;
-  });
+  const deptCounts = countByValue(data.map(e => e.department));
   const deptData = Object.entries(deptCounts).map(([name, value]) => ({ name, value }));
 
-  const posCounts: Record<string, number> = {};
-  data.forEach(e => {
-    posCounts[e.position] = (posCounts[e.position] || 0) + 1;
-  });
+  const posCounts = countByValue(data.map(e => e.position));
   const posData = Object.entries(posCounts).map(([name, value]) => ({ name, value }));
 
   const formatNumber = (num: number) => {
@@ -159,7 +173,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
               </defs>
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 9 }} width={25} />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Area type="monotone" dataKey="value" stroke={COLORS.cyan} fillOpacity={1} fill="url(#colorAge)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -182,7 +196,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -204,7 +218,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -226,7 +240,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -251,7 +265,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '10px' }} />
             </PieChart>
           </ResponsiveContainer>
@@ -262,7 +276,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
             <BarChart data={deptData} layout="vertical">
               <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} />
               <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={70} />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Bar dataKey="value" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -271,9 +285,9 @@ export function OverviewTab({ data }: OverviewTabProps) {
         <ChartCard title="پرسنل به تفکیک جایگاه شغلی">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={posData} layout="vertical">
-              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} />
-              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={50} />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={105} interval={0} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Bar dataKey="value" fill={COLORS.pink} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>

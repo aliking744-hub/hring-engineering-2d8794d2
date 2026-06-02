@@ -92,7 +92,35 @@ const persianDigitsToEnglish = (str: string) =>
 
 function cleanString(v: any): string {
   if (v === null || v === undefined) return '';
-  return String(v).trim();
+  return String(v).replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeHeader(v: string): string {
+  return cleanString(v)
+    .replace(/[ي]/g, 'ی')
+    .replace(/[ك]/g, 'ک')
+    .replace(/[‌\u200cـ]/g, '')
+    .replace(/[\s:：،,؛;\-_/\\.()（）\[\]{}]/g, '')
+    .toLowerCase();
+}
+
+function getCell(row: Record<string, any>, aliases: string[]): any {
+  for (const alias of aliases) {
+    const value = row[alias];
+    if (cleanString(value)) return value;
+  }
+
+  const normalizedRow: Record<string, any> = {};
+  Object.entries(row).forEach(([key, value]) => {
+    normalizedRow[normalizeHeader(key)] = value;
+  });
+
+  for (const alias of aliases) {
+    const value = normalizedRow[normalizeHeader(alias)];
+    if (cleanString(value)) return value;
+  }
+
+  return '';
 }
 
 function parsePersianDateParts(raw: string): { year: number; month: number; day: number } | null {
@@ -124,51 +152,63 @@ function deriveAgeGroup(birthDate: string): string {
   return '50+';
 }
 
+function normalizeEducationLevel(raw: string): string {
+  const value = cleanString(raw).replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک');
+  const compact = normalizeHeader(value);
+  if (!compact) return '';
+  if (compact.includes('دکتری') || compact.includes('دکترا') || compact.includes('phd')) return 'دکتری';
+  if (compact.includes('فوقلیسانس') || compact.includes('کارشناسیارشد') || compact.includes('ارشد') || compact.includes('master')) return 'کارشناسی ارشد';
+  if (compact.includes('لیسانس') || compact.includes('کارشناسی') || compact.includes('bachelor')) return 'کارشناسی';
+  if (compact.includes('فوق دیپلم') || compact.includes('فوقدیپلم') || compact.includes('کاردانی')) return 'کاردانی';
+  if (compact.includes('دیپلم') || compact.includes('زیردیپلم') || compact.includes('سیکل')) return 'دیپلم و زیردیپلم';
+  return value;
+}
+
 export function parseExcelData(data: any[]): Employee[] {
   return data.map((row, index) => {
-    const name = cleanString(row['نام'] || row['name']) || undefined;
-    const lastName = cleanString(row['نام خانوادگی'] || row['lastName']) || undefined;
+    const name = cleanString(getCell(row, ['نام', 'name', 'firstName'])) || undefined;
+    const lastName = cleanString(getCell(row, ['نام خانوادگی', 'نام‌خانوادگی', 'lastName', 'familyName'])) || undefined;
     const fullName = (name && lastName) ? `${name} ${lastName}` : undefined;
 
-    const birthDate = cleanString(row['تاریخ تولد'] || row['birthDate']);
-    const birthMonthRaw = cleanString(row['ماه تولد'] || row['birthMonth']);
+    const birthDate = cleanString(getCell(row, ['تاریخ تولد', 'birthDate']));
+    const birthMonthRaw = cleanString(getCell(row, ['ماه تولد', 'birthMonth']));
     const birthMonth = birthMonthRaw || deriveBirthMonth(birthDate);
-    const ageGroupRaw = cleanString(row['رده سنی'] || row['ageGroup']);
+    const ageGroupRaw = cleanString(getCell(row, ['رده سنی', 'گروه سنی', 'ageGroup']));
     const ageGroup = ageGroupRaw || deriveAgeGroup(birthDate);
 
     return {
       id: `emp-${index + 1}`,
-      personnelCode: String(row['کد پرسنلی'] || row['personnelCode'] || `${10001 + index}`),
+      personnelCode: cleanString(getCell(row, ['کد پرسنلی', 'کدپرسنلی', 'شماره پرسنلی', 'personnelCode'])) || `${10001 + index}`,
       name,
       lastName,
       fullName,
-      gender: (cleanString(row['جنسیت'] || row['gender']) === 'زن' ? 'زن' : 'مرد'),
+      gender: (cleanString(getCell(row, ['جنسیت', 'gender'])) === 'زن' ? 'زن' : 'مرد'),
       birthDate,
       birthMonth,
-      education: cleanString(row['مدرک تحصیلی'] || row['education']),
-      educationField: cleanString(row['رشته تحصیلی'] || row['educationField']),
-      maritalStatus: cleanString(row['وضعیت تاهل'] || row['maritalStatus']),
-      childrenCount: parseInt(row['تعداد فرزندان'] || row['childrenCount'] || '0') || 0,
-      department: cleanString(row['معاونت'] || row['department']),
-      position: cleanString(row['جایگاه شغلی'] || row['position']),
-      employmentType: cleanString(row['نوع استخدام'] || row['employmentType']),
-      employmentDate: cleanString(row['تاریخ استخدام'] || row['employmentDate']),
-      location: cleanString(row['محل فعالیت'] || row['location']),
-      region: parseInt(row['منطقه'] || row['region'] || '1') || 1,
-      salary: parseFloat(row['حقوق پرداختی'] || row['salary'] || '0') || 0,
-      contractSalary: parseFloat(row['حقوق قراردادی'] || row['contractSalary'] || '0') || 0,
-      overtimeHours: parseFloat(row['اضافه کار'] || row['overtimeHours'] || '0') || 0,
-      evaluationScore: parseFloat(row['امتیاز ارزشیابی'] || row['evaluationScore'] || '0') || 0,
-      managerEvaluation: parseFloat(row['ارزیابی مدیرعامل'] || '0') || 0,
-      selfEvaluation: parseFloat(row['ارزیابی فردی'] || '0') || 0,
-      deputyEvaluation: parseFloat(row['ارزیابی معاونت'] || '0') || 0,
-      peerEvaluation: parseFloat(row['ارزیابی مدیر مستقیم'] || '0') || 0,
-      performanceScore: parseFloat(row['عملکرد'] || '0') || 0,
-      knowledgeScore: parseFloat(row['دانش و تخصص'] || '0') || 0,
-      behaviorScore: parseFloat(row['تعامل و رفتار'] || '0') || 0,
-      responsibilityScore: parseFloat(row['مسئولیت و وفاداری'] || '0') || 0,
+      education: normalizeEducationLevel(getCell(row, ['مدرک تحصیلی', 'مقطع تحصیلی', 'تحصیلات', 'سطح تحصیلات', 'میزان تحصیلات', 'آخرین مدرک تحصیلی', 'مدرک', 'education', 'degree'])),
+      educationField: cleanString(getCell(row, ['رشته تحصیلی', 'رشته', 'گرایش', 'educationField', 'field'])),
+      maritalStatus: cleanString(getCell(row, ['وضعیت تاهل', 'وضعیت تأهل', 'تاهل', 'maritalStatus'])),
+      childrenCount: parseInt(getCell(row, ['تعداد فرزندان', 'فرزند', 'childrenCount']) || '0') || 0,
+      department: cleanString(getCell(row, ['معاونت', 'واحد سازمانی', 'واحد', 'دپارتمان', 'بخش', 'department'])),
+      position: cleanString(getCell(row, ['جایگاه شغلی', 'سمت', 'عنوان شغلی', 'پست سازمانی', 'شغل', 'موقعیت شغلی', 'رده شغلی', 'position', 'jobTitle'])),
+      employmentType: cleanString(getCell(row, ['نوع استخدام', 'نوع همکاری', 'employmentType'])),
+      employmentDate: cleanString(getCell(row, ['تاریخ استخدام', 'تاریخ شروع همکاری', 'employmentDate'])),
+      location: cleanString(getCell(row, ['محل فعالیت', 'محل خدمت', 'محل کار', 'شرکت', 'نام شرکت', 'location', 'company'])),
+      region: parseInt(getCell(row, ['منطقه', 'region']) || '1') || 1,
+      salary: parseFloat(getCell(row, ['حقوق پرداختی', 'حقوق', 'salary']) || '0') || 0,
+      contractSalary: parseFloat(getCell(row, ['حقوق قراردادی', 'contractSalary']) || '0') || 0,
+      overtimeHours: parseFloat(getCell(row, ['اضافه کار', 'اضافه‌کار', 'overtimeHours']) || '0') || 0,
+      evaluationScore: parseFloat(getCell(row, ['امتیاز ارزشیابی', 'evaluationScore']) || '0') || 0,
+      managerEvaluation: parseFloat(getCell(row, ['ارزیابی مدیرعامل']) || '0') || 0,
+      selfEvaluation: parseFloat(getCell(row, ['ارزیابی فردی']) || '0') || 0,
+      deputyEvaluation: parseFloat(getCell(row, ['ارزیابی معاونت']) || '0') || 0,
+      peerEvaluation: parseFloat(getCell(row, ['ارزیابی مدیر مستقیم']) || '0') || 0,
+      performanceScore: parseFloat(getCell(row, ['عملکرد']) || '0') || 0,
+      knowledgeScore: parseFloat(getCell(row, ['دانش و تخصص']) || '0') || 0,
+      behaviorScore: parseFloat(getCell(row, ['تعامل و رفتار']) || '0') || 0,
+      responsibilityScore: parseFloat(getCell(row, ['مسئولیت و وفاداری']) || '0') || 0,
       ageGroup,
-      tenure: parseInt(row['سابقه'] || row['tenure'] || '0') || 0,
+      tenure: parseInt(getCell(row, ['سابقه', 'سابقه کاری', 'tenure']) || '0') || 0,
     };
   });
 }
