@@ -84,11 +84,57 @@ export function generateSampleData(count: number = 78): Employee[] {
   return employees;
 }
 
+const CURRENT_PERSIAN_YEAR = 1403;
+
+const persianDigitsToEnglish = (str: string) =>
+  str.replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)])
+     .replace(/[٠-٩]/g, d => '0123456789'['٠١٢٣٤٥٦٧٨٩'.indexOf(d)]);
+
+function cleanString(v: any): string {
+  if (v === null || v === undefined) return '';
+  return String(v).trim();
+}
+
+function parsePersianDateParts(raw: string): { year: number; month: number; day: number } | null {
+  if (!raw) return null;
+  const normalized = persianDigitsToEnglish(raw).trim();
+  const m = normalized.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (!m) return null;
+  const year = parseInt(m[1]);
+  const month = parseInt(m[2]);
+  const day = parseInt(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { year, month, day };
+}
+
+function deriveBirthMonth(birthDate: string): string {
+  const parts = parsePersianDateParts(birthDate);
+  if (!parts) return '';
+  return persianMonths[parts.month - 1] || '';
+}
+
+function deriveAgeGroup(birthDate: string): string {
+  const parts = parsePersianDateParts(birthDate);
+  if (!parts || parts.year < 1300 || parts.year > 1410) return '';
+  const age = CURRENT_PERSIAN_YEAR - parts.year;
+  if (age < 20) return '20-30';
+  if (age < 30) return '20-30';
+  if (age < 40) return '30-40';
+  if (age < 50) return '40-50';
+  return '50+';
+}
+
 export function parseExcelData(data: any[]): Employee[] {
   return data.map((row, index) => {
-    const name = row['نام'] || row['name'] || undefined;
-    const lastName = row['نام خانوادگی'] || row['lastName'] || undefined;
+    const name = cleanString(row['نام'] || row['name']) || undefined;
+    const lastName = cleanString(row['نام خانوادگی'] || row['lastName']) || undefined;
     const fullName = (name && lastName) ? `${name} ${lastName}` : undefined;
+
+    const birthDate = cleanString(row['تاریخ تولد'] || row['birthDate']);
+    const birthMonthRaw = cleanString(row['ماه تولد'] || row['birthMonth']);
+    const birthMonth = birthMonthRaw || deriveBirthMonth(birthDate);
+    const ageGroupRaw = cleanString(row['رده سنی'] || row['ageGroup']);
+    const ageGroup = ageGroupRaw || deriveAgeGroup(birthDate);
 
     return {
       id: `emp-${index + 1}`,
@@ -96,33 +142,33 @@ export function parseExcelData(data: any[]): Employee[] {
       name,
       lastName,
       fullName,
-      gender: row['جنسیت'] || row['gender'] || 'مرد',
-      birthDate: row['تاریخ تولد'] || row['birthDate'] || '',
-      birthMonth: row['ماه تولد'] || row['birthMonth'] || '',
-      education: row['مدرک تحصیلی'] || row['education'] || '',
-      educationField: row['رشته تحصیلی'] || row['educationField'] || '',
-      maritalStatus: row['وضعیت تاهل'] || row['maritalStatus'] || '',
-      childrenCount: parseInt(row['تعداد فرزندان'] || row['childrenCount'] || '0'),
-      department: row['معاونت'] || row['department'] || '',
-      position: row['جایگاه شغلی'] || row['position'] || '',
-      employmentType: row['نوع استخدام'] || row['employmentType'] || '',
-      employmentDate: row['تاریخ استخدام'] || row['employmentDate'] || '',
-      location: row['محل فعالیت'] || row['location'] || '',
-      region: parseInt(row['منطقه'] || row['region'] || '1'),
-      salary: parseFloat(row['حقوق پرداختی'] || row['salary'] || '0'),
-      contractSalary: parseFloat(row['حقوق قراردادی'] || row['contractSalary'] || '0'),
-      overtimeHours: parseFloat(row['اضافه کار'] || row['overtimeHours'] || '0'),
-      evaluationScore: parseFloat(row['امتیاز ارزشیابی'] || row['evaluationScore'] || '0'),
-      managerEvaluation: parseFloat(row['ارزیابی مدیرعامل'] || '0'),
-      selfEvaluation: parseFloat(row['ارزیابی فردی'] || '0'),
-      deputyEvaluation: parseFloat(row['ارزیابی معاونت'] || '0'),
-      peerEvaluation: parseFloat(row['ارزیابی مدیر مستقیم'] || '0'),
-      performanceScore: parseFloat(row['عملکرد'] || '0'),
-      knowledgeScore: parseFloat(row['دانش و تخصص'] || '0'),
-      behaviorScore: parseFloat(row['تعامل و رفتار'] || '0'),
-      responsibilityScore: parseFloat(row['مسئولیت و وفاداری'] || '0'),
-      ageGroup: row['رده سنی'] || row['ageGroup'] || '',
-      tenure: parseInt(row['سابقه'] || row['tenure'] || '0'),
+      gender: cleanString(row['جنسیت'] || row['gender']) || 'مرد',
+      birthDate,
+      birthMonth,
+      education: cleanString(row['مدرک تحصیلی'] || row['education']),
+      educationField: cleanString(row['رشته تحصیلی'] || row['educationField']),
+      maritalStatus: cleanString(row['وضعیت تاهل'] || row['maritalStatus']),
+      childrenCount: parseInt(row['تعداد فرزندان'] || row['childrenCount'] || '0') || 0,
+      department: cleanString(row['معاونت'] || row['department']),
+      position: cleanString(row['جایگاه شغلی'] || row['position']),
+      employmentType: cleanString(row['نوع استخدام'] || row['employmentType']),
+      employmentDate: cleanString(row['تاریخ استخدام'] || row['employmentDate']),
+      location: cleanString(row['محل فعالیت'] || row['location']),
+      region: parseInt(row['منطقه'] || row['region'] || '1') || 1,
+      salary: parseFloat(row['حقوق پرداختی'] || row['salary'] || '0') || 0,
+      contractSalary: parseFloat(row['حقوق قراردادی'] || row['contractSalary'] || '0') || 0,
+      overtimeHours: parseFloat(row['اضافه کار'] || row['overtimeHours'] || '0') || 0,
+      evaluationScore: parseFloat(row['امتیاز ارزشیابی'] || row['evaluationScore'] || '0') || 0,
+      managerEvaluation: parseFloat(row['ارزیابی مدیرعامل'] || '0') || 0,
+      selfEvaluation: parseFloat(row['ارزیابی فردی'] || '0') || 0,
+      deputyEvaluation: parseFloat(row['ارزیابی معاونت'] || '0') || 0,
+      peerEvaluation: parseFloat(row['ارزیابی مدیر مستقیم'] || '0') || 0,
+      performanceScore: parseFloat(row['عملکرد'] || '0') || 0,
+      knowledgeScore: parseFloat(row['دانش و تخصص'] || '0') || 0,
+      behaviorScore: parseFloat(row['تعامل و رفتار'] || '0') || 0,
+      responsibilityScore: parseFloat(row['مسئولیت و وفاداری'] || '0') || 0,
+      ageGroup,
+      tenure: parseInt(row['سابقه'] || row['tenure'] || '0') || 0,
     };
   });
 }
