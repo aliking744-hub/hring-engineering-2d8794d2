@@ -45,7 +45,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useAuth } from "@/hooks/useAuth";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 
 const SmartHeadhunting = () => {
   const navigate = useNavigate();

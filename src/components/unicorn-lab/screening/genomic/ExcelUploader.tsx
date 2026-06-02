@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import * as XLSX from 'xlsx';
+import * as XLSX from '@e965/xlsx';
 
 interface ExcelUploaderProps {
   onBack: () => void;

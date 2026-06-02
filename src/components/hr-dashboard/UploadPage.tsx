@@ -3,7 +3,7 @@ import { Upload, FileSpreadsheet, Sparkles, Download, ArrowRight } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@e965/xlsx';
 import { Employee } from '@/types/employee';
 import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
