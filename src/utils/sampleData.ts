@@ -142,7 +142,7 @@ export function parseExcelData(data: any[]): Employee[] {
       name,
       lastName,
       fullName,
-      gender: cleanString(row['جنسیت'] || row['gender']) || 'مرد',
+      gender: (cleanString(row['جنسیت'] || row['gender']) === 'زن' ? 'زن' : 'مرد'),
       birthDate,
       birthMonth,
       education: cleanString(row['مدرک تحصیلی'] || row['education']),
