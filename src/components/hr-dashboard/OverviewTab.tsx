@@ -240,7 +240,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -265,7 +265,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '10px' }} />
             </PieChart>
           </ResponsiveContainer>
@@ -276,7 +276,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
             <BarChart data={deptData} layout="vertical">
               <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 9 }} />
               <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 9 }} width={70} />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
+              <Tooltip contentStyle={tooltipContentStyle} itemStyle={tooltipTextStyle} labelStyle={tooltipTextStyle} />
               <Bar dataKey="value" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
