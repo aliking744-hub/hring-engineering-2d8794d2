@@ -9,10 +9,11 @@ import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
 
 interface UploadPageProps {
-  onDataLoaded: (data: Employee[]) => void;
+  onDataLoaded: (data: Employee[], name: string) => void;
+  historySlot?: React.ReactNode;
 }
 
-export function UploadPage({ onDataLoaded }: UploadPageProps) {
+export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +43,7 @@ export function UploadPage({ onDataLoaded }: UploadPageProps) {
         description: `${employees.length} رکورد با موفقیت بارگذاری شد`,
       });
 
-      onDataLoaded(employees);
+      onDataLoaded(employees, file.name);
     } catch (error) {
       toast({
         title: 'خطا',
@@ -81,7 +82,7 @@ export function UploadPage({ onDataLoaded }: UploadPageProps) {
       title: 'داده نمونه',
       description: '78 رکورد نمونه بارگذاری شد',
     });
-    onDataLoaded(sampleData);
+    onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
   }, [onDataLoaded]);
 
   const handleDownloadTemplate = useCallback(() => {
@@ -135,12 +136,13 @@ export function UploadPage({ onDataLoaded }: UploadPageProps) {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 transition-colors duration-300 relative" dir="rtl">
-      {/* Back Button */}
-      <div className="absolute top-4 right-4">
+      {/* Top Bar */}
+      <div className="absolute top-4 right-4 left-4 flex justify-between items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="gap-2">
           <ArrowRight className="w-4 h-4" />
           <span>بازگشت به پنل کاربری</span>
         </Button>
+        {historySlot}
       </div>
 
       <div className="w-full max-w-2xl">
