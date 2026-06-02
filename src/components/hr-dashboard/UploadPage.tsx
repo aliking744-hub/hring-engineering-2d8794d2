@@ -136,12 +136,13 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 transition-colors duration-300 relative" dir="rtl">
-      {/* Back Button */}
-      <div className="absolute top-4 right-4">
+      {/* Top Bar */}
+      <div className="absolute top-4 right-4 left-4 flex justify-between items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="gap-2">
           <ArrowRight className="w-4 h-4" />
           <span>بازگشت به پنل کاربری</span>
         </Button>
+        {historySlot}
       </div>
 
       <div className="w-full max-w-2xl">
