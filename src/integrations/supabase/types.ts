@@ -601,6 +601,33 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_uploads: {
+        Row: {
+          created_at: string
+          data: Json
+          employee_count: number
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          employee_count?: number
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          employee_count?: number
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       intent_assignments: {
         Row: {
           created_at: string
