@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Employee, FilterState, TabType } from '@/types/employee';
 import { FilterBar } from '@/components/hr-dashboard/FilterBar';
 import { OverviewTab } from '@/components/hr-dashboard/OverviewTab';
@@ -8,15 +8,23 @@ import { MapTab } from '@/components/hr-dashboard/MapTab';
 import { ProfileTab } from '@/components/hr-dashboard/ProfileTab';
 import { OvertimeTab } from '@/components/hr-dashboard/OvertimeTab';
 import { UploadPage } from '@/components/hr-dashboard/UploadPage';
+import { UploadHistorySheet } from '@/components/hr-dashboard/UploadHistorySheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, LayoutDashboard, Cake, Banknote, MapPin, User, Clock, RefreshCw } from 'lucide-react';
+import { ArrowRight, LayoutDashboard, Cake, Banknote, MapPin, User, Clock, RefreshCw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AuroraBackground from '@/components/AuroraBackground';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<Employee[] | null>(null);
+  const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [restoring, setRestoring] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
     gender: [],
     education: [],
@@ -26,9 +34,86 @@ export default function HRDashboard() {
   });
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
+  // Restore most recent upload on login
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setRestoring(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data: row } = await supabase
+        .from('hr_uploads')
+        .select('id, data')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      if (row) {
+        setData((row.data as unknown as Employee[]) || []);
+        setCurrentUploadId(row.id);
+      }
+      setRestoring(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user, authLoading]);
+
+  const persistUpload = useCallback(async (employees: Employee[], name: string) => {
+    if (!user) return null;
+    const { data: row, error } = await supabase
+      .from('hr_uploads')
+      .insert({
+        user_id: user.id,
+        name,
+        employee_count: employees.length,
+        data: employees as unknown as object,
+      })
+      .select('id')
+      .single();
+    if (error) {
+      toast({ title: 'ذخیره نشد', description: 'بارگذاری در تاریخچه ذخیره نشد', variant: 'destructive' });
+      return null;
+    }
+    setHistoryRefresh(k => k + 1);
+    return row?.id ?? null;
+  }, [user]);
+
+  const handleDataLoaded = useCallback(async (employees: Employee[], name: string) => {
+    setData(employees);
+    const id = await persistUpload(employees, name);
+    setCurrentUploadId(id);
+  }, [persistUpload]);
+
+  const handleLoadFromHistory = useCallback((employees: Employee[], id: string) => {
+    setData(employees);
+    setCurrentUploadId(id);
+  }, []);
+
+  if (authLoading || restoring) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   // Show upload page if no data
   if (!data) {
-    return <UploadPage onDataLoaded={setData} />;
+    return (
+      <UploadPage
+        onDataLoaded={handleDataLoaded}
+        historySlot={
+          user ? (
+            <UploadHistorySheet
+              onLoad={handleLoadFromHistory}
+              currentUploadId={currentUploadId}
+              refreshKey={historyRefresh}
+            />
+          ) : null
+        }
+      />
+    );
   }
 
   const filterOptions = {
@@ -76,10 +161,19 @@ export default function HRDashboard() {
               <p className="text-muted-foreground text-xs md:text-sm mt-1 hidden sm:block">تحلیل و گزارش‌گیری اطلاعات پرسنلی</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setData(null)} className="gap-2">
-            <RefreshCw className="w-4 h-4" />
-            <span>بارگذاری مجدد</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            {user && (
+              <UploadHistorySheet
+                onLoad={handleLoadFromHistory}
+                currentUploadId={currentUploadId}
+                refreshKey={historyRefresh}
+              />
+            )}
+            <Button variant="outline" size="sm" onClick={() => setData(null)} className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              <span>بارگذاری مجدد</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filter Bar */}
