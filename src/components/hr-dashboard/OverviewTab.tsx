@@ -75,10 +75,18 @@ export function OverviewTab({ data }: OverviewTabProps) {
     { name: 'مجرد', value: data.filter(e => e.maritalStatus === 'مجرد').length, color: COLORS.orange },
   ];
 
-  const locationData = [
-    { name: 'ستاد', value: data.filter(e => e.location === 'ستاد').length, color: COLORS.cyan },
-    { name: 'پروژه', value: data.filter(e => e.location === 'پروژه').length, color: COLORS.yellow },
-  ];
+  const locationCounts: Record<string, number> = {};
+  data.forEach(e => {
+    const loc = (e.location || '').trim();
+    if (!loc) return;
+    locationCounts[loc] = (locationCounts[loc] || 0) + 1;
+  });
+  const locationPalette = [COLORS.cyan, COLORS.yellow, COLORS.purple, COLORS.pink, COLORS.green, COLORS.orange, COLORS.blue];
+  const locationData = Object.entries(locationCounts).map(([name, value], i) => ({
+    name,
+    value,
+    color: locationPalette[i % locationPalette.length],
+  }));
 
   const educationCounts: Record<string, number> = {};
   data.forEach(e => {
