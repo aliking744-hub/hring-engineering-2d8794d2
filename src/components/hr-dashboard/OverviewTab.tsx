@@ -111,10 +111,7 @@ export function OverviewTab({ data }: OverviewTabProps) {
     color: locationPalette[i % locationPalette.length],
   }));
 
-  const educationCounts: Record<string, number> = {};
-  data.forEach(e => {
-    educationCounts[e.education] = (educationCounts[e.education] || 0) + 1;
-  });
+  const educationCounts = countByValue(data.map(e => e.education));
   const educationData = Object.entries(educationCounts).map(([name, value], i) => ({
     name,
     value,
@@ -137,16 +134,10 @@ export function OverviewTab({ data }: OverviewTabProps) {
   });
   const ageData = ageGroupOrder.map(group => ({ name: group, value: ageCounts[group] || 0 }));
 
-  const deptCounts: Record<string, number> = {};
-  data.forEach(e => {
-    deptCounts[e.department] = (deptCounts[e.department] || 0) + 1;
-  });
+  const deptCounts = countByValue(data.map(e => e.department));
   const deptData = Object.entries(deptCounts).map(([name, value]) => ({ name, value }));
 
-  const posCounts: Record<string, number> = {};
-  data.forEach(e => {
-    posCounts[e.position] = (posCounts[e.position] || 0) + 1;
-  });
+  const posCounts = countByValue(data.map(e => e.position));
   const posData = Object.entries(posCounts).map(([name, value]) => ({ name, value }));
 
   const formatNumber = (num: number) => {
