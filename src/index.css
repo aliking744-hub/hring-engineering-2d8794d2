@@ -106,6 +106,22 @@
     overflow-x: hidden;
   }
 
+  .recharts-default-tooltip {
+    background: hsl(var(--chart-tooltip-bg)) !important;
+    color: hsl(var(--chart-tooltip-foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 8px !important;
+    direction: rtl;
+  }
+
+  .recharts-tooltip-label,
+  .recharts-tooltip-item,
+  .recharts-tooltip-item-name,
+  .recharts-tooltip-item-value,
+  .recharts-tooltip-item-separator {
+    color: hsl(var(--chart-tooltip-foreground)) !important;
+  }
+
   /* Safe area padding for mobile devices */
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
