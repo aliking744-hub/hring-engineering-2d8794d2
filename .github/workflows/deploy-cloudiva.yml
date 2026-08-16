@@ -17,7 +17,7 @@ jobs:
   deploy:
     name: Deploy HRing to CloudIva
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 35
 
     steps:
       - name: Checkout repository
@@ -40,18 +40,13 @@ jobs:
       - name: Install CloudIva CLI
         run: npm install --global @cloudiva.net/cli
 
-      - name: Authenticate and deploy
+      - name: Authenticate
         env:
           CHABOKAN_TOKEN: ${{ secrets.CHABOKAN_TOKEN }}
-        run: |
-          diva login -t "$CHABOKAN_TOKEN"
-          diva deploy -s hring-app
+        run: diva login -t "$CHABOKAN_TOKEN"
 
-      - name: Capture CloudIva service logs after build
-        if: always()
-        env:
-          CHABOKAN_TOKEN: ${{ secrets.CHABOKAN_TOKEN }}
-        run: |
-          sleep 90
-          diva login -t "$CHABOKAN_TOKEN"
-          timeout 120s diva service logs -s hring-app || true
+      - name: Capture previous CloudIva build logs
+        run: timeout 120s diva service logs -s hring-app || true
+
+      - name: Deploy
+        run: diva deploy -s hring-app
