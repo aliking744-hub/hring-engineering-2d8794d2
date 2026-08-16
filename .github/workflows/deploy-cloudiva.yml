@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Synchronize npm lockfile
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
       - name: Install CloudIva CLI
         run: npm install --global @cloudiva.net/cli
 
@@ -44,4 +47,4 @@ jobs:
           CHABOKAN_TOKEN: ${{ secrets.CHABOKAN_TOKEN }}
         run: |
           diva login -t "$CHABOKAN_TOKEN"
-          timeout 90s diva service logs -s hring-app || true
+          timeout 120s diva service logs -s hring-app || true
