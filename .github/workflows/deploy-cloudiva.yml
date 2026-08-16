@@ -1,0 +1,39 @@
+name: deploy-cloudiva
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudiva-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy HRing to CloudIva
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install CloudIva CLI
+        run: npm install --global @cloudiva.net/cli
+
+      - name: Authenticate and deploy
+        env:
+          CHABOKAN_TOKEN: ${{ secrets.CHABOKAN_TOKEN }}
+        run: |
+          diva login -t "$CHABOKAN_TOKEN"
+          diva deploy -s hring-app
