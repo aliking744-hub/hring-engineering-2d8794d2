@@ -1,4 +1,4 @@
-name: deploy-cloudiva
+name: inspect-cloudiva
 
 on:
   push:
@@ -6,43 +6,27 @@ on:
       - main
   workflow_dispatch:
 
-concurrency:
-  group: deploy-cloudiva-production
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy HRing to CloudIva
+  inspect:
+    name: Inspect CloudIva
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
 
-      - name: Regenerate npm lockfile for deployment
-        run: |
-          rm -f package-lock.json
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore: use synchronized npm lockfile for deployment" || true
-
       - name: Install CloudIva CLI
         run: npm install --global @cloudiva.net/cli
 
-      - name: Authenticate and deploy
+      - name: Authenticate and capture logs
         env:
           CHABOKAN_TOKEN: ${{ secrets.CHABOKAN_TOKEN }}
         run: |
           diva login -t "$CHABOKAN_TOKEN"
-          diva deploy -s hring-app
+          timeout 120s diva service logs -s hring-app || true
