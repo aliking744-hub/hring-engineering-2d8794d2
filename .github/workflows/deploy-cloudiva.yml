@@ -40,13 +40,9 @@ jobs:
       - name: Install CloudIva CLI
         run: npm install --global @cloudiva.net/cli
 
-      - name: Authenticate
+      - name: Authenticate and deploy
         env:
           CHABOKAN_TOKEN: ${{ secrets.CHABOKAN_TOKEN }}
-        run: diva login -t "$CHABOKAN_TOKEN"
-
-      - name: Capture previous CloudIva build logs
-        run: timeout 120s diva service logs -s hring-app || true
-
-      - name: Deploy
-        run: diva deploy -s hring-app
+        run: |
+          diva login -t "$CHABOKAN_TOKEN"
+          diva deploy -s hring-app
