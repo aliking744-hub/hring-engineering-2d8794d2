@@ -268,7 +268,7 @@ async function saveCandidatesToDB(
     red_flags: Array.isArray(c.redFlags) ? c.redFlags : [],
     layer_scores: c.layerScores || null,
     raw_data: { linkedin: c.linkedin, summary: c.summary, sourceIndex: index },
-    status: 'analyzed',
+    status: 'pending',
   }));
 
   const { error } = await supabaseClient
