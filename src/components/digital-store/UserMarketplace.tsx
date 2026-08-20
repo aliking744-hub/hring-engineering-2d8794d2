@@ -73,14 +73,14 @@ const UserMarketplace = () => {
   };
 
   const handleDownload = async (product: DigitalProduct) => {
-    if (!product.file_path) {
+    if (!product.has_file) {
       toast.error('فایلی برای دانلود وجود ندارد');
       return;
     }
 
     try {
       setDownloadingId(product.id);
-      await downloadFile(product.file_path, product.name);
+      await downloadFile(product.id, product.name);
       await incrementDownloadCount(product.id);
       toast.success('دانلود شروع شد');
     } catch (error) {
@@ -161,7 +161,7 @@ const UserMarketplace = () => {
               
               {/* Icon */}
               <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                {getFileIcon(product.file_path)}
+                {getFileIcon(product.file_ext)}
               </div>
               
               {/* Category */}

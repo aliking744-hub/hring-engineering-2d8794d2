@@ -68,13 +68,13 @@ const AdminProductTable = () => {
   };
 
   const handleDownload = async (product: DigitalProduct) => {
-    if (!product.file_path) {
+    if (!product.has_file) {
       toast.error('فایلی برای دانلود وجود ندارد');
       return;
     }
     
     try {
-      await downloadFile(product.file_path, product.name);
+      await downloadFile(product.id, product.name);
       await incrementDownloadCount(product.id);
       toast.success('دانلود شروع شد');
     } catch (error) {
@@ -146,7 +146,7 @@ const AdminProductTable = () => {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        {getFileIcon(product.file_path)}
+                        {getFileIcon(product.file_ext)}
                       </div>
                       <div>
                         <p className="font-medium text-foreground">{product.name}</p>
@@ -200,7 +200,7 @@ const AdminProductTable = () => {
                       >
                         {product.is_active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </Button>
-                      {product.file_path && (
+                      {product.has_file && (
                         <Button
                           variant="ghost"
                           size="icon"
