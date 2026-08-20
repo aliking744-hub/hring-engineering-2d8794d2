@@ -1,3 +1,4 @@
+import { requireUser } from "../_shared/auth.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -52,6 +53,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const auth = await requireUser(req);
+  if (auth.response) return auth.response;
 
   try {
     const { companyId, engineId, companyData } = await req.json() as EngineAnalysisRequest;
