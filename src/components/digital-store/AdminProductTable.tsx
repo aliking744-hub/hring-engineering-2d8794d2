@@ -34,9 +34,9 @@ const AdminProductTable = () => {
     return new Intl.NumberFormat('fa-IR').format(price);
   };
 
-  const getFileIcon = (filePath: string | null) => {
-    if (!filePath) return <FileText className="w-4 h-4" />;
-    if (filePath.includes('.xlsx') || filePath.includes('.xls')) {
+  const getFileIcon = (fileExt: string | null) => {
+    if (!fileExt) return <FileText className="w-4 h-4" />;
+    if (fileExt === 'xlsx' || fileExt === 'xls') {
       return <FileSpreadsheet className="w-4 h-4 text-emerald-400" />;
     }
     return <FileText className="w-4 h-4 text-sky-400" />;

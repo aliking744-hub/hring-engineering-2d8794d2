@@ -43,9 +43,9 @@ const UserMarketplace = () => {
     return new Intl.NumberFormat('fa-IR').format(price);
   };
 
-  const getFileIcon = (filePath: string | null) => {
-    if (!filePath) return <FileText className="w-8 h-8 text-primary" />;
-    if (filePath.includes('.xlsx') || filePath.includes('.xls')) {
+  const getFileIcon = (fileExt: string | null) => {
+    if (!fileExt) return <FileText className="w-8 h-8 text-primary" />;
+    if (fileExt === 'xlsx' || fileExt === 'xls') {
       return <FileSpreadsheet className="w-8 h-8 text-emerald-400" />;
     }
     return <FileText className="w-8 h-8 text-sky-400" />;
