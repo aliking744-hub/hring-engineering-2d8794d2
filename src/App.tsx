@@ -4,53 +4,55 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
+import { lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { SiteSettingsProvider } from "@/hooks/useSiteSettings";
 import { UserContextProvider } from "@/hooks/useUserContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Shop from "./pages/Shop";
-import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
-import JobDescriptionGenerator from "./pages/JobDescriptionGenerator";
-import SmartAdGenerator from "./pages/SmartAdGenerator";
-import InterviewAssistant from "./pages/InterviewAssistant";
-import OnboardingRoadmap from "./pages/OnboardingRoadmap";
-import SuccessArchitect from "./pages/SuccessArchitect";
-import ToolsGrid from "./pages/ToolsGrid";
-import HRDashboard from "./pages/HRDashboard";
-import Modules from "./pages/Modules";
-import AnalyticsHub from "./pages/AnalyticsHub";
-import CostCalculator from "./pages/CostCalculator";
-import SmartHeadhunting from "./pages/SmartHeadhunting";
-import CampaignDetail from "./pages/CampaignDetail";
-import CandidateDetail from "./pages/CandidateDetail";
-import King744 from "./pages/King744";
-import LegalSearchPage from "./pages/LegalSearchPage";
-import LegalAdvisor from "./pages/LegalAdvisor";
-import StrategicCompass from "./pages/StrategicCompass";
-import StrategicRadar from "./pages/StrategicRadar";
-import UnicornLab from "./pages/UnicornLab";
-import CompanyMembers from "./pages/CompanyMembers";
-import CompanySettings from "./pages/CompanySettings";
-import Upgrade from "./pages/Upgrade";
-import PaymentHistory from "./pages/PaymentHistory";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
 import SupportChatWidget from "./components/SupportChatWidget";
 import PageVisibilityGate from "./components/PageVisibilityGate";
 import { useSectionVisible } from "./hooks/useSectionVisible";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Shop = lazy(() => import("./pages/Shop"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const JobDescriptionGenerator = lazy(() => import("./pages/JobDescriptionGenerator"));
+const SmartAdGenerator = lazy(() => import("./pages/SmartAdGenerator"));
+const InterviewAssistant = lazy(() => import("./pages/InterviewAssistant"));
+const OnboardingRoadmap = lazy(() => import("./pages/OnboardingRoadmap"));
+const SuccessArchitect = lazy(() => import("./pages/SuccessArchitect"));
+const ToolsGrid = lazy(() => import("./pages/ToolsGrid"));
+const HRDashboard = lazy(() => import("./pages/HRDashboard"));
+const Modules = lazy(() => import("./pages/Modules"));
+const AnalyticsHub = lazy(() => import("./pages/AnalyticsHub"));
+const CostCalculator = lazy(() => import("./pages/CostCalculator"));
+const SmartHeadhunting = lazy(() => import("./pages/SmartHeadhunting"));
+const CampaignDetail = lazy(() => import("./pages/CampaignDetail"));
+const CandidateDetail = lazy(() => import("./pages/CandidateDetail"));
+const King744 = lazy(() => import("./pages/King744"));
+const LegalSearchPage = lazy(() => import("./pages/LegalSearchPage"));
+const LegalAdvisor = lazy(() => import("./pages/LegalAdvisor"));
+const StrategicCompass = lazy(() => import("./pages/StrategicCompass"));
+const StrategicRadar = lazy(() => import("./pages/StrategicRadar"));
+const UnicornLab = lazy(() => import("./pages/UnicornLab"));
+const CompanyMembers = lazy(() => import("./pages/CompanyMembers"));
+const CompanySettings = lazy(() => import("./pages/CompanySettings"));
+const Upgrade = lazy(() => import("./pages/Upgrade"));
+const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
+const Profile = lazy(() => import("./pages/Profile"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const Admin = lazy(() => import("./pages/Admin"));
+const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
+const LearningPath = lazy(() => import("./pages/LearningPath"));
 
 const GatedSupportChat = () => {
   const visible = useSectionVisible('support_chat');
   return visible ? <SupportChatWidget /> : null;
 };
-import FAQ from "./pages/FAQ";
-import Admin from "./pages/Admin";
-import ProductCatalog from "./pages/ProductCatalog";
-import LearningPath from "./pages/LearningPath";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -63,6 +65,7 @@ const App = () => (
           <AuthProvider>
             <UserContextProvider>
               <SiteSettingsProvider>
+                <Suspense fallback={<div className="min-h-screen bg-background" aria-busy="true" />}>
                 <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
@@ -293,6 +296,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
                 </Routes>
+                </Suspense>
                 <GatedSupportChat />
               </SiteSettingsProvider>
             </UserContextProvider>
