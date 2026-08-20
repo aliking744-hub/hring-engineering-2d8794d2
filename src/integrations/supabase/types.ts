@@ -511,7 +511,9 @@ export type Database = {
           created_at: string
           description: string | null
           download_count: number
+          file_ext: string | null
           file_path: string | null
+          has_file: boolean | null
           id: string
           is_active: boolean
           name: string
@@ -524,7 +526,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           download_count?: number
+          file_ext?: string | null
           file_path?: string | null
+          has_file?: boolean | null
           id?: string
           is_active?: boolean
           name: string
@@ -537,7 +541,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           download_count?: number
+          file_ext?: string | null
           file_path?: string | null
+          has_file?: boolean | null
           id?: string
           is_active?: boolean
           name?: string
@@ -1003,6 +1009,13 @@ export type Database = {
             referencedRelation: "scenarios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "scenario_responses_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios_with_answers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       scenarios: {
@@ -1011,6 +1024,7 @@ export type Database = {
           ceo_answer: string | null
           ceo_id: string | null
           created_at: string
+          has_ceo_answer: boolean | null
           id: string
           intent_id: string | null
           is_active: boolean
@@ -1024,6 +1038,7 @@ export type Database = {
           ceo_answer?: string | null
           ceo_id?: string | null
           created_at?: string
+          has_ceo_answer?: boolean | null
           id?: string
           intent_id?: string | null
           is_active?: boolean
@@ -1037,6 +1052,7 @@ export type Database = {
           ceo_answer?: string | null
           ceo_id?: string | null
           created_at?: string
+          has_ceo_answer?: boolean | null
           id?: string
           intent_id?: string | null
           is_active?: boolean
@@ -1509,7 +1525,59 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      scenarios_with_answers: {
+        Row: {
+          category: string | null
+          ceo_answer: string | null
+          ceo_id: string | null
+          created_at: string | null
+          has_ceo_answer: boolean | null
+          id: string | null
+          intent_id: string | null
+          is_active: boolean | null
+          option_a: string | null
+          option_b: string | null
+          option_c: string | null
+          question: string | null
+        }
+        Insert: {
+          category?: string | null
+          ceo_answer?: string | null
+          ceo_id?: string | null
+          created_at?: string | null
+          has_ceo_answer?: boolean | null
+          id?: string | null
+          intent_id?: string | null
+          is_active?: boolean | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          question?: string | null
+        }
+        Update: {
+          category?: string | null
+          ceo_answer?: string | null
+          ceo_id?: string | null
+          created_at?: string | null
+          has_ceo_answer?: boolean | null
+          id?: string | null
+          intent_id?: string | null
+          is_active?: boolean | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          question?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenarios_intent_id_fkey"
+            columns: ["intent_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_intents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       deduct_credits:

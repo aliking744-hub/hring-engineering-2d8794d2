@@ -119,7 +119,7 @@ const CEODashboard = () => {
       const [intentsRes, behaviorsRes, scenariosRes, responsesRes, usersRes] = await Promise.all([
         supabase.from('strategic_intents').select('*').eq('status', 'active'),
         supabase.from('behaviors').select('*').order('created_at', { ascending: false }),
-        supabase.from('scenarios').select('*').eq('is_active', true),
+        supabase.from('scenarios_with_answers').select('*').eq('is_active', true),
         supabase.from('scenario_responses').select('*'),
         supabase.from('compass_user_roles').select('*').neq('role', 'ceo')
       ]);

@@ -119,7 +119,7 @@ const MentalPrism = () => {
     try {
       const [intentsRes, scenariosRes, responsesRes, usersRes, assignmentsRes] = await Promise.all([
         supabase.from('strategic_intents').select('*').eq('status', 'active'),
-        supabase.from('scenarios').select('*').order('created_at', { ascending: false }),
+        supabase.from('scenarios_with_answers').select('*').order('created_at', { ascending: false }),
         supabase.from('scenario_responses').select('*'),
         supabase.from('compass_user_roles').select('*').neq('role', 'ceo'),
         supabase.from('intent_assignments').select('*')

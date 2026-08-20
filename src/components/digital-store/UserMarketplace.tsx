@@ -43,9 +43,9 @@ const UserMarketplace = () => {
     return new Intl.NumberFormat('fa-IR').format(price);
   };
 
-  const getFileIcon = (filePath: string | null) => {
-    if (!filePath) return <FileText className="w-8 h-8 text-primary" />;
-    if (filePath.includes('.xlsx') || filePath.includes('.xls')) {
+  const getFileIcon = (fileExt: string | null) => {
+    if (!fileExt) return <FileText className="w-8 h-8 text-primary" />;
+    if (fileExt === 'xlsx' || fileExt === 'xls') {
       return <FileSpreadsheet className="w-8 h-8 text-emerald-400" />;
     }
     return <FileText className="w-8 h-8 text-sky-400" />;
@@ -73,14 +73,14 @@ const UserMarketplace = () => {
   };
 
   const handleDownload = async (product: DigitalProduct) => {
-    if (!product.file_path) {
+    if (!product.has_file) {
       toast.error('فایلی برای دانلود وجود ندارد');
       return;
     }
 
     try {
       setDownloadingId(product.id);
-      await downloadFile(product.file_path, product.name);
+      await downloadFile(product.id, product.name);
       await incrementDownloadCount(product.id);
       toast.success('دانلود شروع شد');
     } catch (error) {
@@ -161,7 +161,7 @@ const UserMarketplace = () => {
               
               {/* Icon */}
               <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                {getFileIcon(product.file_path)}
+                {getFileIcon(product.file_ext)}
               </div>
               
               {/* Category */}

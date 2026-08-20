@@ -9,13 +9,18 @@ export interface DigitalProduct {
   description: string | null;
   price: number;
   payment_link: string | null;
-  file_path: string | null;
+  has_file: boolean | null;
+  file_ext: string | null;
   category: string | null;
   download_count: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
+
+const PRODUCT_COLUMNS =
+  'id, name, description, price, payment_link, has_file, file_ext, category, download_count, is_active, created_at, updated_at';
+
 
 export interface UserPurchase {
   id: string;
@@ -34,7 +39,7 @@ export const useDigitalProducts = () => {
     try {
       const { data, error } = await supabase
         .from('digital_products')
-        .select('*')
+        .select(PRODUCT_COLUMNS)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -72,11 +77,13 @@ export const useDigitalProducts = () => {
     load();
   }, [fetchProducts, fetchPurchases]);
 
-  const createProduct = async (product: Omit<DigitalProduct, 'id' | 'created_at' | 'updated_at' | 'download_count'>) => {
+  const createProduct = async (
+    product: Omit<DigitalProduct, 'id' | 'created_at' | 'updated_at' | 'download_count' | 'has_file' | 'file_ext'>
+  ) => {
     const { data, error } = await supabase
       .from('digital_products')
       .insert(product)
-      .select()
+      .select('id')
       .single();
 
     if (error) throw error;
@@ -84,7 +91,7 @@ export const useDigitalProducts = () => {
     return data;
   };
 
-  const updateProduct = async (id: string, updates: Partial<DigitalProduct>) => {
+  const updateProduct = async (id: string, updates: Record<string, unknown>) => {
     const { error } = await supabase
       .from('digital_products')
       .update(updates)
@@ -110,39 +117,34 @@ export const useDigitalProducts = () => {
     const filePath = `digital-assets/${fileName}`;
 
     const { error } = await supabase.storage
-      .from('products')
+      .from('product-files')
       .upload(filePath, file, { upsert: true });
 
     if (error) throw error;
     return filePath;
   };
 
-  const downloadFile = async (filePath: string, fileName: string) => {
-    const { data, error } = await supabase.storage
-      .from('products')
-      .download(filePath);
+  // Downloads are authorized server-side (admin or verified purchase) and
+  // served through a short-lived signed URL from the private bucket.
+  const downloadFile = async (productId: string, fileName: string) => {
+    const { data, error } = await supabase.functions.invoke('download-product', {
+      body: { productId },
+    });
 
     if (error) throw error;
+    if (!data?.url) throw new Error(data?.error || 'download failed');
 
-    const url = URL.createObjectURL(data);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = data.url;
     a.download = fileName;
+    a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
-  const incrementDownloadCount = async (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-
-    await supabase
-      .from('digital_products')
-      .update({ download_count: product.download_count + 1 })
-      .eq('id', productId);
-
+  // Download counting happens server-side in the download-product function.
+  const incrementDownloadCount = async (_productId: string) => {
     await fetchProducts();
   };
 
