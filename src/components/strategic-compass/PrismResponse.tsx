@@ -36,7 +36,7 @@ interface Scenario {
   option_a: string;
   option_b: string;
   option_c: string;
-  ceo_answer: string | null;
+  has_ceo_answer: boolean | null;
   is_active: boolean;
   intent_id: string | null;
   created_at: string;
