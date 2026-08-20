@@ -169,7 +169,7 @@ const PrismResponse = ({ canEdit = true }: PrismResponseProps) => {
   };
 
   const getIntentScenarios = (intentId: string) => {
-    return scenarios.filter(s => s.intent_id === intentId && s.is_active && s.ceo_answer);
+    return scenarios.filter(s => s.intent_id === intentId && s.is_active && s.has_ceo_answer);
   };
 
   const getMyResponse = (scenarioId: string) => {

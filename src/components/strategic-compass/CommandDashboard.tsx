@@ -95,7 +95,7 @@ const CommandDashboard = () => {
       const [behaviorsRes, usersRes, scenariosRes, responsesRes] = await Promise.all([
         supabase.from('behaviors').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('compass_user_roles').select('*').neq('role', 'ceo'),
-        supabase.from('scenarios').select('*').eq('is_active', true),
+        supabase.from('scenarios_with_answers').select('*').eq('is_active', true),
         supabase.from('scenario_responses').select('*')
       ]);
 
