@@ -71,12 +71,8 @@ Deno.serve(async (req) => {
 
     if (!allowed) return json({ error: 'شما این محصول را خریداری نکرده‌اید' }, 403);
 
-    const bucket = product.file_path.startsWith('digital-assets/') && !product.file_path.startsWith('product-files/')
-      ? 'product-files'
-      : 'product-files';
-
     const { data: signed, error: signErr } = await admin.storage
-      .from(bucket)
+      .from('product-files')
       .createSignedUrl(product.file_path, 120, { download: product.name });
 
     if (signErr || !signed) {
