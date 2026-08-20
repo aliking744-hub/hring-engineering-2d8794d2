@@ -25,10 +25,4 @@
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
-  <url>
-    <loc>https://hring-app.lovable.app/blog/my-post-1</loc>
-    <lastmod>2025-12-31</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
 </urlset>
