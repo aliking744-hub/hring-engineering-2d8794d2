@@ -135,20 +135,19 @@ const AddProductModal = ({ open, onClose, editingProduct }: AddProductModalProps
     try {
       if (editingProduct) {
         // Update existing product
-        let filePath = editingProduct.file_path;
-        
-        if (file) {
-          filePath = await uploadFile(file, editingProduct.id);
-        }
-
-        await updateProduct(editingProduct.id, {
+        const updates: Record<string, unknown> = {
           name: formData.name.trim(),
           price: Number(formData.price),
           description: formData.description.trim() || null,
           payment_link: formData.payment_link.trim() || null,
           category: formData.category,
-          file_path: filePath,
-        });
+        };
+
+        if (file) {
+          updates.file_path = await uploadFile(file, editingProduct.id);
+        }
+
+        await updateProduct(editingProduct.id, updates);
 
         toast.success('محصول با موفقیت ویرایش شد');
       } else {
@@ -159,7 +158,6 @@ const AddProductModal = ({ open, onClose, editingProduct }: AddProductModalProps
           description: formData.description.trim() || null,
           payment_link: formData.payment_link.trim() || null,
           category: formData.category,
-          file_path: null,
           is_active: true,
         });
 
@@ -302,9 +300,9 @@ const AddProductModal = ({ open, onClose, editingProduct }: AddProductModalProps
                 )}
               </div>
 
-              {editingProduct?.file_path && !file && (
+              {editingProduct?.has_file && !file && (
                 <p className="text-xs text-primary mt-2">
-                  فایل فعلی: {editingProduct.file_path.split('/').pop()}
+                  فایل فعلی بارگذاری شده است{editingProduct.file_ext ? ` (${editingProduct.file_ext})` : ''}
                 </p>
               )}
             </div>
