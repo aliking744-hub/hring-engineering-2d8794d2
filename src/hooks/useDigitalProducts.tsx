@@ -9,13 +9,18 @@ export interface DigitalProduct {
   description: string | null;
   price: number;
   payment_link: string | null;
-  file_path: string | null;
+  has_file: boolean | null;
+  file_ext: string | null;
   category: string | null;
   download_count: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
+
+const PRODUCT_COLUMNS =
+  'id, name, description, price, payment_link, has_file, file_ext, category, download_count, is_active, created_at, updated_at';
+
 
 export interface UserPurchase {
   id: string;
