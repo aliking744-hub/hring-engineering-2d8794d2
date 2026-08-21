@@ -12,6 +12,9 @@ from hring_api.domains.identity.schemas import (
     MembershipResponse,
     RefreshRequest,
     RegisterRequest,
+    SmsChallengeResponse,
+    SmsLoginRequest,
+    SmsLoginVerifyRequest,
     TokenPairResponse,
     UserResponse,
 )
@@ -24,6 +27,16 @@ from hring_api.domains.identity.service import (
     logout,
     refresh,
     register,
+)
+from hring_api.domains.identity.sms_service import (
+    InvalidSmsChallengeError,
+    PhoneUnavailableError,
+    SmsRateLimitedError,
+    SmsUnavailableError,
+    request_login_otp,
+    request_phone_verification_otp,
+    verify_login_otp,
+    verify_phone_otp,
 )
 
 
@@ -92,6 +105,120 @@ async def login_account(
             detail="Invalid email or password",
         ) from exc
     return _auth_response(result)
+
+
+@router.post("/sms/request", response_model=SmsChallengeResponse, status_code=status.HTTP_202_ACCEPTED)
+async def request_sms_login(
+    payload: SmsLoginRequest,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SmsChallengeResponse:
+    try:
+        async with db.begin():
+            challenge = await request_login_otp(db, phone=payload.phone, settings=settings)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except SmsRateLimitedError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except SmsUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    return SmsChallengeResponse(
+        challenge_id=challenge.challenge_id,
+        expires_at=challenge.expires_at,
+    )
+
+
+@router.post("/sms/verify", response_model=AuthResponse)
+async def verify_sms_login(
+    payload: SmsLoginVerifyRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> AuthResponse:
+    try:
+        result = await verify_login_otp(
+            db,
+            challenge_id=payload.challenge_id,
+            code=payload.code,
+            settings=settings,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=_client_ip(request),
+        )
+    except InvalidSmsChallengeError as exc:
+        # Persist failed-attempt counters; rolling this transaction back would make
+        # the max-attempts control ineffective.
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired verification code",
+        ) from exc
+    await db.commit()
+    return _auth_response(result)
+
+
+@router.post(
+    "/phone/request-verification",
+    response_model=SmsChallengeResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_phone_verification(
+    payload: SmsLoginRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SmsChallengeResponse:
+    try:
+        challenge = await request_phone_verification_otp(
+            db,
+            user_id=principal.user_id,
+            phone=payload.phone,
+            settings=settings,
+        )
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except PhoneUnavailableError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except SmsRateLimitedError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except SmsUnavailableError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    await db.commit()
+    return SmsChallengeResponse(
+        challenge_id=challenge.challenge_id,
+        expires_at=challenge.expires_at,
+    )
+
+
+@router.post("/phone/verify", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_phone(
+    payload: SmsLoginVerifyRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    try:
+        await verify_phone_otp(
+            db,
+            user_id=principal.user_id,
+            challenge_id=payload.challenge_id,
+            code=payload.code,
+            settings=settings,
+        )
+    except InvalidSmsChallengeError as exc:
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired verification code",
+        ) from exc
+    except PhoneUnavailableError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/refresh", response_model=AuthResponse)

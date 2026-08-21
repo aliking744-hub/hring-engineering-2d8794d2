@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     auth_access_token_minutes: int = 15
     auth_refresh_token_days: int = 30
 
+    sms_provider: str = "disabled"
+    sms_otp_pepper: SecretStr = SecretStr("development-sms-otp-pepper-change-me")
+    sms_otp_ttl_seconds: int = 120
+    sms_otp_max_attempts: int = 5
+    sms_otp_resend_cooldown_seconds: int = 60
+
     @model_validator(mode="after")
     def reject_default_production_secrets(self) -> "Settings":
         if self.environment.lower() != "production":
@@ -43,14 +49,18 @@ class Settings(BaseSettings):
             "change-me",
             "local-development",
             "development-only-change-me",
+            "development-sms-otp-pepper-change-me",
         }
         secrets = {
             self.object_storage_secret_key.get_secret_value(),
             self.ai_api_key.get_secret_value(),
             self.auth_jwt_secret.get_secret_value(),
+            self.sms_otp_pepper.get_secret_value(),
         }
         if secrets & insecure_values:
             raise ValueError("Production secrets must be supplied securely")
+        if self.sms_provider.lower() == "development":
+            raise ValueError("Development SMS provider is forbidden in production")
         return self
 
 

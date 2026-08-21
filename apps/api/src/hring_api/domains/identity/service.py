@@ -77,7 +77,7 @@ async def register(
         password_hash=hash_password(password),
         full_name=full_name.strip() if full_name else None,
     )
-    return await _create_authenticated_session(
+    return await create_authenticated_session(
         session,
         user=user,
         settings=settings,
@@ -104,7 +104,7 @@ async def login(
     ):
         raise InvalidCredentialsError("Invalid email or password")
 
-    return await _create_authenticated_session(
+    return await create_authenticated_session(
         session,
         user=user,
         settings=settings,
@@ -164,7 +164,7 @@ async def logout(session: AsyncSession, *, refresh_token: str) -> None:
         await revoke_user_session(session, user_session)
 
 
-async def _create_authenticated_session(
+async def create_authenticated_session(
     session: AsyncSession,
     *,
     user: User,
