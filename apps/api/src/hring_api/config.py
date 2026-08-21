@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     ai_headhunting_analysis_model: str = "gemini-2.5-pro"
     ai_headhunting_research_provider: str = "perplexity"
     ai_headhunting_research_model: str = "sonar"
+    headhunting_source_webhook_url: SecretStr | None = None
+    headhunting_source_webhook_bearer_token: SecretStr | None = None
     cors_origins: list[str] = ["http://localhost:5173"]
 
     auth_jwt_secret: SecretStr = SecretStr("development-only-change-me")
