@@ -168,21 +168,25 @@ async def request_phone_verification(
     settings: Settings = Depends(get_settings),
 ) -> SmsChallengeResponse:
     try:
-        async with db.begin():
-            challenge = await request_phone_verification_otp(
-                db,
-                user_id=principal.user_id,
-                phone=payload.phone,
-                settings=settings,
-            )
+        challenge = await request_phone_verification_otp(
+            db,
+            user_id=principal.user_id,
+            phone=payload.phone,
+            settings=settings,
+        )
     except ValueError as exc:
+        await db.rollback()
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except PhoneUnavailableError as exc:
+        await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except SmsRateLimitedError as exc:
+        await db.rollback()
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     except SmsUnavailableError as exc:
+        await db.rollback()
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    await db.commit()
     return SmsChallengeResponse(
         challenge_id=challenge.challenge_id,
         expires_at=challenge.expires_at,
