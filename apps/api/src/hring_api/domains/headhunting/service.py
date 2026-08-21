@@ -1,7 +1,7 @@
 import asyncio
 import json
 import re
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from hring_api.config import get_settings
@@ -12,7 +12,10 @@ from hring_api.domains.headhunting.schemas import (
     AnalyzeCandidatesResponse,
     CandidateCreate,
     CandidateInput,
+    CandidateTemperature,
+    JobRequirements,
 )
+from hring_api.domains.headhunting.source_client import fetch_candidates_from_source
 from hring_api.domains.identity.dependencies import Principal
 
 
@@ -209,9 +212,10 @@ async def analyze_candidates(
                 if len(str(key)) <= 80
             }
 
-        temperature = str(analysis.get("candidateTemperature", "cold")).lower()
-        if temperature not in {"hot", "warm", "cold"}:
-            temperature = "cold"
+        raw_temperature = str(analysis.get("candidateTemperature", "cold")).lower()
+        if raw_temperature not in {"hot", "warm", "cold"}:
+            raw_temperature = "cold"
+        temperature = cast(CandidateTemperature, raw_temperature)
 
         raw_data = dict(original.raw_data or {})
         summary = str(analysis.get("summary", "")).strip()
@@ -231,7 +235,7 @@ async def analyze_candidates(
                 title=original.title,
                 raw_data=raw_data or None,
                 match_score=_score(analysis.get("matchScore")),
-                candidate_temperature=temperature,  # type: ignore[arg-type]
+                candidate_temperature=temperature,
                 recommendation=str(analysis.get("recommendation", "در لیست انتظار"))[:10_000],
                 green_flags=_string_list(analysis.get("greenFlags")),
                 red_flags=_string_list(analysis.get("redFlags")),
@@ -252,3 +256,55 @@ async def analyze_candidates(
         cold_candidates=sum(item.candidate_temperature == "cold" for item in processed),
     )
     return AnalyzeCandidatesResponse(candidates=processed, stats=stats)
+
+
+async def auto_headhunt_candidates(
+    *,
+    principal: Principal,
+    requirements: JobRequirements,
+    company_id: UUID | None,
+) -> AnalyzeCandidatesResponse:
+    """Fetch real candidates from the configured source and analyze them in safe batches."""
+    source_candidates = await fetch_candidates_from_source(requirements=requirements)
+    if not source_candidates:
+        return AnalyzeCandidatesResponse(
+            candidates=[],
+            stats=AnalysisStats(
+                total=0,
+                excellent=0,
+                good=0,
+                average=0,
+                avg_score=0,
+                hot_candidates=0,
+                warm_candidates=0,
+                cold_candidates=0,
+            ),
+        )
+
+    analyzed: list[CandidateCreate] = []
+    for offset in range(0, len(source_candidates), 20):
+        chunk = source_candidates[offset : offset + 20]
+        result = await analyze_candidates(
+            principal=principal,
+            payload=AnalyzeCandidatesRequest(
+                candidates=chunk,
+                job_requirements=requirements,
+                enable_web_search=True,
+            ),
+            company_id=company_id,
+        )
+        analyzed.extend(result.candidates)
+
+    analyzed.sort(key=lambda item: item.match_score, reverse=True)
+    scores = [item.match_score for item in analyzed]
+    stats = AnalysisStats(
+        total=len(analyzed),
+        excellent=sum(score >= 85 for score in scores),
+        good=sum(70 <= score < 85 for score in scores),
+        average=sum(score < 70 for score in scores),
+        avg_score=round(sum(scores) / len(scores)) if scores else 0,
+        hot_candidates=sum(item.candidate_temperature == "hot" for item in analyzed),
+        warm_candidates=sum(item.candidate_temperature == "warm" for item in analyzed),
+        cold_candidates=sum(item.candidate_temperature == "cold" for item in analyzed),
+    )
+    return AnalyzeCandidatesResponse(candidates=analyzed, stats=stats)
