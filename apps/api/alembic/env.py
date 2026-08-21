@@ -8,6 +8,7 @@ from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from hring_api.config import get_settings
+from hring_api.db import models as registered_models
 from hring_api.db.base import Base
 
 
@@ -18,6 +19,9 @@ if config.config_file_name is not None:
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)
 target_metadata = Base.metadata
+
+# Keep an explicit reference so linters and humans can see that model registration is intentional.
+_ = registered_models
 
 
 def run_migrations_offline() -> None:
