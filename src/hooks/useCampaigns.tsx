@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiRequest } from "@/lib/api";
 import { useAuth } from "./useAuth";
+import { useUserContext } from "./useUserContext";
 
 export interface Campaign {
   id: string;
+  user_id: string;
+  company_id: string | null;
   name: string;
   city: string | null;
   status: string;
@@ -16,7 +19,6 @@ export interface Campaign {
   auto_headhunting: boolean;
   created_at: string;
   updated_at: string;
-  // Computed fields
   candidatesCount?: number;
   avgMatchScore?: number;
   source?: string;
@@ -40,13 +42,32 @@ export interface Candidate {
   recommendation: string | null;
   green_flags: string[] | null;
   red_flags: string[] | null;
-  layer_scores: any;
-  raw_data: any;
+  layer_scores: Record<string, number> | null;
+  raw_data: Record<string, unknown> | null;
   created_at: string;
 }
 
+interface ApiCampaign extends Omit<Campaign, "candidatesCount" | "avgMatchScore" | "source" | "lastUpdated"> {
+  candidates_count: number;
+  avg_match_score: number;
+}
+
+interface CampaignDetailResponse {
+  campaign: ApiCampaign;
+  candidates: Candidate[];
+}
+
+const mapCampaign = (campaign: ApiCampaign): Campaign => ({
+  ...campaign,
+  candidatesCount: campaign.candidates_count,
+  avgMatchScore: campaign.avg_match_score,
+  source: campaign.auto_headhunting ? "auto" : "excel",
+  lastUpdated: formatDate(campaign.updated_at),
+});
+
 export const useCampaigns = () => {
   const { user } = useAuth();
+  const { context } = useUserContext();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,62 +82,19 @@ export const useCampaigns = () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Fetch campaigns (newest created first)
-      const { data: campaignsData, error: campaignsError } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (campaignsError) throw campaignsError;
-
-      // Fetch candidate counts for each campaign
-      const campaignIds = campaignsData?.map((c) => c.id) || [];
-      
-      if (campaignIds.length > 0) {
-        const { data: candidatesData, error: candidatesError } = await supabase
-          .from("candidates")
-          .select("campaign_id, match_score")
-          .in("campaign_id", campaignIds);
-
-        if (candidatesError) throw candidatesError;
-
-        // Calculate counts and averages
-        const countMap: Record<string, { count: number; totalScore: number }> = {};
-        candidatesData?.forEach((c) => {
-          if (!countMap[c.campaign_id]) {
-            countMap[c.campaign_id] = { count: 0, totalScore: 0 };
-          }
-          countMap[c.campaign_id].count++;
-          countMap[c.campaign_id].totalScore += c.match_score || 0;
-        });
-
-        const enrichedCampaigns = campaignsData?.map((campaign) => {
-          const stats = countMap[campaign.id] || { count: 0, totalScore: 0 };
-          return {
-            ...campaign,
-            candidatesCount: stats.count,
-            avgMatchScore: stats.count > 0 ? Math.round(stats.totalScore / stats.count) : 0,
-            source: campaign.auto_headhunting ? "auto" : "excel",
-            lastUpdated: formatDate(campaign.updated_at),
-          };
-        });
-
-        setCampaigns(enrichedCampaigns || []);
-      } else {
-        setCampaigns([]);
-      }
-    } catch (err: any) {
+      const data = await apiRequest<ApiCampaign[]>("/headhunting/campaigns");
+      setCampaigns(data.map(mapCampaign));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "خطا در دریافت کمپین‌ها";
       console.error("Error fetching campaigns:", err);
-      setError(err.message);
+      setError(message);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
-    fetchCampaigns();
+    void fetchCampaigns();
   }, [fetchCampaigns]);
 
   const createCampaign = async (campaignData: {
@@ -131,62 +109,48 @@ export const useCampaigns = () => {
   }) => {
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await supabase
-      .from("campaigns")
-      .insert({
-        user_id: user.id,
-        name: campaignData.name,
-        city: campaignData.city,
-        job_title: campaignData.job_title || null,
-        industry: campaignData.industry || null,
-        experience_range: campaignData.experience_range || null,
-        education_level: campaignData.education_level || null,
-        skills: campaignData.skills || null,
-        auto_headhunting: campaignData.auto_headhunting || false,
-        status: "processing",
-        progress: 0,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    const data = await apiRequest<ApiCampaign>("/headhunting/campaigns", {
+      method: "POST",
+      body: JSON.stringify({
+        ...campaignData,
+        company_id: context?.companyId || null,
+      }),
+    });
+    const mapped = mapCampaign(data);
+    setCampaigns((current) => [mapped, ...current.filter((item) => item.id !== mapped.id)]);
+    return mapped;
   };
 
-  const updateCampaign = async (
-    campaignId: string,
-    updates: Partial<Campaign>
-  ) => {
-    const safeUpdates: Partial<Campaign> = {
-      ...updates,
-      // Ensure "آخرین تغییر" is meaningful even without a DB trigger
-      updated_at: new Date().toISOString(),
-    };
+  const updateCampaign = async (campaignId: string, updates: Partial<Campaign>) => {
+    const body: Record<string, unknown> = {};
+    const allowed = [
+      "status",
+      "progress",
+      "name",
+      "city",
+      "job_title",
+      "industry",
+      "experience_range",
+      "education_level",
+      "skills",
+      "auto_headhunting",
+    ] as const;
+    for (const key of allowed) {
+      if (updates[key] !== undefined) body[key] = updates[key];
+    }
 
-    const { data, error } = await supabase
-      .from("campaigns")
-      .update(safeUpdates)
-      .eq("id", campaignId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Refresh campaigns list
-    await fetchCampaigns();
-    return data;
+    const data = await apiRequest<ApiCampaign>(`/headhunting/campaigns/${campaignId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+    const mapped = mapCampaign(data);
+    setCampaigns((current) => current.map((item) => item.id === campaignId ? mapped : item));
+    return mapped;
   };
 
   const deleteCampaign = async (campaignId: string) => {
-    const { error } = await supabase
-      .from("campaigns")
-      .delete()
-      .eq("id", campaignId);
-
-    if (error) throw error;
-    
-    // Refresh campaigns list
-    await fetchCampaigns();
+    await apiRequest<void>(`/headhunting/campaigns/${campaignId}`, { method: "DELETE" });
+    setCampaigns((current) => current.filter((item) => item.id !== campaignId));
   };
 
   const addCandidates = async (
@@ -208,36 +172,11 @@ export const useCampaigns = () => {
       red_flags?: string[];
       layer_scores?: Record<string, number>;
       raw_data?: Record<string, unknown>;
-    }>
-  ) => {
-    const candidatesWithCampaignId = candidates.map((c) => ({
-      campaign_id: campaignId,
-      name: c.name || null,
-      email: c.email || null,
-      phone: c.phone || null,
-      skills: c.skills || null,
-      experience: c.experience || null,
-      education: c.education || null,
-      last_company: c.last_company || null,
-      location: c.location || null,
-      title: c.title || null,
-      match_score: c.match_score || 0,
-      candidate_temperature: c.candidate_temperature || "cold",
-      recommendation: c.recommendation || null,
-      green_flags: c.green_flags || null,
-      red_flags: c.red_flags || null,
-      layer_scores: c.layer_scores ? JSON.parse(JSON.stringify(c.layer_scores)) : null,
-      raw_data: c.raw_data ? JSON.parse(JSON.stringify(c.raw_data)) : null,
-    }));
-
-    const { data, error } = await supabase
-      .from("candidates")
-      .insert(candidatesWithCampaignId)
-      .select();
-
-    if (error) throw error;
-    return data;
-  };
+    }>,
+  ) => apiRequest<Candidate[]>(`/headhunting/campaigns/${campaignId}/candidates`, {
+    method: "POST",
+    body: JSON.stringify({ candidates }),
+  });
 
   return {
     campaigns,
@@ -264,49 +203,23 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
         setLoading(false);
         return;
       }
-
       try {
         setLoading(true);
         setError(null);
-
-        // Fetch campaign
-        const { data: campaignData, error: campaignError } = await supabase
-          .from("campaigns")
-          .select("*")
-          .eq("id", campaignId)
-          .maybeSingle();
-
-        if (campaignError) throw campaignError;
-
-        if (!campaignData) {
-          setError("کمپین پیدا نشد");
-          setLoading(false);
-          return;
-        }
-
-        // Fetch candidates
-        const { data: candidatesData, error: candidatesError } = await supabase
-          .from("candidates")
-          .select("*")
-          .eq("campaign_id", campaignId)
-          .order("match_score", { ascending: false });
-
-        if (candidatesError) throw candidatesError;
-
-        setCampaign(campaignData);
-        setCandidates(candidatesData || []);
-      } catch (err: any) {
+        const data = await apiRequest<CampaignDetailResponse>(`/headhunting/campaigns/${campaignId}`);
+        setCampaign(mapCampaign(data.campaign));
+        setCandidates(data.candidates || []);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "خطا در دریافت کمپین";
         console.error("Error fetching campaign detail:", err);
-        setError(err.message);
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchCampaignDetail();
+    void fetchCampaignDetail();
   }, [user, campaignId]);
 
-  // Calculate stats from candidates
   const stats = {
     total: candidates.length,
     excellent: candidates.filter((c) => c.match_score >= 85).length,
@@ -320,13 +233,7 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
     coldCandidates: candidates.filter((c) => c.candidate_temperature === "cold").length,
   };
 
-  return {
-    campaign,
-    candidates,
-    stats,
-    loading,
-    error,
-  };
+  return { campaign, candidates, stats, loading, error };
 };
 
 function formatDate(dateStr: string): string {
