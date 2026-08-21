@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -103,6 +104,9 @@ class PlatformPrincipal:
         return self.principal.user_id
 
 
+PlatformPermissionDependency = Callable[..., Awaitable[PlatformPrincipal]]
+
+
 def _platform_permissions_for_roles(
     platform_roles: list[str],
     legacy_app_roles: list[str],
@@ -115,7 +119,7 @@ def _platform_permissions_for_roles(
     return permissions
 
 
-def require_platform_permission(permission_key: str):
+def require_platform_permission(permission_key: str) -> PlatformPermissionDependency:
     async def dependency(
         principal: Principal = Depends(get_current_principal),
         db: AsyncSession = Depends(get_db_session),
