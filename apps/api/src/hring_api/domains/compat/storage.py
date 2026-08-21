@@ -47,11 +47,16 @@ def put_object(
     content_type: str | None,
 ) -> str:
     key = logical_key(logical_bucket, path)
-    extra: dict[str, str] = {}
-    if content_type:
-        extra["ContentType"] = content_type
     client = _client(settings)
-    client.upload_fileobj(stream, settings.object_storage_bucket, key, ExtraArgs=extra or None)
+    if content_type:
+        client.upload_fileobj(
+            stream,
+            settings.object_storage_bucket,
+            key,
+            ExtraArgs={"ContentType": content_type},
+        )
+    else:
+        client.upload_fileobj(stream, settings.object_storage_bucket, key)
     return key
 
 
@@ -98,9 +103,7 @@ def list_objects(
     limit: int,
 ) -> list[dict[str, object]]:
     client = _client(settings)
-    base = logical_key(logical_bucket, prefix or "_")
-    if not prefix:
-        base = f"compat/{_safe_part(logical_bucket)}/"
+    base = logical_key(logical_bucket, prefix) if prefix else f"compat/{_safe_part(logical_bucket)}/"
     response = client.list_objects_v2(
         Bucket=settings.object_storage_bucket,
         Prefix=base,
@@ -112,13 +115,12 @@ def list_objects(
         key = str(item.get("Key", ""))
         if not key.startswith(logical_prefix):
             continue
+        last_modified = item.get("LastModified")
         rows.append(
             {
                 "name": key[len(logical_prefix) :],
                 "size": int(item.get("Size", 0)),
-                "updated_at": item.get("LastModified").isoformat()
-                if item.get("LastModified") is not None
-                else None,
+                "updated_at": last_modified.isoformat() if last_modified is not None else None,
             }
         )
     return rows
