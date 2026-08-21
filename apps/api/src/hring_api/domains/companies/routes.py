@@ -46,6 +46,7 @@ from hring_api.domains.companies.service import (
     validate_invite,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
+from hring_api.domains.identity.models import CompanyMember, Profile
 
 
 router = APIRouter(tags=["companies"])
@@ -65,7 +66,10 @@ def _domain_http_error(exc: CompanyError) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
-def _member_response(member, profile) -> CompanyMemberResponse:
+def _member_response(
+    member: CompanyMember,
+    profile: Profile | None,
+) -> CompanyMemberResponse:
     profile_response = None
     if profile is not None:
         profile_response = MemberProfileResponse(
