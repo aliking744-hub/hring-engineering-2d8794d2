@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,8 +12,13 @@ from hring_api.domains.access.repository import (
     replace_platform_roles,
 )
 from hring_api.domains.admin.models import SiteSetting
-from hring_api.domains.admin.repository import add_audit_log, get_company_for_admin, get_user_for_admin, upsert_site_setting
-from hring_api.domains.identity.models import Company, CompanyMember
+from hring_api.domains.admin.repository import (
+    add_audit_log,
+    get_company_for_admin,
+    get_user_for_admin,
+    upsert_site_setting,
+)
+from hring_api.domains.identity.models import Company, CompanyMember, Profile, User
 from hring_api.domains.identity.repository import create_user, get_user_by_email
 from hring_api.domains.identity.security import hash_password
 from hring_api.domains.identity.session_repository import revoke_all_user_sessions
@@ -53,7 +59,7 @@ async def create_managed_company(
     owner_password: str,
     owner_full_name: str,
     ip_address: str | None,
-) -> tuple[Company, object]:
+) -> tuple[Company, User]:
     normalized_email = normalize_email(owner_email)
     if await get_user_by_email(session, normalized_email) is not None:
         raise AdminConflictError("Owner email is already registered")
@@ -72,8 +78,6 @@ async def create_managed_company(
         password_hash=hash_password(owner_password),
         full_name=owner_full_name.strip(),
     )
-    from datetime import UTC, datetime
-
     owner.email_verified_at = datetime.now(UTC)
 
     company = Company(
@@ -88,17 +92,18 @@ async def create_managed_company(
     session.add(company)
     await session.flush()
 
-    membership = CompanyMember(
-        company_id=company.id,
-        user_id=owner.id,
-        role="ceo",
-        can_invite=True,
-        is_active=True,
-        invited_by=actor_user_id,
+    session.add(
+        CompanyMember(
+            company_id=company.id,
+            user_id=owner.id,
+            role="ceo",
+            can_invite=True,
+            is_active=True,
+            invited_by=actor_user_id,
+        )
     )
-    session.add(membership)
 
-    profile = await session.get(__import__("hring_api.domains.identity.models", fromlist=["Profile"]).Profile, owner.id)
+    profile = await session.get(Profile, owner.id)
     if profile is not None:
         profile.user_type = "corporate"
         profile.subscription_tier = subscription_tier
@@ -143,9 +148,16 @@ async def update_managed_company(
                 raise AdminConflictError("Company domain is already registered")
         company.domain = normalized_domain
 
-    for field in ("name", "status", "subscription_tier", "monthly_credits", "max_members"):
-        if field in values and values[field] is not None:
-            setattr(company, field, values[field])
+    if "name" in values and isinstance(values["name"], str):
+        company.name = values["name"].strip()
+    if "status" in values and isinstance(values["status"], str):
+        company.status = values["status"]
+    if "subscription_tier" in values and isinstance(values["subscription_tier"], str):
+        company.subscription_tier = values["subscription_tier"]
+    if "monthly_credits" in values and isinstance(values["monthly_credits"], int):
+        company.monthly_credits = values["monthly_credits"]
+    if "max_members" in values and isinstance(values["max_members"], int):
+        company.max_members = values["max_members"]
 
     await add_audit_log(
         session,
@@ -168,7 +180,7 @@ async def set_user_active_state(
     target_user_id: UUID,
     is_active: bool,
     ip_address: str | None,
-) -> object:
+) -> User:
     if actor_user_id == target_user_id and not is_active:
         raise AdminSafetyError("You cannot deactivate your own account")
     user = await get_user_for_admin(session, target_user_id)
