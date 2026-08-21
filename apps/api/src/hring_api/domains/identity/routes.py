@@ -12,6 +12,9 @@ from hring_api.domains.identity.schemas import (
     MembershipResponse,
     RefreshRequest,
     RegisterRequest,
+    SmsChallengeResponse,
+    SmsLoginRequest,
+    SmsLoginVerifyRequest,
     TokenPairResponse,
     UserResponse,
 )
@@ -24,6 +27,13 @@ from hring_api.domains.identity.service import (
     logout,
     refresh,
     register,
+)
+from hring_api.domains.identity.sms_service import (
+    InvalidSmsChallengeError,
+    SmsRateLimitedError,
+    SmsUnavailableError,
+    request_login_otp,
+    verify_login_otp,
 )
 
 
@@ -90,6 +100,52 @@ async def login_account(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
+        ) from exc
+    return _auth_response(result)
+
+
+@router.post("/sms/request", response_model=SmsChallengeResponse, status_code=status.HTTP_202_ACCEPTED)
+async def request_sms_login(
+    payload: SmsLoginRequest,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SmsChallengeResponse:
+    try:
+        async with db.begin():
+            challenge = await request_login_otp(db, phone=payload.phone, settings=settings)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except SmsRateLimitedError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except SmsUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    return SmsChallengeResponse(
+        challenge_id=challenge.challenge_id,
+        expires_at=challenge.expires_at,
+    )
+
+
+@router.post("/sms/verify", response_model=AuthResponse)
+async def verify_sms_login(
+    payload: SmsLoginVerifyRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> AuthResponse:
+    try:
+        async with db.begin():
+            result = await verify_login_otp(
+                db,
+                challenge_id=payload.challenge_id,
+                code=payload.code,
+                settings=settings,
+                user_agent=request.headers.get("user-agent"),
+                ip_address=_client_ip(request),
+            )
+    except InvalidSmsChallengeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired verification code",
         ) from exc
     return _auth_response(result)
 
