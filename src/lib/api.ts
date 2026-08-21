@@ -1,0 +1,142 @@
+const configuredBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const API_BASE = (configuredBase || '/api/v1').replace(/\/$/, '');
+
+let accessToken: string | null = null;
+let refreshInFlight: Promise<AuthEnvelope | null> | null = null;
+
+export interface ApiUser {
+  id: string;
+  email: string;
+  is_active: boolean;
+  email_verified_at: string | null;
+  created_at: string;
+}
+
+export interface AuthEnvelope {
+  user: ApiUser;
+  tokens: {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    access_expires_at: string;
+    refresh_expires_at: string;
+  };
+}
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail?: unknown;
+
+  constructor(message: string, status: number, detail?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+export const setAccessToken = (token: string | null) => {
+  accessToken = token;
+};
+
+export const getAccessToken = () => accessToken;
+
+const urlFor = (path: string) => {
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+};
+
+const parseResponse = async <T>(response: Response): Promise<T> => {
+  if (response.status === 204) return undefined as T;
+
+  const contentType = response.headers.get('content-type') || '';
+  const payload = contentType.includes('application/json')
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    const detail = typeof payload === 'object' && payload !== null && 'detail' in payload
+      ? (payload as { detail?: unknown }).detail
+      : payload;
+    const message = typeof detail === 'string' ? detail : `HTTP ${response.status}`;
+    throw new ApiError(message, response.status, detail);
+  }
+
+  return payload as T;
+};
+
+const execute = async <T>(
+  path: string,
+  init: RequestInit = {},
+  token: string | null = accessToken,
+): Promise<T> => {
+  const headers = new Headers(init.headers);
+  if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(urlFor(path), {
+    ...init,
+    headers,
+    credentials: 'include',
+  });
+  return parseResponse<T>(response);
+};
+
+export const refreshSession = async (): Promise<AuthEnvelope | null> => {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const auth = await execute<AuthEnvelope>(
+        '/auth/refresh',
+        { method: 'POST' },
+        null,
+      );
+      setAccessToken(auth.tokens.access_token);
+      return auth;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) {
+        console.error('Session refresh failed:', error);
+      }
+      setAccessToken(null);
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+};
+
+export const apiRequest = async <T>(
+  path: string,
+  init: RequestInit = {},
+  options: { auth?: boolean; retryAuth?: boolean } = {},
+): Promise<T> => {
+  const authRequired = options.auth !== false;
+  const retryAuth = options.retryAuth !== false;
+
+  try {
+    return await execute<T>(path, init, authRequired ? accessToken : null);
+  } catch (error) {
+    if (
+      authRequired &&
+      retryAuth &&
+      error instanceof ApiError &&
+      error.status === 401
+    ) {
+      const refreshed = await refreshSession();
+      if (refreshed) {
+        return execute<T>(path, init, accessToken);
+      }
+    }
+    throw error;
+  }
+};
+
+export const authRequest = async <T>(path: string, init: RequestInit = {}) =>
+  apiRequest<T>(path, init, { auth: false, retryAuth: false });
