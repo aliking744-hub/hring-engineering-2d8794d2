@@ -86,6 +86,10 @@ class CandidateCreate(CandidateInput):
     layer_scores: dict[str, Any] | None = None
 
 
+class CandidateBatchCreate(BaseModel):
+    candidates: list[CandidateCreate] = Field(min_length=1, max_length=100)
+
+
 class CandidateOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -108,6 +112,11 @@ class CandidateOut(BaseModel):
     layer_scores: dict[str, Any] | None
     raw_data: dict[str, Any] | None
     created_at: datetime
+
+
+class CampaignDetail(BaseModel):
+    campaign: CampaignOut
+    candidates: list[CandidateOut]
 
 
 class JobRequirements(BaseModel):
