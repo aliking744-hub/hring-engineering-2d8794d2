@@ -46,6 +46,8 @@ const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Admin = lazy(() => import("./pages/Admin"));
+const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
+const ProductAdmin = lazy(() => import("./pages/ProductAdmin"));
 const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
 const LearningPath = lazy(() => import("./pages/LearningPath"));
 
@@ -266,6 +268,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Admin />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/platform" 
+                element={
+                  <ProtectedRoute>
+                    <PlatformAdmin />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/product" 
+                element={
+                  <ProtectedRoute>
+                    <ProductAdmin />
                   </ProtectedRoute>
                 } 
               />

@@ -13,6 +13,10 @@ test('core HRing routes remain registered', async () => {
     '/campaign/:id',
     '/campaign/:campaignId/candidate/:candidateId',
     '/admin',
+    '/admin/platform',
+    '/admin/product',
+    '/company-members',
+    '/company-settings',
   ];
 
   for (const route of requiredRoutes) {
@@ -20,11 +24,27 @@ test('core HRing routes remain registered', async () => {
   }
 });
 
-test('admin area keeps both admin and super-admin authorization checks', async () => {
+test('admin hub derives control-plane access from server-issued user context', async () => {
   const admin = await read('src/pages/Admin.tsx');
-  assert.match(admin, /useAdmin/);
-  assert.match(admin, /useSuperAdmin/);
-  assert.match(admin, /!isAdmin && !isSuperAdmin/);
+  assert.match(admin, /useUserContext/);
+  assert.match(admin, /platformRoles/);
+  assert.match(admin, /companyId/);
+  assert.match(admin, /\/admin\/platform/);
+  assert.match(admin, /\/admin\/product/);
+  assert.equal(/UsersView|CompanyManager|SiteSettingsManager/.test(admin), false);
+});
+
+test('platform role management is limited to super admins in the UI', async () => {
+  const platform = await read('src/pages/PlatformAdmin.tsx');
+  assert.match(platform, /roles\.includes\('super_admin'\)/);
+  assert.match(platform, /if \(!isSuperAdmin\) return/);
+  assert.match(platform, /\/admin\/platform\/users\/\$\{user\.id\}\/roles/);
+});
+
+test('product admin uses backend product settings and does not import Supabase', async () => {
+  const product = await read('src/pages/ProductAdmin.tsx');
+  assert.match(product, /\/admin\/product\/settings/);
+  assert.equal(/integrations\/supabase|supabase\./.test(product), false);
 });
 
 test('auto-headhunt persists candidates with allowed pending status', async () => {

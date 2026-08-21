@@ -1,189 +1,110 @@
-import { useState } from "react";
-import { Helmet } from "react-helmet-async";
-import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Shield,
-  Users,
-  FileText,
-  Settings,
-  BarChart3,
-  MessageSquare,
-  Package,
-  Star,
-  Building2,
-  Sliders,
-  Home,
-  Key,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import AuroraBackground from "@/components/AuroraBackground";
-import { useAdmin } from "@/hooks/useAdmin";
-import { useSuperAdmin } from "@/hooks/useSuperAdmin";
-import { useSiteName } from "@/hooks/useSiteSettings";
-
-// Admin components
-import UsersView from "@/components/admin/UsersView";
-import UsersCreditsManager from "@/components/admin/UsersCreditsManager";
-import BlogManager from "@/components/admin/BlogManager";
-import ProductManager from "@/components/admin/ProductManager";
-import TestimonialsManager from "@/components/admin/TestimonialsManager";
-import CompanyManager from "@/components/admin/CompanyManager";
-import SiteSettingsManager from "@/components/admin/SiteSettingsManager";
-import CreditAnalytics from "@/components/admin/CreditAnalytics";
-import ChatbotManager from "@/components/admin/ChatbotManager";
-import AuditLogsViewer from "@/components/admin/AuditLogsViewer";
-import CorporateUserManager from "@/components/admin/CorporateUserManager";
-import FeaturePermissionsManager from "@/components/admin/FeaturePermissionsManager";
+import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
+import { Building2, ChevronLeft, Package, ShieldCheck, UsersRound } from 'lucide-react';
+import AuroraBackground from '@/components/AuroraBackground';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useUserContext } from '@/hooks/useUserContext';
+import { useSiteName } from '@/hooks/useSiteSettings';
 
 const Admin = () => {
-  const { isAdmin, loading: adminLoading } = useAdmin();
-  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
+  const { context, loading } = useUserContext();
   const siteName = useSiteName();
-  const [activeTab, setActiveTab] = useState("users");
 
-  if (adminLoading || superAdminLoading) {
+  if (loading) {
+    return <div className="min-h-screen bg-background" aria-busy="true" />;
+  }
+
+  const roles = context?.platformRoles || [];
+  const hasLegacyAdmin = context?.appRoles.includes('admin') || false;
+  const canOpenPlatform = roles.some((role) => ['super_admin', 'platform_admin', 'support_admin'].includes(role)) || hasLegacyAdmin;
+  const canOpenProduct = roles.some((role) => ['super_admin', 'content_admin'].includes(role));
+  const canOpenCompany = Boolean(context?.companyId);
+
+  const panels = [
+    canOpenPlatform && {
+      title: 'Platform Control Center',
+      description: 'شرکت‌ها، کل کاربران، پلن‌ها، سقف قرارداد، نقش‌های سراسری و Audit Log.',
+      icon: ShieldCheck,
+      href: '/admin/platform',
+      badge: 'Platform',
+    },
+    canOpenProduct && {
+      title: 'Product & Content Admin',
+      description: 'ظاهر، متن‌ها، visibility، SEO و تنظیمات عمومی محصول. Secret و API Key در این بخش ذخیره نمی‌شود.',
+      icon: Package,
+      href: '/admin/product',
+      badge: 'Product',
+    },
+    canOpenCompany && {
+      title: 'Company Admin',
+      description: 'کاربران، نقش‌ها، دعوت‌نامه‌ها، سطح دسترسی و تنظیمات همان شرکت.',
+      icon: UsersRound,
+      href: '/company-members',
+      badge: 'Tenant',
+    },
+  ].filter(Boolean) as Array<{
+    title: string;
+    description: string;
+    icon: typeof ShieldCheck;
+    href: string;
+    badge: string;
+  }>;
+
+  if (!panels.length) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="flex min-h-screen items-center justify-center bg-background" dir="rtl">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <ShieldCheck className="mx-auto mb-3 h-12 w-12 text-destructive" />
+            <h1 className="text-xl font-bold">پنل مدیریتی برای این حساب فعال نیست</h1>
+            <Button asChild className="mt-5"><Link to="/dashboard">بازگشت به داشبورد</Link></Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
-
-  if (!isAdmin && !isSuperAdmin) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <Shield className="w-16 h-16 text-destructive" />
-        <h1 className="text-2xl font-bold">دسترسی محدود</h1>
-        <p className="text-muted-foreground">شما به این صفحه دسترسی ندارید.</p>
-        <Button asChild>
-          <Link to="/dashboard">بازگشت به داشبورد</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  const adminTabs = [
-    { id: "users", label: "کاربران", icon: Users },
-    { id: "corporate", label: "کاربران شرکتی", icon: Building2 },
-    { id: "credits", label: "اعتبارات", icon: BarChart3 },
-    { id: "permissions", label: "دسترسی فیچرها", icon: Key },
-    { id: "companies", label: "شرکت‌ها", icon: Building2 },
-    { id: "blog", label: "وبلاگ", icon: FileText },
-    { id: "products", label: "محصولات", icon: Package },
-    { id: "testimonials", label: "نظرات", icon: Star },
-    { id: "chatbot", label: "چت‌بات", icon: MessageSquare },
-    { id: "settings", label: "تنظیمات", icon: Settings },
-    { id: "audit", label: "لاگ‌ها", icon: Sliders },
-  ];
 
   return (
     <>
-      <Helmet>
-        <title>پنل ادمین | {siteName}</title>
-        <meta name="robots" content="noindex, nofollow" />
-      </Helmet>
-
+      <Helmet><title>مرکز مدیریت | {siteName}</title><meta name="robots" content="noindex, nofollow" /></Helmet>
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />
-
-        <div className="relative z-10 container mx-auto px-4 py-8">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between mb-8"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-primary/10">
-                <Shield className="w-8 h-8 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">پنل مدیریت</h1>
-                <p className="text-sm text-muted-foreground">
-                  {isSuperAdmin ? "سوپر ادمین" : "ادمین"}
-                </p>
-              </div>
+        <div className="container relative z-10 mx-auto max-w-6xl px-4 py-10">
+          <div className="mb-8 flex items-center gap-3">
+            <Button variant="ghost" size="icon" asChild><Link to="/dashboard"><ChevronLeft className="h-5 w-5" /></Link></Button>
+            <div>
+              <h1 className="text-3xl font-bold">مرکز مدیریت HRing</h1>
+              <p className="mt-1 text-sm text-muted-foreground">سه Control Plane جدا با مرز دسترسی مستقل.</p>
             </div>
-            <Button asChild variant="outline">
-              <Link to="/dashboard">
-                <Home className="w-4 h-4 ml-2" />
-                داشبورد
-              </Link>
-            </Button>
-          </motion.div>
+          </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="flex flex-wrap h-auto gap-2 mb-6 bg-transparent">
-              {adminTabs.map((tab) => (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2"
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="grid gap-5 lg:grid-cols-3">
+            {panels.map((panel) => (
+              <Card key={panel.href} className="flex h-full flex-col">
+                <CardHeader>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="rounded-xl bg-primary/10 p-3"><panel.icon className="h-6 w-6 text-primary" /></div>
+                    <span className="rounded-full border px-2 py-1 text-xs text-muted-foreground">{panel.badge}</span>
+                  </div>
+                  <CardTitle>{panel.title}</CardTitle>
+                  <CardDescription className="leading-6">{panel.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="mt-auto">
+                  <Button asChild className="w-full"><Link to={panel.href}>ورود به پنل</Link></Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className="glass-card p-6"
-            >
-              <TabsContent value="users" className="mt-0">
-                <UsersView />
-              </TabsContent>
-
-              <TabsContent value="corporate" className="mt-0">
-                <CorporateUserManager />
-              </TabsContent>
-
-              <TabsContent value="credits" className="mt-0">
-                <div className="space-y-6">
-                  <CreditAnalytics />
-                  <UsersCreditsManager />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="permissions" className="mt-0">
-                <FeaturePermissionsManager />
-              </TabsContent>
-
-              <TabsContent value="companies" className="mt-0">
-                <CompanyManager />
-              </TabsContent>
-
-              <TabsContent value="blog" className="mt-0">
-                <BlogManager />
-              </TabsContent>
-
-              <TabsContent value="products" className="mt-0">
-                <ProductManager />
-              </TabsContent>
-
-              <TabsContent value="testimonials" className="mt-0">
-                <TestimonialsManager />
-              </TabsContent>
-
-              <TabsContent value="chatbot" className="mt-0">
-                <ChatbotManager />
-              </TabsContent>
-
-              <TabsContent value="settings" className="mt-0">
-                <SiteSettingsManager />
-              </TabsContent>
-
-              <TabsContent value="audit" className="mt-0">
-                <AuditLogsViewer />
-              </TabsContent>
-            </motion.div>
-          </Tabs>
+          {canOpenCompany && (
+            <Card className="mt-6">
+              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+                <div className="flex items-center gap-3"><Building2 className="h-5 w-5 text-primary" /><div><div className="font-medium">تنظیمات شرکت</div><div className="text-sm text-muted-foreground">پروفایل شرکت، دامنه، credit pool و ماتریس دسترسی نقش‌ها.</div></div></div>
+                <Button asChild variant="outline"><Link to="/company-settings">تنظیمات شرکت</Link></Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </>
