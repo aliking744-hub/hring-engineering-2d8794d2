@@ -6,6 +6,7 @@ from hring_api.domains.admin.routes import router as admin_router
 from hring_api.domains.ai.routes import router as ai_router
 from hring_api.domains.companies.routes import router as companies_router
 from hring_api.domains.companies.settings_routes import router as company_settings_router
+from hring_api.domains.headhunting.routes import router as headhunting_router
 from hring_api.domains.identity.recovery_routes import router as identity_recovery_router
 from hring_api.domains.identity.routes import router as identity_router
 
@@ -19,3 +20,4 @@ api_router.include_router(company_settings_router)
 api_router.include_router(access_router)
 api_router.include_router(admin_router)
 api_router.include_router(ai_router)
+api_router.include_router(headhunting_router)
