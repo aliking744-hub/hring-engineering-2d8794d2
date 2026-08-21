@@ -25,6 +25,8 @@ interface ApiUserContext {
   app_roles: string[];
   company_id: string | null;
   company_role: string | null;
+  company_can_invite: boolean;
+  company_permissions: string[];
   company_tier: string | null;
   credits: number;
   used_credits: number;
@@ -62,6 +64,8 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
         appRoles: data.app_roles,
         companyId: data.company_id,
         companyRole: data.company_role as CompanyRole | null,
+        companyCanInvite: data.company_can_invite,
+        companyPermissions: data.company_permissions,
         companyTier: data.company_tier as SubscriptionTier | null,
         credits: data.credits,
         usedCredits: data.used_credits,
