@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+dist
+logs
+*.log
+.env
+.env.*
+!.env.example
+!.env.standalone.example
+.runtime
+backups
+*.dump
+*.sql.gz

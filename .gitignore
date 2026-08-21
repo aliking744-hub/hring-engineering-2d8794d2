@@ -12,6 +12,21 @@ dist
 dist-ssr
 *.local
 
+# Runtime secrets / local environments
+.env
+.env.*
+!.env.example
+!.env.standalone.example
+apps/api/.env
+apps/api/.env.*
+!apps/api/.env.example
+
+# Local persistent data / exports
+.runtime/
+backups/
+*.dump
+*.sql.gz
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

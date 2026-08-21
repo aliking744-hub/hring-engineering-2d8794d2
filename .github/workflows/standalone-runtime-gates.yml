@@ -1,0 +1,36 @@
+name: standalone-runtime-gates
+
+on:
+  pull_request:
+    branches:
+      - engineering/foundation
+    paths:
+      - "compose.yaml"
+      - ".dockerignore"
+      - ".env.standalone.example"
+      - "infra/**"
+      - "apps/api/Dockerfile"
+      - "index.html"
+      - "public/**"
+      - "scripts/generate-sitemap.ts"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/standalone-runtime-gates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-standalone-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env.standalone.example config --quiet
+
+      - name: Build standalone web image
+        run: docker build --file infra/docker/web.Dockerfile --build-arg PUBLIC_BASE_URL=https://hring.ir --tag hring-web-ci .
