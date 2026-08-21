@@ -4,10 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.db.session import get_db_session
+from hring_api.domains.ai.gateway_client import AiGatewayError
 from hring_api.domains.headhunting import repository
 from hring_api.domains.headhunting.schemas import (
     AnalyzeCandidatesRequest,
     AnalyzeCandidatesResponse,
+    AutoHeadhuntRequest,
+    AutoHeadhuntResponse,
+    AutoHeadhuntStats,
     CampaignCreate,
     CampaignDetail,
     CampaignOut,
@@ -15,7 +19,8 @@ from hring_api.domains.headhunting.schemas import (
     CandidateBatchCreate,
     CandidateOut,
 )
-from hring_api.domains.headhunting.service import analyze_candidates
+from hring_api.domains.headhunting.service import analyze_candidates, auto_headhunt_candidates
+from hring_api.domains.headhunting.source_client import HeadhuntingSourceError
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 
 
@@ -144,7 +149,7 @@ async def analyze_candidate_batch(
             payload=payload,
             company_id=company_id,
         )
-    except ValueError as exc:
+    except (ValueError, AiGatewayError) as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
     if campaign is not None:
@@ -160,3 +165,75 @@ async def analyze_candidate_batch(
         )
 
     return result
+
+
+@router.post("/auto-headhunt", response_model=AutoHeadhuntResponse)
+async def auto_headhunt(
+    payload: AutoHeadhuntRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> AutoHeadhuntResponse:
+    campaign = await repository.get_campaign(
+        db,
+        principal=principal,
+        campaign_id=payload.campaign_id,
+    )
+    if campaign is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    await repository.update_campaign(
+        db,
+        campaign=campaign,
+        payload=CampaignUpdate(status="processing", progress=20),
+    )
+    try:
+        result = await auto_headhunt_candidates(
+            principal=principal,
+            requirements=payload.job_requirements,
+            company_id=campaign.company_id,
+        )
+    except HeadhuntingSourceError as exc:
+        await repository.update_campaign(
+            db,
+            campaign=campaign,
+            payload=CampaignUpdate(status="paused", progress=0),
+        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except (ValueError, AiGatewayError) as exc:
+        await repository.update_campaign(
+            db,
+            campaign=campaign,
+            payload=CampaignUpdate(status="paused", progress=0),
+        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if not result.candidates:
+        await repository.replace_candidates(db, campaign_id=campaign.id, candidates=[])
+        await repository.update_campaign(
+            db,
+            campaign=campaign,
+            payload=CampaignUpdate(status="paused", progress=0),
+        )
+    else:
+        await repository.replace_candidates(
+            db,
+            campaign_id=campaign.id,
+            candidates=result.candidates,
+        )
+        await repository.update_campaign(
+            db,
+            campaign=campaign,
+            payload=CampaignUpdate(status="active", progress=100),
+        )
+
+    return AutoHeadhuntResponse(
+        success=True,
+        campaign_id=campaign.id,
+        stats=AutoHeadhuntStats(
+            total=result.stats.total,
+            hot=result.stats.hot_candidates,
+            warm=result.stats.warm_candidates,
+            cold=result.stats.cold_candidates,
+            avg_score=result.stats.avg_score,
+        ),
+    )
