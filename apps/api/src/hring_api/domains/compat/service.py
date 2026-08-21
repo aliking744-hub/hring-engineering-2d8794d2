@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.compat.models import CompatRecord
 from hring_api.domains.compat.schemas import CompatQueryRequest, QueryFilter
 from hring_api.domains.identity.dependencies import Principal
@@ -15,6 +16,7 @@ from hring_api.domains.identity.models import FeaturePermission, Profile
 
 PUBLIC_READ_TABLES = frozenset({"posts", "testimonials", "digital_products"})
 GLOBAL_CONTENT_TABLES = frozenset({"posts", "testimonials", "digital_products"})
+GLOBAL_CONTENT_WRITE_ROLES = frozenset({"super_admin", "platform_admin", "content_admin"})
 
 
 class CompatError(RuntimeError):
@@ -44,32 +46,32 @@ def _matches_filter(row: dict[str, Any], item: QueryFilter) -> bool:
     current = _value(row, item.column)
     expected = item.value
     if item.operator == "eq":
-        return current == expected
+        return bool(current == expected)
     if item.operator == "neq":
-        return current != expected
+        return bool(current != expected)
     if item.operator == "in":
-        return isinstance(expected, list) and current in expected
+        return bool(isinstance(expected, list) and current in expected)
     if item.operator == "is":
-        return current is expected
+        return bool(current is expected)
     if item.operator == "contains":
         if isinstance(current, list):
             if isinstance(expected, list):
-                return all(value in current for value in expected)
-            return expected in current
+                return bool(all(value in current for value in expected))
+            return bool(expected in current)
         if isinstance(current, str) and isinstance(expected, str):
-            return expected in current
+            return bool(expected in current)
         if isinstance(current, dict) and isinstance(expected, dict):
-            return all(current.get(key) == value for key, value in expected.items())
+            return bool(all(current.get(key) == value for key, value in expected.items()))
         return False
     try:
         if item.operator == "gt":
-            return current > expected
+            return bool(current > expected)
         if item.operator == "gte":
-            return current >= expected
+            return bool(current >= expected)
         if item.operator == "lt":
-            return current < expected
+            return bool(current < expected)
         if item.operator == "lte":
-            return current <= expected
+            return bool(current <= expected)
     except TypeError:
         return False
     return False
@@ -96,8 +98,6 @@ def _project(row: dict[str, Any], columns: str | None) -> dict[str, Any]:
     if not columns or columns.strip() == "*":
         return row
     selected: dict[str, Any] = {}
-    # Legacy callers use simple comma-separated projections. Nested PostgREST
-    # projections are intentionally returned as full rows until migrated to typed APIs.
     simple_columns = [part.strip() for part in columns.split(",") if part.strip()]
     if any("(" in part or ")" in part for part in simple_columns):
         return row
@@ -226,6 +226,22 @@ def _record_payload(record: CompatRecord) -> dict[str, Any]:
     return row
 
 
+async def _ensure_global_write_allowed(
+    db: AsyncSession,
+    *,
+    principal: Principal,
+    table: str,
+    operation: str,
+) -> None:
+    if table not in GLOBAL_CONTENT_TABLES or operation == "select":
+        return
+    if "admin" in principal.app_roles:
+        return
+    platform_roles = set(await list_platform_roles(db, principal.user_id))
+    if platform_roles.isdisjoint(GLOBAL_CONTENT_WRITE_ROLES):
+        raise CompatForbiddenError("Global product/content writes require product administration access")
+
+
 async def execute_query(
     db: AsyncSession,
     *,
@@ -241,6 +257,14 @@ async def execute_query(
         return await _query_profiles(db, principal=principal, request=request)
     if request.table == "feature_permissions":
         return await _query_feature_permissions(db, request=request)
+
+    if principal is not None:
+        await _ensure_global_write_allowed(
+            db,
+            principal=principal,
+            table=request.table,
+            operation=request.operation,
+        )
 
     records = await _load_compat_rows(
         db,
