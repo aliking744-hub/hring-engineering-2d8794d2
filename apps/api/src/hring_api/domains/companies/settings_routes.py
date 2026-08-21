@@ -68,8 +68,11 @@ async def change_company_settings(
             metadata_json={"changed_fields": changed_fields},
             ip_address=_client_ip(request),
         )
+        await db.flush()
+        await db.refresh(company)
+        response = CompanyResponse.model_validate(company)
     except CompanyError as exc:
         await db.rollback()
         raise _settings_error(exc) from exc
     await db.commit()
-    return CompanyResponse.model_validate(company)
+    return response
