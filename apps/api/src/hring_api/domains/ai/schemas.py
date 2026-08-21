@@ -64,6 +64,29 @@ class AiUsageSummaryResponse(BaseModel):
     total_credits_charged: int
 
 
+class AiCompanyUsageSummaryRow(BaseModel):
+    company_id: UUID | None
+    requests: int
+    failures: int
+    input_tokens: int
+    output_tokens: int
+    cached_input_tokens: int
+    reasoning_tokens: int
+    credits_charged: int
+    estimated_cost_microusd: int
+    provider_cost_microusd: int
+
+
+class AiCompanyUsageSummaryResponse(BaseModel):
+    since: datetime
+    rows: list[AiCompanyUsageSummaryRow]
+    total_requests: int
+    total_failures: int
+    total_estimated_cost_microusd: int
+    total_provider_cost_microusd: int
+    total_credits_charged: int
+
+
 class AiRateCardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
