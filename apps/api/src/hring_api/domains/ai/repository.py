@@ -187,3 +187,38 @@ async def usage_summary_rows(
     )
     result = await session.execute(statement, params)
     return [dict(row) for row in result.mappings().all()]
+
+
+async def company_usage_summary_rows(
+    session: AsyncSession,
+    *,
+    since: datetime,
+    feature_key: str | None = None,
+) -> list[dict[str, object]]:
+    conditions = ["created_at >= :since"]
+    params: dict[str, object] = {"since": since}
+    if feature_key:
+        conditions.append("feature_key = :feature_key")
+        params["feature_key"] = feature_key
+
+    statement = text(
+        f"""
+        SELECT
+          company_id,
+          COUNT(*)::bigint AS requests,
+          COUNT(*) FILTER (WHERE status = 'failure')::bigint AS failures,
+          COALESCE(SUM((metrics_json->>'input_tokens')::bigint), 0)::bigint AS input_tokens,
+          COALESCE(SUM((metrics_json->>'output_tokens')::bigint), 0)::bigint AS output_tokens,
+          COALESCE(SUM((metrics_json->>'cached_input_tokens')::bigint), 0)::bigint AS cached_input_tokens,
+          COALESCE(SUM((metrics_json->>'reasoning_tokens')::bigint), 0)::bigint AS reasoning_tokens,
+          COALESCE(SUM(credits_charged), 0)::bigint AS credits_charged,
+          COALESCE(SUM(estimated_cost_microusd), 0)::bigint AS estimated_cost_microusd,
+          COALESCE(SUM(provider_cost_microusd), 0)::bigint AS provider_cost_microusd
+        FROM ai_usage_events
+        WHERE {' AND '.join(conditions)}
+        GROUP BY company_id
+        ORDER BY estimated_cost_microusd DESC, requests DESC
+        """
+    )
+    result = await session.execute(statement, params)
+    return [dict(row) for row in result.mappings().all()]
