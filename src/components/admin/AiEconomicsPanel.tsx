@@ -56,6 +56,34 @@ interface UsageSummary {
   total_credits_charged: number;
 }
 
+interface CompanyUsageRow {
+  company_id: string | null;
+  requests: number;
+  failures: number;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  reasoning_tokens: number;
+  credits_charged: number;
+  estimated_cost_microusd: number;
+  provider_cost_microusd: number;
+}
+
+interface CompanyUsageSummary {
+  since: string;
+  rows: CompanyUsageRow[];
+  total_requests: number;
+  total_failures: number;
+  total_estimated_cost_microusd: number;
+  total_provider_cost_microusd: number;
+  total_credits_charged: number;
+}
+
+interface PlatformCompany {
+  id: string;
+  name: string;
+}
+
 interface RateCard {
   id: string;
   provider: string;
@@ -89,9 +117,17 @@ const usd = (microUsd: number) =>
   }).format(microUsd / 1_000_000);
 
 const integer = (value: number) => value.toLocaleString('fa-IR');
+const toman = (value: number) => `${Math.round(value).toLocaleString('fa-IR')} تومان`;
+
+const numberValue = (value: string) => {
+  const parsed = Number(value.replace(/,/g, '').trim());
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+};
 
 const AiEconomicsPanel = () => {
   const [summary, setSummary] = useState<UsageSummary | null>(null);
+  const [companySummary, setCompanySummary] = useState<CompanyUsageSummary | null>(null);
+  const [companies, setCompanies] = useState<PlatformCompany[]>([]);
   const [rates, setRates] = useState<RateCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [rateOpen, setRateOpen] = useState(false);
@@ -102,15 +138,24 @@ const AiEconomicsPanel = () => {
   const [unitSize, setUnitSize] = useState(1_000_000);
   const [costUsd, setCostUsd] = useState('');
 
+  const [contractRevenueToman, setContractRevenueToman] = useState('200000000');
+  const [usdTomanRate, setUsdTomanRate] = useState('');
+  const [targetGrossMargin, setTargetGrossMargin] = useState('70');
+  const [otherMonthlyCostToman, setOtherMonthlyCostToman] = useState('0');
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, rateData] = await Promise.all([
+      const [summaryData, companyData, rateData, companyList] = await Promise.all([
         apiRequest<UsageSummary>('/admin/platform/ai/usage-summary?days=30'),
+        apiRequest<CompanyUsageSummary>('/admin/platform/ai/company-summary?days=30'),
         apiRequest<RateCard[]>('/admin/platform/ai/rates'),
+        apiRequest<PlatformCompany[]>('/admin/platform/companies?limit=500'),
       ]);
       setSummary(summaryData);
+      setCompanySummary(companyData);
       setRates(rateData);
+      setCompanies(companyList);
     } catch (error) {
       console.error('AI economics load failed:', error);
       toast.error(error instanceof Error ? error.message : 'دریافت آمار مصرف هوش مصنوعی انجام نشد');
@@ -122,6 +167,11 @@ const AiEconomicsPanel = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const companyNames = useMemo(
+    () => new Map(companies.map((company) => [company.id, company.name])),
+    [companies],
+  );
 
   const activeRates = useMemo(() => rates.filter((rate) => rate.is_active), [rates]);
 
@@ -158,17 +208,32 @@ const AiEconomicsPanel = () => {
     return <div className="flex min-h-48 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
   }
 
-  const totalCost = summary?.total_provider_cost_microusd || summary?.total_estimated_cost_microusd || 0;
+  const totalCostMicro = summary?.total_provider_cost_microusd || summary?.total_estimated_cost_microusd || 0;
+  const totalCostUsd = totalCostMicro / 1_000_000;
   const failedPercent = summary?.total_requests
     ? (summary.total_failures / summary.total_requests) * 100
     : 0;
+  const avgCostPerRequestUsd = summary?.total_requests ? totalCostUsd / summary.total_requests : 0;
+  const avgCostPerCreditUsd = summary?.total_credits_charged ? totalCostUsd / summary.total_credits_charged : 0;
+
+  const revenue = numberValue(contractRevenueToman);
+  const fx = numberValue(usdTomanRate);
+  const margin = Math.min(99.9, numberValue(targetGrossMargin));
+  const otherCosts = numberValue(otherMonthlyCostToman);
+  const maxVariableCostToman = Math.max(0, revenue * (1 - margin / 100) - otherCosts);
+  const safeAiCalls = fx > 0 && avgCostPerRequestUsd > 0
+    ? Math.floor(maxVariableCostToman / (avgCostPerRequestUsd * fx))
+    : null;
+  const safeCredits = fx > 0 && avgCostPerCreditUsd > 0
+    ? Math.floor(maxVariableCostToman / (avgCostPerCreditUsd * fx))
+    : null;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold">AI Economics</h2>
-          <p className="text-sm text-muted-foreground">مصرف ۳۰ روز اخیر؛ هزینه provider، توکن، Credit و failure به تفکیک قابلیت.</p>
+          <p className="text-sm text-muted-foreground">مصرف ۳۰ روز اخیر؛ هزینه provider، توکن، Credit و failure به تفکیک قابلیت و شرکت.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => void load()}><RefreshCw className="ml-2 h-4 w-4" />تازه‌سازی</Button>
@@ -178,10 +243,37 @@ const AiEconomicsPanel = () => {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">درخواست AI</div><div className="mt-1 text-2xl font-bold">{integer(summary?.total_requests || 0)}</div></CardContent></Card>
-        <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">هزینه ۳۰ روز</div><div className="mt-1 text-2xl font-bold" dir="ltr">{usd(totalCost)}</div></CardContent></Card>
+        <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">هزینه ۳۰ روز</div><div className="mt-1 text-2xl font-bold" dir="ltr">{usd(totalCostMicro)}</div></CardContent></Card>
         <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">Credit مصرف‌شده</div><div className="mt-1 text-2xl font-bold">{integer(summary?.total_credits_charged || 0)}</div></CardContent></Card>
         <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">Failure rate</div><div className="mt-1 text-2xl font-bold" dir="ltr">{failedPercent.toFixed(1)}%</div></CardContent></Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5 text-primary" />Pricing Simulator</CardTitle>
+          <CardDescription>برآورد اولیه بر اساس میانگین هزینه واقعی ۳۰ روز اخیر. هزینه زیرساخت، نیروی انسانی، مالیات و فروش را در «سایر هزینه‌ها» وارد کنید.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div><Label>مبلغ قرارداد ماهانه (تومان)</Label><Input dir="ltr" inputMode="numeric" value={contractRevenueToman} onChange={(event) => setContractRevenueToman(event.target.value)} /></div>
+            <div><Label>نرخ هر دلار (تومان)</Label><Input dir="ltr" inputMode="numeric" value={usdTomanRate} onChange={(event) => setUsdTomanRate(event.target.value)} placeholder="نرخ واقعی روز" /></div>
+            <div><Label>Gross Margin هدف (%)</Label><Input dir="ltr" inputMode="decimal" value={targetGrossMargin} onChange={(event) => setTargetGrossMargin(event.target.value)} /></div>
+            <div><Label>سایر هزینه ماهانه (تومان)</Label><Input dir="ltr" inputMode="numeric" value={otherMonthlyCostToman} onChange={(event) => setOtherMonthlyCostToman(event.target.value)} /></div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border p-4"><div className="text-xs text-muted-foreground">بودجه امن متغیر</div><div className="mt-1 font-bold">{toman(maxVariableCostToman)}</div></div>
+            <div className="rounded-lg border p-4"><div className="text-xs text-muted-foreground">AI cost / call مشاهده‌شده</div><div className="mt-1 font-bold" dir="ltr">${avgCostPerRequestUsd.toFixed(6)}</div></div>
+            <div className="rounded-lg border p-4"><div className="text-xs text-muted-foreground">حداکثر AI call تقریبی</div><div className="mt-1 font-bold">{safeAiCalls === null ? 'نیاز به داده و نرخ دلار' : integer(safeAiCalls)}</div></div>
+            <div className="rounded-lg border p-4"><div className="text-xs text-muted-foreground">حداکثر Credit تقریبی</div><div className="mt-1 font-bold">{safeCredits === null ? 'پس از کالیبراسیون Credit' : integer(safeCredits)}</div></div>
+          </div>
+          <p className="text-xs leading-6 text-muted-foreground">این خروجی «قیمت قطعی فروش» نیست. بعد از چند هفته مصرف واقعی، بهتر است Credit هر feature بر مبنای هزینه P95 آن feature تنظیم شود تا کاربران سنگین حاشیه سود قرارداد را نخورند.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>هزینه به تفکیک شرکت</CardTitle><CardDescription>برای Drill-down هر شرکت، `company_id` به گزارش feature-level ارسال می‌شود؛ این جدول نمای اقتصادی کل tenant است.</CardDescription></CardHeader>
+        <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>شرکت</TableHead><TableHead>Calls</TableHead><TableHead>Input</TableHead><TableHead>Output</TableHead><TableHead>Credits</TableHead><TableHead>Failure</TableHead><TableHead>AI Cost</TableHead></TableRow></TableHeader><TableBody>{(companySummary?.rows || []).map((row) => <TableRow key={row.company_id || 'individual'}><TableCell>{row.company_id ? companyNames.get(row.company_id) || row.company_id : 'کاربران فردی / بدون شرکت'}</TableCell><TableCell>{integer(row.requests)}</TableCell><TableCell>{integer(row.input_tokens)}</TableCell><TableCell>{integer(row.output_tokens)}</TableCell><TableCell>{integer(row.credits_charged)}</TableCell><TableCell>{integer(row.failures)}</TableCell><TableCell dir="ltr">{usd(row.provider_cost_microusd || row.estimated_cost_microusd)}</TableCell></TableRow>)}{!companySummary?.rows.length && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">هنوز مصرف شرکتی ثبت نشده است.</TableCell></TableRow>}</TableBody></Table></div></CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>هزینه به تفکیک قابلیت</CardTitle><CardDescription>بعد از مهاجرت هر feature به AI Gateway، مصرف واقعی آن اینجا ظاهر می‌شود.</CardDescription></CardHeader>
