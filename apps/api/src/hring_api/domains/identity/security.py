@@ -44,7 +44,7 @@ def create_access_token(
     settings: Settings,
     now: datetime | None = None,
 ) -> tuple[str, datetime]:
-    issued_at = now or datetime.now(UTC)
+    issued_at = (now or datetime.now(UTC)).replace(microsecond=0)
     expires_at = issued_at + timedelta(minutes=settings.auth_access_token_minutes)
     payload = {
         "sub": str(user_id),
