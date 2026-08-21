@@ -1,0 +1,140 @@
+name: hring
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hring
+      POSTGRES_USER: hring
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - hring_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hring -d hring"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [hring_internal]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    volumes:
+      - hring_redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    networks: [hring_internal]
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hring}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+    volumes:
+      - hring_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [hring_internal]
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >-
+      /bin/sh -c '
+      mc alias set hring http://minio:9000 "${MINIO_ROOT_USER:-hring}" "${MINIO_ROOT_PASSWORD}";
+      mc mb --ignore-existing hring/hring-private;
+      mc anonymous set none hring/hring-private;
+      '
+    restart: "no"
+    networks: [hring_internal]
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      ENVIRONMENT: production
+      API_V1_PREFIX: /api/v1
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://hring.ir}
+      DATABASE_URL: postgresql+asyncpg://hring:${POSTGRES_PASSWORD}@postgres:5432/hring
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      OBJECT_STORAGE_ENDPOINT: http://minio:9000
+      OBJECT_STORAGE_BUCKET: hring-private
+      OBJECT_STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-hring}
+      OBJECT_STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      AI_BASE_URL: ${AI_BASE_URL:-http://ai:8000/v1}
+      AI_API_KEY: ${AI_API_KEY:?set AI_API_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["https://hring.ir"]}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?set AUTH_JWT_SECRET}
+      AUTH_SECURITY_TOKEN_PEPPER: ${AUTH_SECURITY_TOKEN_PEPPER:?set AUTH_SECURITY_TOKEN_PEPPER}
+      SMS_PROVIDER: ${SMS_PROVIDER:-disabled}
+      SMS_OTP_PEPPER: ${SMS_OTP_PEPPER:?set SMS_OTP_PEPPER}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-disabled}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-["hring.ir","www.hring.ir","localhost"]}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        alembic upgrade head
+        exec uvicorn hring_api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks: [hring_internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        PUBLIC_BASE_URL: ${PUBLIC_APP_URL:-https://hring.ir}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    networks: [hring_internal]
+
+networks:
+  hring_internal:
+    driver: bridge
+
+volumes:
+  hring_postgres:
+  hring_redis:
+  hring_minio:
