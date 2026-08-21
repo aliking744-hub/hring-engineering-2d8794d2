@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
     public_app_url: str = "http://localhost:5173"
+    trusted_hosts: list[str] = ["localhost", "127.0.0.1", "testserver"]
     database_url: str = Field(
         default="postgresql+asyncpg://hring:hring@postgres:5432/hring",
         description="Independent PostgreSQL database URL.",
@@ -34,7 +35,9 @@ class Settings(BaseSettings):
     auth_jwt_issuer: str = "hring"
     auth_access_token_minutes: int = 15
     auth_refresh_token_days: int = 30
-    auth_security_token_pepper: SecretStr = SecretStr("development-security-token-pepper-change-me")
+    auth_security_token_pepper: SecretStr = SecretStr(
+        "development-security-token-pepper-change-me"
+    )
     auth_password_reset_ttl_minutes: int = 30
     auth_email_verify_ttl_hours: int = 24
 
@@ -46,8 +49,14 @@ class Settings(BaseSettings):
 
     email_provider: str = "disabled"
 
+    rate_limit_enabled: bool = True
+    rate_limit_login_per_minute: int = 12
+    rate_limit_register_per_minute: int = 6
+    rate_limit_sms_request_per_minute: int = 5
+    rate_limit_recovery_per_minute: int = 6
+
     @model_validator(mode="after")
-    def reject_default_production_secrets(self) -> "Settings":
+    def reject_unsafe_production_configuration(self) -> "Settings":
         if self.environment.lower() != "production":
             return self
 
@@ -71,6 +80,12 @@ class Settings(BaseSettings):
             raise ValueError("Development SMS provider is forbidden in production")
         if self.email_provider.lower() == "development":
             raise ValueError("Development email provider is forbidden in production")
+        if "*" in self.cors_origins:
+            raise ValueError("Wildcard CORS is forbidden in production")
+        if not self.trusted_hosts or "*" in self.trusted_hosts:
+            raise ValueError("Explicit trusted hosts are required in production")
+        if not self.public_app_url.lower().startswith("https://"):
+            raise ValueError("PUBLIC_APP_URL must use HTTPS in production")
         return self
 
 
