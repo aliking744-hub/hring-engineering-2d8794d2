@@ -21,6 +21,9 @@ class GatewaySettings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
 
+    perplexity_api_key: SecretStr | None = None
+    perplexity_base_url: str = "https://api.perplexity.ai"
+
     upstream_timeout_seconds: float = 120.0
     upstream_connect_timeout_seconds: float = 10.0
 
