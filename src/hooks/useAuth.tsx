@@ -15,6 +15,11 @@ export interface AuthSession {
   user: AuthUser;
 }
 
+interface SmsChallenge {
+  challenge_id: string;
+  expires_at: string;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   session: AuthSession | null;
@@ -27,6 +32,11 @@ interface AuthContextType {
   signIn: (
     email: string,
     password: string,
+  ) => Promise<{ error: Error | null; user: AuthUser | null }>;
+  requestSmsLogin: (phone: string) => Promise<{ error: Error | null; challenge: SmsChallenge | null }>;
+  verifySmsLogin: (
+    challengeId: string,
+    code: string,
   ) => Promise<{ error: Error | null; user: AuthUser | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -76,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       applyAuth(auth);
       setLoading(false);
     };
-    initialize();
+    void initialize();
     return () => {
       active = false;
     };
@@ -110,6 +120,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const requestSmsLogin = async (phone: string) => {
+    try {
+      const challenge = await authRequest<SmsChallenge>('/auth/sms/request', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      });
+      return { error: null, challenge };
+    } catch (error) {
+      return { error: asError(error), challenge: null };
+    }
+  };
+
+  const verifySmsLogin = async (challengeId: string, code: string) => {
+    try {
+      const auth = await authRequest<AuthEnvelope>('/auth/sms/verify', {
+        method: 'POST',
+        body: JSON.stringify({ challenge_id: challengeId, code }),
+      });
+      return { error: null, user: applyAuth(auth) };
+    } catch (error) {
+      return { error: asError(error), user: null };
+    }
+  };
+
   const signInWithGoogle = async () => ({
     error: new ApiError(
       'ورود با گوگل در نسخه مستقل هنوز پیکربندی نشده است',
@@ -134,6 +168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loading,
       signUp,
       signIn,
+      requestSmsLogin,
+      verifySmsLogin,
       signInWithGoogle,
       signOut,
       restoreSession,
