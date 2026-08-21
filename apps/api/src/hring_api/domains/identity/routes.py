@@ -16,6 +16,7 @@ from hring_api.domains.identity.schemas import (
     UserResponse,
 )
 from hring_api.domains.identity.service import (
+    AuthResult,
     EmailAlreadyExistsError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
@@ -33,7 +34,7 @@ def _client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
-def _auth_response(result) -> AuthResponse:
+def _auth_response(result: AuthResult) -> AuthResponse:
     return AuthResponse(
         user=UserResponse.model_validate(result.user),
         tokens=TokenPairResponse(
