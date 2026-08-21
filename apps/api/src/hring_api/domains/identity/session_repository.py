@@ -36,7 +36,7 @@ async def revoke_all_user_sessions(
     *,
     user_id: UUID,
     except_session_id: UUID | None = None,
-) -> int:
+) -> None:
     statement = (
         update(UserSession)
         .where(
@@ -47,5 +47,4 @@ async def revoke_all_user_sessions(
     )
     if except_session_id is not None:
         statement = statement.where(UserSession.id != except_session_id)
-    result = await session.execute(statement)
-    return int(result.rowcount or 0)
+    await session.execute(statement)
