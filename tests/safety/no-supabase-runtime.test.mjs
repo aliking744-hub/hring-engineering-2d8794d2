@@ -5,11 +5,12 @@ import test from 'node:test';
 
 const ROOT = process.cwd();
 const RUNTIME_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-const NEEDLES = [
+const FORBIDDEN = [
   /@supabase\//,
-  /integrations\/supabase/,
-  /\bsupabase\./,
   /VITE_SUPABASE_/,
+  /\.supabase\.co/i,
+  /supabase\.com/i,
+  /ai\.gateway\.lovable\.dev/i,
 ];
 
 function walk(dir) {
@@ -22,7 +23,7 @@ function walk(dir) {
   return files;
 }
 
-function findRuntimeReferences() {
+function findExternalRuntimeReferences() {
   const targets = walk(path.join(ROOT, 'src'));
   const packageJson = path.join(ROOT, 'package.json');
   if (fs.existsSync(packageJson)) targets.push(packageJson);
@@ -32,7 +33,7 @@ function findRuntimeReferences() {
     const text = fs.readFileSync(file, 'utf8');
     const lines = text.split(/\r?\n/);
     lines.forEach((line, index) => {
-      if (NEEDLES.some((needle) => needle.test(line))) {
+      if (FORBIDDEN.some((needle) => needle.test(line))) {
         hits.push(`${path.relative(ROOT, file)}:${index + 1}: ${line.trim().slice(0, 180)}`);
       }
     });
@@ -40,11 +41,22 @@ function findRuntimeReferences() {
   return hits;
 }
 
-test('browser/runtime code has zero Supabase dependency', () => {
-  const hits = findRuntimeReferences();
+test('browser/runtime code has zero external Supabase or Lovable AI dependency', () => {
+  const hits = findExternalRuntimeReferences();
   assert.deepEqual(
     hits,
     [],
-    `Remaining Supabase runtime references (${hits.length}):\n${hits.join('\n')}`,
+    `Remaining external runtime references (${hits.length}):\n${hits.join('\n')}`,
   );
+});
+
+test('legacy compatibility client is implemented by HRing API, not Supabase SDK', () => {
+  const clientPath = path.join(ROOT, 'src/integrations/supabase/client.ts');
+  const client = fs.readFileSync(clientPath, 'utf8');
+  assert.doesNotMatch(client, /createClient\s*\(/);
+  assert.doesNotMatch(client, /@supabase\//);
+  assert.doesNotMatch(client, /VITE_SUPABASE_/);
+  assert.match(client, /\/compat\/query/);
+  assert.match(client, /\/compat\/functions\//);
+  assert.match(client, /\/compat\/storage\//);
 });
