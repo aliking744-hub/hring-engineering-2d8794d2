@@ -23,6 +23,32 @@ async def get_phone_identity_by_user(
     return result.scalar_one_or_none()
 
 
+async def bind_verified_phone(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    phone_e164: str,
+    verified_at: datetime,
+) -> PhoneIdentity:
+    existing_phone = await get_phone_identity_by_phone(session, phone_e164)
+    if existing_phone is not None and existing_phone.user_id != user_id:
+        raise ValueError("Phone number is already bound to another account")
+
+    identity = await get_phone_identity_by_user(session, user_id)
+    if identity is None:
+        identity = PhoneIdentity(
+            user_id=user_id,
+            phone_e164=phone_e164,
+            verified_at=verified_at,
+        )
+        session.add(identity)
+    else:
+        identity.phone_e164 = phone_e164
+        identity.verified_at = verified_at
+    await session.flush()
+    return identity
+
+
 async def create_sms_challenge(
     session: AsyncSession,
     challenge: SmsOtpChallenge,
