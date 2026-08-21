@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiRequest } from "@/lib/api";
 import { useAuth } from "./useAuth";
 
 export interface Campaign {
@@ -16,7 +16,6 @@ export interface Campaign {
   auto_headhunting: boolean;
   created_at: string;
   updated_at: string;
-  // Computed fields
   candidatesCount?: number;
   avgMatchScore?: number;
   source?: string;
@@ -37,13 +36,47 @@ export interface Candidate {
   title: string | null;
   match_score: number;
   candidate_temperature: string;
+  status: string;
   recommendation: string | null;
   green_flags: string[] | null;
   red_flags: string[] | null;
-  layer_scores: any;
-  raw_data: any;
+  layer_scores: Record<string, unknown> | null;
+  raw_data: Record<string, unknown> | null;
   created_at: string;
+  updated_at: string;
 }
+
+interface ApiCampaign extends Omit<Campaign, "candidatesCount" | "avgMatchScore" | "source" | "lastUpdated"> {
+  owner_user_id: string;
+  company_id: string | null;
+  description: string | null;
+  candidates_count: number;
+  avg_match_score: number;
+}
+
+interface ApiCampaignDetail extends ApiCampaign {
+  candidates: Candidate[];
+}
+
+const mapCampaign = (campaign: ApiCampaign): Campaign => ({
+  id: campaign.id,
+  name: campaign.name,
+  city: campaign.city,
+  status: campaign.status,
+  progress: campaign.progress,
+  job_title: campaign.job_title,
+  industry: campaign.industry,
+  experience_range: campaign.experience_range,
+  education_level: campaign.education_level,
+  skills: campaign.skills,
+  auto_headhunting: campaign.auto_headhunting,
+  created_at: campaign.created_at,
+  updated_at: campaign.updated_at,
+  candidatesCount: campaign.candidates_count,
+  avgMatchScore: campaign.avg_match_score,
+  source: campaign.auto_headhunting ? "auto" : "excel",
+  lastUpdated: formatDate(campaign.updated_at),
+});
 
 export const useCampaigns = () => {
   const { user } = useAuth();
@@ -61,62 +94,19 @@ export const useCampaigns = () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Fetch campaigns (newest created first)
-      const { data: campaignsData, error: campaignsError } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (campaignsError) throw campaignsError;
-
-      // Fetch candidate counts for each campaign
-      const campaignIds = campaignsData?.map((c) => c.id) || [];
-      
-      if (campaignIds.length > 0) {
-        const { data: candidatesData, error: candidatesError } = await supabase
-          .from("candidates")
-          .select("campaign_id, match_score")
-          .in("campaign_id", campaignIds);
-
-        if (candidatesError) throw candidatesError;
-
-        // Calculate counts and averages
-        const countMap: Record<string, { count: number; totalScore: number }> = {};
-        candidatesData?.forEach((c) => {
-          if (!countMap[c.campaign_id]) {
-            countMap[c.campaign_id] = { count: 0, totalScore: 0 };
-          }
-          countMap[c.campaign_id].count++;
-          countMap[c.campaign_id].totalScore += c.match_score || 0;
-        });
-
-        const enrichedCampaigns = campaignsData?.map((campaign) => {
-          const stats = countMap[campaign.id] || { count: 0, totalScore: 0 };
-          return {
-            ...campaign,
-            candidatesCount: stats.count,
-            avgMatchScore: stats.count > 0 ? Math.round(stats.totalScore / stats.count) : 0,
-            source: campaign.auto_headhunting ? "auto" : "excel",
-            lastUpdated: formatDate(campaign.updated_at),
-          };
-        });
-
-        setCampaigns(enrichedCampaigns || []);
-      } else {
-        setCampaigns([]);
-      }
-    } catch (err: any) {
+      const rows = await apiRequest<ApiCampaign[]>("/recruiting/campaigns");
+      setCampaigns(rows.map(mapCampaign));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Campaign fetch failed";
       console.error("Error fetching campaigns:", err);
-      setError(err.message);
+      setError(message);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
-    fetchCampaigns();
+    void fetchCampaigns();
   }, [fetchCampaigns]);
 
   const createCampaign = async (campaignData: {
@@ -128,64 +118,44 @@ export const useCampaigns = () => {
     education_level?: string;
     skills?: string[];
     auto_headhunting?: boolean;
+    description?: string;
   }) => {
     if (!user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from("campaigns")
-      .insert({
-        user_id: user.id,
-        name: campaignData.name,
-        city: campaignData.city,
-        job_title: campaignData.job_title || null,
-        industry: campaignData.industry || null,
-        experience_range: campaignData.experience_range || null,
-        education_level: campaignData.education_level || null,
-        skills: campaignData.skills || null,
-        auto_headhunting: campaignData.auto_headhunting || false,
-        status: "processing",
-        progress: 0,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    const data = await apiRequest<ApiCampaign>("/recruiting/campaigns", {
+      method: "POST",
+      body: JSON.stringify(campaignData),
+    });
+    return mapCampaign(data);
   };
 
-  const updateCampaign = async (
-    campaignId: string,
-    updates: Partial<Campaign>
-  ) => {
-    const safeUpdates: Partial<Campaign> = {
-      ...updates,
-      // Ensure "آخرین تغییر" is meaningful even without a DB trigger
-      updated_at: new Date().toISOString(),
-    };
+  const updateCampaign = async (campaignId: string, updates: Partial<Campaign>) => {
+    const payload: Record<string, unknown> = {};
+    const allowed = [
+      "name",
+      "city",
+      "status",
+      "progress",
+      "job_title",
+      "industry",
+      "experience_range",
+      "education_level",
+      "skills",
+      "auto_headhunting",
+    ] as const;
+    for (const key of allowed) {
+      if (key in updates) payload[key] = updates[key];
+    }
 
-    const { data, error } = await supabase
-      .from("campaigns")
-      .update(safeUpdates)
-      .eq("id", campaignId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Refresh campaigns list
+    const data = await apiRequest<ApiCampaign>(`/recruiting/campaigns/${campaignId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
     await fetchCampaigns();
-    return data;
+    return mapCampaign(data);
   };
 
   const deleteCampaign = async (campaignId: string) => {
-    const { error } = await supabase
-      .from("campaigns")
-      .delete()
-      .eq("id", campaignId);
-
-    if (error) throw error;
-    
-    // Refresh campaigns list
+    await apiRequest<void>(`/recruiting/campaigns/${campaignId}`, { method: "DELETE" });
     await fetchCampaigns();
   };
 
@@ -203,40 +173,25 @@ export const useCampaigns = () => {
       title?: string;
       match_score?: number;
       candidate_temperature?: string;
+      status?: "pending" | "approved" | "rejected" | "waiting";
       recommendation?: string;
       green_flags?: string[];
       red_flags?: string[];
-      layer_scores?: Record<string, number>;
+      layer_scores?: Record<string, unknown>;
       raw_data?: Record<string, unknown>;
     }>
   ) => {
-    const candidatesWithCampaignId = candidates.map((c) => ({
-      campaign_id: campaignId,
-      name: c.name || null,
-      email: c.email || null,
-      phone: c.phone || null,
-      skills: c.skills || null,
-      experience: c.experience || null,
-      education: c.education || null,
-      last_company: c.last_company || null,
-      location: c.location || null,
-      title: c.title || null,
-      match_score: c.match_score || 0,
-      candidate_temperature: c.candidate_temperature || "cold",
-      recommendation: c.recommendation || null,
-      green_flags: c.green_flags || null,
-      red_flags: c.red_flags || null,
-      layer_scores: c.layer_scores ? JSON.parse(JSON.stringify(c.layer_scores)) : null,
-      raw_data: c.raw_data ? JSON.parse(JSON.stringify(c.raw_data)) : null,
-    }));
-
-    const { data, error } = await supabase
-      .from("candidates")
-      .insert(candidatesWithCampaignId)
-      .select();
-
-    if (error) throw error;
-    return data;
+    return apiRequest<Candidate[]>(`/recruiting/campaigns/${campaignId}/candidates`, {
+      method: "POST",
+      body: JSON.stringify({
+        candidates: candidates.map((candidate) => ({
+          ...candidate,
+          match_score: candidate.match_score || 0,
+          candidate_temperature: candidate.candidate_temperature || "cold",
+          status: candidate.status || "pending",
+        })),
+      }),
+    });
   };
 
   return {
@@ -268,45 +223,21 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
       try {
         setLoading(true);
         setError(null);
-
-        // Fetch campaign
-        const { data: campaignData, error: campaignError } = await supabase
-          .from("campaigns")
-          .select("*")
-          .eq("id", campaignId)
-          .maybeSingle();
-
-        if (campaignError) throw campaignError;
-
-        if (!campaignData) {
-          setError("کمپین پیدا نشد");
-          setLoading(false);
-          return;
-        }
-
-        // Fetch candidates
-        const { data: candidatesData, error: candidatesError } = await supabase
-          .from("candidates")
-          .select("*")
-          .eq("campaign_id", campaignId)
-          .order("match_score", { ascending: false });
-
-        if (candidatesError) throw candidatesError;
-
-        setCampaign(campaignData);
-        setCandidates(candidatesData || []);
-      } catch (err: any) {
+        const data = await apiRequest<ApiCampaignDetail>(`/recruiting/campaigns/${campaignId}`);
+        setCampaign(mapCampaign(data));
+        setCandidates(data.candidates || []);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "کمپین پیدا نشد";
         console.error("Error fetching campaign detail:", err);
-        setError(err.message);
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCampaignDetail();
+    void fetchCampaignDetail();
   }, [user, campaignId]);
 
-  // Calculate stats from candidates
   const stats = {
     total: candidates.length,
     excellent: candidates.filter((c) => c.match_score >= 85).length,
@@ -320,13 +251,7 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
     coldCandidates: candidates.filter((c) => c.candidate_temperature === "cold").length,
   };
 
-  return {
-    campaign,
-    candidates,
-    stats,
-    loading,
-    error,
-  };
+  return { campaign, candidates, stats, loading, error };
 };
 
 function formatDate(dateStr: string): string {
