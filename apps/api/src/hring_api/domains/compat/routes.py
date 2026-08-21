@@ -49,6 +49,8 @@ def _compat_http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, CompatFunctionUnavailableError):
         return HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    if isinstance(exc, CompatFunctionError):
+        return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     if isinstance(exc, StorageCompatError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -100,6 +102,23 @@ async def execute_compat_rpc(
                 f"RPC {payload.name} requires a dedicated HRing service"
             )
     except (CompatError, CompatFunctionUnavailableError) as exc:
+        raise _compat_http_error(exc) from exc
+    return CompatQueryResponse(data=data, count=1)
+
+
+@router.post("/public-functions/hring-support", response_model=CompatQueryResponse)
+async def public_support(
+    payload: CompatFunctionRequest,
+    settings: Settings = Depends(get_settings),
+) -> CompatQueryResponse:
+    try:
+        data = await invoke_ai_function(
+            name="hring-support",
+            body=payload.body,
+            principal=None,
+            settings=settings,
+        )
+    except CompatFunctionError as exc:
         raise _compat_http_error(exc) from exc
     return CompatQueryResponse(data=data, count=1)
 
