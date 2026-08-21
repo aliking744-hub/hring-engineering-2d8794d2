@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import {
+  createCampaignRecord,
+  deleteCampaignRecord,
+  getCampaignRecord,
+  insertCandidateRecords,
+  listCampaignsForUser,
+  listCandidatesForCampaign,
+  listCandidateScores,
+  updateCampaignRecord,
+  type CampaignRow,
+  type CampaignUpdate,
+  type CandidateInsert,
+  type CandidateRow,
+} from "@/features/headhunting/data/campaignRepository";
 
 export interface Campaign {
   id: string;
@@ -45,6 +58,36 @@ export interface Candidate {
   created_at: string;
 }
 
+type CreateCampaignInput = {
+  name: string;
+  city: string;
+  job_title?: string;
+  industry?: string;
+  experience_range?: string;
+  education_level?: string;
+  skills?: string[];
+  auto_headhunting?: boolean;
+};
+
+type CandidateDraft = {
+  name?: string;
+  email?: string;
+  phone?: string;
+  skills?: string;
+  experience?: string;
+  education?: string;
+  last_company?: string;
+  location?: string;
+  title?: string;
+  match_score?: number;
+  candidate_temperature?: string;
+  recommendation?: string;
+  green_flags?: string[];
+  red_flags?: string[];
+  layer_scores?: Record<string, number>;
+  raw_data?: Record<string, unknown>;
+};
+
 export const useCampaigns = () => {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -62,51 +105,31 @@ export const useCampaigns = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch campaigns (newest created first)
-      const { data: campaignsData, error: campaignsError } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const campaignRows = await listCampaignsForUser(user.id);
+      const campaignIds = campaignRows.map((campaign) => campaign.id);
+      const candidateScores = await listCandidateScores(campaignIds);
 
-      if (campaignsError) throw campaignsError;
+      const countMap: Record<string, { count: number; totalScore: number }> = {};
+      candidateScores.forEach((candidate) => {
+        if (!countMap[candidate.campaign_id]) {
+          countMap[candidate.campaign_id] = { count: 0, totalScore: 0 };
+        }
+        countMap[candidate.campaign_id].count++;
+        countMap[candidate.campaign_id].totalScore += candidate.match_score || 0;
+      });
 
-      // Fetch candidate counts for each campaign
-      const campaignIds = campaignsData?.map((c) => c.id) || [];
-      
-      if (campaignIds.length > 0) {
-        const { data: candidatesData, error: candidatesError } = await supabase
-          .from("candidates")
-          .select("campaign_id, match_score")
-          .in("campaign_id", campaignIds);
+      const enrichedCampaigns = campaignRows.map((campaign) => {
+        const stats = countMap[campaign.id] || { count: 0, totalScore: 0 };
+        return {
+          ...normalizeCampaign(campaign),
+          candidatesCount: stats.count,
+          avgMatchScore: stats.count > 0 ? Math.round(stats.totalScore / stats.count) : 0,
+          source: campaign.auto_headhunting ? "auto" : "excel",
+          lastUpdated: formatDate(campaign.updated_at),
+        };
+      });
 
-        if (candidatesError) throw candidatesError;
-
-        // Calculate counts and averages
-        const countMap: Record<string, { count: number; totalScore: number }> = {};
-        candidatesData?.forEach((c) => {
-          if (!countMap[c.campaign_id]) {
-            countMap[c.campaign_id] = { count: 0, totalScore: 0 };
-          }
-          countMap[c.campaign_id].count++;
-          countMap[c.campaign_id].totalScore += c.match_score || 0;
-        });
-
-        const enrichedCampaigns = campaignsData?.map((campaign) => {
-          const stats = countMap[campaign.id] || { count: 0, totalScore: 0 };
-          return {
-            ...campaign,
-            candidatesCount: stats.count,
-            avgMatchScore: stats.count > 0 ? Math.round(stats.totalScore / stats.count) : 0,
-            source: campaign.auto_headhunting ? "auto" : "excel",
-            lastUpdated: formatDate(campaign.updated_at),
-          };
-        });
-
-        setCampaigns(enrichedCampaigns || []);
-      } else {
-        setCampaigns([]);
-      }
+      setCampaigns(enrichedCampaigns);
     } catch (err: any) {
       console.error("Error fetching campaigns:", err);
       setError(err.message);
@@ -119,124 +142,89 @@ export const useCampaigns = () => {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  const createCampaign = async (campaignData: {
-    name: string;
-    city: string;
-    job_title?: string;
-    industry?: string;
-    experience_range?: string;
-    education_level?: string;
-    skills?: string[];
-    auto_headhunting?: boolean;
-  }) => {
+  const createCampaign = async (campaignData: CreateCampaignInput) => {
     if (!user) throw new Error("User not authenticated");
 
-    const { data, error } = await supabase
-      .from("campaigns")
-      .insert({
-        user_id: user.id,
-        name: campaignData.name,
-        city: campaignData.city,
-        job_title: campaignData.job_title || null,
-        industry: campaignData.industry || null,
-        experience_range: campaignData.experience_range || null,
-        education_level: campaignData.education_level || null,
-        skills: campaignData.skills || null,
-        auto_headhunting: campaignData.auto_headhunting || false,
-        status: "processing",
-        progress: 0,
-      })
-      .select()
-      .single();
+    const campaign = await createCampaignRecord({
+      user_id: user.id,
+      name: campaignData.name,
+      city: campaignData.city,
+      job_title: campaignData.job_title || null,
+      industry: campaignData.industry || null,
+      experience_range: campaignData.experience_range || null,
+      education_level: campaignData.education_level || null,
+      skills: campaignData.skills || null,
+      auto_headhunting: campaignData.auto_headhunting || false,
+      status: "processing",
+      progress: 0,
+    });
 
-    if (error) throw error;
-    return data;
+    return normalizeCampaign(campaign);
   };
 
   const updateCampaign = async (
     campaignId: string,
-    updates: Partial<Campaign>
+    updates: Partial<Campaign>,
   ) => {
-    const safeUpdates: Partial<Campaign> = {
-      ...updates,
-      // Ensure "آخرین تغییر" is meaningful even without a DB trigger
+    const safeUpdates: CampaignUpdate = {
+      ...(updates.name !== undefined ? { name: updates.name } : {}),
+      ...(updates.city !== undefined ? { city: updates.city } : {}),
+      ...(updates.status !== undefined ? { status: updates.status } : {}),
+      ...(updates.progress !== undefined ? { progress: updates.progress } : {}),
+      ...(updates.job_title !== undefined ? { job_title: updates.job_title } : {}),
+      ...(updates.industry !== undefined ? { industry: updates.industry } : {}),
+      ...(updates.experience_range !== undefined
+        ? { experience_range: updates.experience_range }
+        : {}),
+      ...(updates.education_level !== undefined
+        ? { education_level: updates.education_level }
+        : {}),
+      ...(updates.skills !== undefined ? { skills: updates.skills } : {}),
+      ...(updates.auto_headhunting !== undefined
+        ? { auto_headhunting: updates.auto_headhunting }
+        : {}),
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase
-      .from("campaigns")
-      .update(safeUpdates)
-      .eq("id", campaignId)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Refresh campaigns list
+    const campaign = await updateCampaignRecord(campaignId, safeUpdates);
     await fetchCampaigns();
-    return data;
+    return normalizeCampaign(campaign);
   };
 
   const deleteCampaign = async (campaignId: string) => {
-    const { error } = await supabase
-      .from("campaigns")
-      .delete()
-      .eq("id", campaignId);
-
-    if (error) throw error;
-    
-    // Refresh campaigns list
+    await deleteCampaignRecord(campaignId);
     await fetchCampaigns();
   };
 
   const addCandidates = async (
     campaignId: string,
-    candidates: Array<{
-      name?: string;
-      email?: string;
-      phone?: string;
-      skills?: string;
-      experience?: string;
-      education?: string;
-      last_company?: string;
-      location?: string;
-      title?: string;
-      match_score?: number;
-      candidate_temperature?: string;
-      recommendation?: string;
-      green_flags?: string[];
-      red_flags?: string[];
-      layer_scores?: Record<string, number>;
-      raw_data?: Record<string, unknown>;
-    }>
+    candidates: CandidateDraft[],
   ) => {
-    const candidatesWithCampaignId = candidates.map((c) => ({
+    const candidatesWithCampaignId: CandidateInsert[] = candidates.map((candidate) => ({
       campaign_id: campaignId,
-      name: c.name || null,
-      email: c.email || null,
-      phone: c.phone || null,
-      skills: c.skills || null,
-      experience: c.experience || null,
-      education: c.education || null,
-      last_company: c.last_company || null,
-      location: c.location || null,
-      title: c.title || null,
-      match_score: c.match_score || 0,
-      candidate_temperature: c.candidate_temperature || "cold",
-      recommendation: c.recommendation || null,
-      green_flags: c.green_flags || null,
-      red_flags: c.red_flags || null,
-      layer_scores: c.layer_scores ? JSON.parse(JSON.stringify(c.layer_scores)) : null,
-      raw_data: c.raw_data ? JSON.parse(JSON.stringify(c.raw_data)) : null,
+      name: candidate.name || null,
+      email: candidate.email || null,
+      phone: candidate.phone || null,
+      skills: candidate.skills || null,
+      experience: candidate.experience || null,
+      education: candidate.education || null,
+      last_company: candidate.last_company || null,
+      location: candidate.location || null,
+      title: candidate.title || null,
+      match_score: candidate.match_score || 0,
+      candidate_temperature: candidate.candidate_temperature || "cold",
+      recommendation: candidate.recommendation || null,
+      green_flags: candidate.green_flags || null,
+      red_flags: candidate.red_flags || null,
+      layer_scores: candidate.layer_scores
+        ? JSON.parse(JSON.stringify(candidate.layer_scores))
+        : null,
+      raw_data: candidate.raw_data
+        ? JSON.parse(JSON.stringify(candidate.raw_data))
+        : null,
     }));
 
-    const { data, error } = await supabase
-      .from("candidates")
-      .insert(candidatesWithCampaignId)
-      .select();
-
-    if (error) throw error;
-    return data;
+    return insertCandidateRecords(candidatesWithCampaignId);
   };
 
   return {
@@ -269,32 +257,18 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
         setLoading(true);
         setError(null);
 
-        // Fetch campaign
-        const { data: campaignData, error: campaignError } = await supabase
-          .from("campaigns")
-          .select("*")
-          .eq("id", campaignId)
-          .maybeSingle();
+        const campaignRow = await getCampaignRecord(campaignId);
 
-        if (campaignError) throw campaignError;
-
-        if (!campaignData) {
+        if (!campaignRow) {
           setError("کمپین پیدا نشد");
           setLoading(false);
           return;
         }
 
-        // Fetch candidates
-        const { data: candidatesData, error: candidatesError } = await supabase
-          .from("candidates")
-          .select("*")
-          .eq("campaign_id", campaignId)
-          .order("match_score", { ascending: false });
+        const candidateRows = await listCandidatesForCampaign(campaignId);
 
-        if (candidatesError) throw candidatesError;
-
-        setCampaign(campaignData);
-        setCandidates(candidatesData || []);
+        setCampaign(normalizeCampaign(campaignRow));
+        setCandidates(candidateRows.map(normalizeCandidate));
       } catch (err: any) {
         console.error("Error fetching campaign detail:", err);
         setError(err.message);
@@ -306,18 +280,29 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
     fetchCampaignDetail();
   }, [user, campaignId]);
 
-  // Calculate stats from candidates
   const stats = {
     total: candidates.length,
-    excellent: candidates.filter((c) => c.match_score >= 85).length,
-    good: candidates.filter((c) => c.match_score >= 70 && c.match_score < 85).length,
-    average: candidates.filter((c) => c.match_score < 70).length,
-    avgScore: candidates.length > 0
-      ? Math.round(candidates.reduce((sum, c) => sum + c.match_score, 0) / candidates.length)
-      : 0,
-    hotCandidates: candidates.filter((c) => c.candidate_temperature === "hot").length,
-    warmCandidates: candidates.filter((c) => c.candidate_temperature === "warm").length,
-    coldCandidates: candidates.filter((c) => c.candidate_temperature === "cold").length,
+    excellent: candidates.filter((candidate) => candidate.match_score >= 85).length,
+    good: candidates.filter(
+      (candidate) => candidate.match_score >= 70 && candidate.match_score < 85,
+    ).length,
+    average: candidates.filter((candidate) => candidate.match_score < 70).length,
+    avgScore:
+      candidates.length > 0
+        ? Math.round(
+            candidates.reduce((sum, candidate) => sum + candidate.match_score, 0) /
+              candidates.length,
+          )
+        : 0,
+    hotCandidates: candidates.filter(
+      (candidate) => candidate.candidate_temperature === "hot",
+    ).length,
+    warmCandidates: candidates.filter(
+      (candidate) => candidate.candidate_temperature === "warm",
+    ).length,
+    coldCandidates: candidates.filter(
+      (candidate) => candidate.candidate_temperature === "cold",
+    ).length,
   };
 
   return {
@@ -328,6 +313,21 @@ export const useCampaignDetail = (campaignId: string | undefined) => {
     error,
   };
 };
+
+function normalizeCampaign(campaign: CampaignRow): Campaign {
+  return {
+    ...campaign,
+    auto_headhunting: campaign.auto_headhunting ?? false,
+  };
+}
+
+function normalizeCandidate(candidate: CandidateRow): Candidate {
+  return {
+    ...candidate,
+    match_score: candidate.match_score ?? 0,
+    candidate_temperature: candidate.candidate_temperature ?? "cold",
+  };
+}
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
