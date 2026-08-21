@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp
 
 from hring_api.config import Settings
 
@@ -27,8 +28,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class SensitiveRouteRateLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: object, *, settings: Settings) -> None:
-        super().__init__(app)  # type: ignore[arg-type]
+    def __init__(self, app: ASGIApp, *, settings: Settings) -> None:
+        super().__init__(app)
         self.settings = settings
         self.enabled = settings.rate_limit_enabled and settings.environment.lower() != "test"
         self.redis = Redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
