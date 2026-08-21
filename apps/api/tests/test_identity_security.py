@@ -12,6 +12,9 @@ from hring_api.domains.identity.security import (
 )
 
 
+TEST_JWT_SECRET = "unit-test-secret-at-least-32-bytes-long"
+
+
 def test_password_hash_is_one_way_and_verifiable() -> None:
     encoded = hash_password("correct horse battery staple")
 
@@ -21,7 +24,7 @@ def test_password_hash_is_one_way_and_verifiable() -> None:
 
 
 def test_access_token_round_trip() -> None:
-    settings = Settings(environment="test", auth_jwt_secret="unit-test-secret")
+    settings = Settings(environment="test", auth_jwt_secret=TEST_JWT_SECRET)
     user_id = uuid4()
     session_id = uuid4()
 
@@ -38,7 +41,7 @@ def test_access_token_round_trip() -> None:
 
 
 def test_invalid_access_token_is_rejected() -> None:
-    settings = Settings(environment="test", auth_jwt_secret="unit-test-secret")
+    settings = Settings(environment="test", auth_jwt_secret=TEST_JWT_SECRET)
 
     with pytest.raises(ValueError, match="Invalid access token"):
         decode_access_token("not-a-token", settings)
