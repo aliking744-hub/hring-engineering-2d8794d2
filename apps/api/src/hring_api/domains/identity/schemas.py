@@ -30,6 +30,20 @@ class LogoutRequest(BaseModel):
     refresh_token: str = Field(min_length=40, max_length=512)
 
 
+class SmsLoginRequest(BaseModel):
+    phone: str = Field(min_length=10, max_length=32)
+
+
+class SmsLoginVerifyRequest(BaseModel):
+    challenge_id: UUID
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class SmsChallengeResponse(BaseModel):
+    challenge_id: UUID
+    expires_at: datetime
+
+
 class TokenPairResponse(BaseModel):
     access_token: str
     refresh_token: str
