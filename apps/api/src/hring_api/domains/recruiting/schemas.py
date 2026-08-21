@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -105,3 +106,98 @@ class CampaignResponse(BaseModel):
 
 class CampaignDetailResponse(CampaignResponse):
     candidates: list[CandidateResponse]
+
+
+class JobRequirements(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    job_title: str = Field(alias="jobTitle", min_length=1, max_length=240)
+    city: str = Field(min_length=1, max_length=240)
+    skills: str | None = Field(default=None, max_length=10_000)
+    experience: str | None = Field(default=None, max_length=1_000)
+    industry: str | None = Field(default=None, max_length=500)
+    description: str | None = Field(default=None, max_length=20_000)
+    seniority_level: str | None = Field(default=None, alias="seniorityLevel", max_length=120)
+
+
+class CandidateAnalysisInput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    name: str | None = Field(default=None, max_length=240)
+    email: str | None = Field(default=None, max_length=320)
+    phone: str | None = Field(default=None, max_length=80)
+    skills: str | list[str] | None = None
+    experience: str | None = Field(default=None, max_length=4_000)
+    education: str | None = Field(default=None, max_length=4_000)
+    last_company: str | None = Field(default=None, alias="lastCompany", max_length=500)
+    location: str | None = Field(default=None, max_length=500)
+    linkedin: str | None = Field(default=None, max_length=2_000)
+    about: str | None = Field(default=None, max_length=10_000)
+    raw_data: dict[str, Any] | None = Field(default=None, alias="rawData")
+
+
+class AnalyzeCandidatesRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    candidates: list[CandidateAnalysisInput] = Field(min_length=1, max_length=100)
+    job_requirements: JobRequirements = Field(alias="jobRequirements")
+    enable_web_search: bool = Field(default=True, alias="enableWebSearch")
+
+
+class AutoSourceRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    job_requirements: JobRequirements = Field(alias="jobRequirements")
+
+
+class AnalyzedCandidate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    email: str = ""
+    phone: str = ""
+    title: str = "نامشخص"
+    education: str = "نامشخص"
+    experience: str = "نامشخص"
+    last_company: str = Field(default="نامشخص", alias="lastCompany")
+    location: str = ""
+    linkedin: str = ""
+    skills: list[str] = Field(default_factory=list)
+    match_score: int = Field(default=50, alias="matchScore", ge=0, le=100)
+    candidate_temperature: str = Field(default="cold", alias="candidateTemperature")
+    layer_scores: dict[str, int] = Field(default_factory=dict, alias="layerScores")
+    red_flags: list[str] = Field(default_factory=list, alias="redFlags")
+    green_flags: list[str] = Field(default_factory=list, alias="greenFlags")
+    summary: str = ""
+    recommendation: str = "در لیست انتظار"
+    raw_data: dict[str, Any] | None = Field(default=None, alias="rawData")
+
+
+class CandidateAnalysisStats(BaseModel):
+    total: int
+    excellent: int
+    good: int
+    average: int
+    avg_score: int = Field(alias="avgScore")
+    hot_candidates: int = Field(alias="hotCandidates")
+    warm_candidates: int = Field(alias="warmCandidates")
+    cold_candidates: int = Field(alias="coldCandidates")
+
+
+class AnalyzeCandidatesResponse(BaseModel):
+    candidates: list[AnalyzedCandidate]
+    stats: CandidateAnalysisStats
+
+
+class AutoSourceStats(BaseModel):
+    total: int
+    hot: int
+    warm: int
+    cold: int
+    avg_score: int = Field(alias="avgScore")
+
+
+class AutoSourceResponse(BaseModel):
+    success: bool = True
+    stats: AutoSourceStats
+    campaign_id: UUID = Field(alias="campaignId")
