@@ -60,6 +60,8 @@ class CompanyResponse(BaseModel):
 
 
 class UpdateCompanySettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(default=None, min_length=1, max_length=200)
     domain: str | None = Field(default=None, max_length=255)
     credit_pool_enabled: bool | None = None
