@@ -1,0 +1,60 @@
+services:
+  api:
+    build:
+      context: ../../apps/api
+    env_file:
+      - ../../apps/api/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: hring
+      POSTGRES_USER: hring
+      POSTGRES_PASSWORD: hring
+    ports:
+      - "5432:5432"
+    volumes:
+      - hring_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hring -d hring"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - hring_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: hring
+      MINIO_ROOT_PASSWORD: change-me-now
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - hring_minio:/data
+
+volumes:
+  hring_postgres:
+  hring_redis:
+  hring_minio:

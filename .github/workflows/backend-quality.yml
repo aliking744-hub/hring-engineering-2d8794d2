@@ -1,0 +1,57 @@
+name: backend-quality-gates
+
+on:
+  push:
+    branches:
+      - architecture/**
+      - engineering/**
+    paths:
+      - "apps/api/**"
+      - "infra/compose/**"
+      - ".github/workflows/backend-quality.yml"
+  pull_request:
+    branches:
+      - main
+      - engineering/foundation
+    paths:
+      - "apps/api/**"
+      - "infra/compose/**"
+      - ".github/workflows/backend-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install backend with dev dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check src tests
+
+      - name: Mypy
+        run: mypy src
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Build API container
+        run: docker build -t hring-api-ci .

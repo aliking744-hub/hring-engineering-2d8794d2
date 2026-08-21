@@ -10,7 +10,7 @@ Make the smallest safe change that satisfies the request. Preserve existing beha
 - Never deploy to the production CloudIva service from this repository.
 - Never add production deployment credentials or commands to automated workflows in this repository.
 - Never push application changes directly to `main`; work on a named branch and review the diff first.
-- Never bypass RBAC, RLS, authentication, tenant boundaries, credit checks, billing checks, or audit logging.
+- Never bypass RBAC, authentication, tenant boundaries, credit checks, billing checks, or audit logging.
 - Never expose service-role keys, API keys, payment credentials, or secrets in client code, logs, documentation, commits, or prompts.
 - Never change database schema without an explicit migration and impact analysis.
 - Never delete or rewrite existing migrations to make a new change fit.
@@ -21,30 +21,45 @@ Make the smallest safe change that satisfies the request. Preserve existing beha
 ## Required Change Protocol
 Before editing:
 1. Restate the requested behavior in one sentence.
-2. Identify the affected domain(s), routes, hooks/components, Edge Functions, tables, external integrations, and permissions.
+2. Identify the affected domain(s), routes, hooks/components, Edge Functions, tables, external integrations, permissions and migration risk.
 3. Search for all callers/consumers of the symbols being changed.
-4. Decide whether the change is UI-only, domain logic, data contract, persistence, integration, or infrastructure.
+4. Decide whether the change is UI-only, domain logic, data contract, persistence, integration, infrastructure or migration.
 
 During editing:
 5. Keep the diff narrow.
-6. Prefer stable interfaces/adapters over adding new direct Supabase calls from UI code.
-7. Preserve backwards compatibility unless explicitly approved otherwise.
-8. Add or update tests when test infrastructure exists for the affected layer.
-9. Add comments only where intent is non-obvious; do not narrate obvious code.
+6. Do not add new direct Supabase calls from UI code.
+7. New backend functionality belongs behind the independent HRing API unless the change is explicitly a temporary migration adapter.
+8. Preserve backwards compatibility until the replacement path is tested and rollback-ready.
+9. Add or update tests for the affected layer.
+10. Add comments only where intent is non-obvious; do not narrate obvious code.
 
 Before completion:
-10. Run typecheck and build.
-11. Run lint and distinguish pre-existing lint failures from new failures.
-12. Inspect the final diff for unrelated changes.
-13. Report affected files, validation results, known risks, and rollback path.
+11. Run the relevant frontend/backend type, test and build checks.
+12. Distinguish pre-existing lint failures from newly introduced failures.
+13. Inspect the final diff for unrelated changes.
+14. Report affected files, validation results, known risks, migration impact and rollback path.
 
 ## Architectural Direction
-HRing is being evolved incrementally into an AI-maintainable modular monolith. Do not rewrite the product from scratch.
+HRing is being evolved incrementally into an AI-maintainable modular monolith. Do not rewrite the product from scratch and do not perform a big-bang Supabase deletion.
 
-Target dependency direction:
-UI -> domain/service boundary -> API/Edge adapter -> persistence/integrations
+Final target dependency direction:
 
-Avoid introducing additional direct coupling from pages/components to Supabase. Existing direct calls are technical debt to be reduced gradually through adapters/services, not removed in one big-bang rewrite.
+UI -> centralized HRing API client -> FastAPI domain/service layer -> repositories/adapters -> PostgreSQL/pgvector, Redis, MinIO, AI/providers
+
+The current Supabase runtime is transitional technical debt. It must be removed domain-by-domain only after the independent replacement is implemented, tested, reconciled and rollback-ready. The final accepted platform must contain no operational Supabase or Lovable runtime dependency.
+
+## Target Independent Stack
+- FastAPI + Pydantic v2
+- SQLAlchemy 2 async
+- PostgreSQL + pgvector
+- Alembic migrations
+- Redis
+- Celery or an explicitly approved equivalent
+- Private S3-compatible storage / MinIO
+- Provider-neutral AI gateway with internal vLLM/Ollama OpenAI-compatible target
+- Docker Compose for reproducible environments
+- Prometheus + Grafana + Loki for observability
+- CI/CD with dev/staging/production separation and rollback
 
 ## Initial Domain Boundaries
 - Identity & Authentication
@@ -67,16 +82,27 @@ Avoid introducing additional direct coupling from pages/components to Supabase. 
 - AI & External Integrations
 
 ## Data & Multi-Tenancy
-- Treat `company_id`, user ownership, role checks, and RLS policies as security boundaries.
+- Treat `company_id`, user ownership, role checks and current RLS behavior as security requirements that must be preserved or strengthened in the independent backend.
 - Server-side authorization must be authoritative; client-side hiding is not authorization.
-- For new tables, define ownership/tenant model, RLS, indexes, and audit requirements before implementation.
+- Every migrated tenant-owned resource requires cross-tenant/IDOR tests.
+- For new tables, define ownership/tenant model, indexes, audit requirements and migration strategy before implementation.
 - For schema changes, document forward migration and rollback/mitigation strategy.
 
 ## AI / External Provider Rules
 - AI provider configuration must not be hardwired into UI components.
-- Prefer a gateway/adapter so model/provider changes do not require page-level rewrites.
+- Use a gateway/adapter so model/provider changes do not require page-level rewrites.
 - Validate structured AI outputs before persistence.
-- External scraping/search/payment/email services must fail safely and expose actionable logs without leaking secrets.
+- External scraping/search/payment/email/storage services must fail safely and expose actionable logs without leaking secrets.
+
+## Migration Rule
+Do not delete a working Supabase Auth/DB/Storage/Function path until:
+1. its current contract and security behavior are inventoried,
+2. its independent replacement exists,
+3. tests pass,
+4. required data/files reconcile,
+5. frontend traffic has been switched in staging,
+6. observability is available, and
+7. rollback is documented and exercised where appropriate.
 
 ## Baseline as of Foundation 01
 - Production build: passing.
@@ -88,4 +114,6 @@ Avoid introducing additional direct coupling from pages/components to Supabase. 
 - The engineering database is separate from the production HRing database.
 
 ## Definition of Done for Future Changes
-A change is not complete merely because the preview looks correct. It is complete when its behavior, data contract, authorization boundary, build/type safety, regression risk, and rollback path have been checked and reported.
+A change is not complete merely because the preview looks correct. It is complete when its behavior, data contract, authorization boundary, build/type safety, regression risk, migration impact and rollback path have been checked and reported.
+
+For the full reengineering program, completion additionally requires the independence acceptance gate in `docs/architecture/INDEPENDENT_PLATFORM.md` and the full checklist in `docs/engineering/INDEPENDENCE_BACKLOG.md`.
