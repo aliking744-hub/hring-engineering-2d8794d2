@@ -3,6 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
+from hring_api.domains.access.policy import (
+    COMPANY_PERMISSION_CATALOG,
+    is_company_permission_allowed,
+)
 from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.identity.models import Company, Profile
@@ -304,7 +308,8 @@ async def logout_session(
         async with db.begin():
             await logout(db, refresh_token=refresh_token)
     _clear_refresh_cookie(response, settings)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @router.get("/me", response_model=CurrentUserResponse)
@@ -336,6 +341,16 @@ async def current_user_context(
     company = await db.get(Company, membership.company_id) if membership is not None else None
     platform_roles = await list_platform_roles(db, principal.user_id)
 
+    effective_permissions: list[str] = []
+    if membership is not None:
+        for permission_key in COMPANY_PERMISSION_CATALOG:
+            if await is_company_permission_allowed(
+                db,
+                membership=membership,
+                permission_key=permission_key,
+            ):
+                effective_permissions.append(permission_key)
+
     return CurrentUserContextResponse(
         user_id=principal.user_id,
         email=principal.user.email,
@@ -346,6 +361,8 @@ async def current_user_context(
         app_roles=principal.app_roles,
         company_id=membership.company_id if membership is not None else None,
         company_role=membership.role if membership is not None else None,
+        company_can_invite=membership.can_invite if membership is not None else False,
+        company_permissions=effective_permissions,
         company_tier=company.subscription_tier if company is not None else None,
         credits=profile.monthly_credits if profile is not None else 50,
         used_credits=profile.used_credits if profile is not None else 0,
