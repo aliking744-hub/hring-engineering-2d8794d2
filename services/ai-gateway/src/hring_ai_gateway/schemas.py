@@ -16,6 +16,10 @@ class GenerateRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0, le=2)
     max_output_tokens: int | None = Field(default=None, ge=1, le=200_000)
     response_format: str = Field(default="text", pattern=r"^(text|json_object)$")
+    search_recency_filter: str | None = Field(
+        default=None,
+        pattern=r"^(day|week|month|year)$",
+    )
 
     @field_validator("provider", "model")
     @classmethod
