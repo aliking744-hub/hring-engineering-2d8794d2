@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - engineering/**
+      - feature/**
   pull_request:
     branches:
       - main
+      - engineering/**
 
 permissions:
   contents: read
