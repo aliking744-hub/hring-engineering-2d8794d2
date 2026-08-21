@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     app_name: str = "HRing API"
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
+    public_app_url: str = "http://localhost:5173"
     database_url: str = Field(
         default="postgresql+asyncpg://hring:hring@postgres:5432/hring",
         description="Independent PostgreSQL database URL.",
@@ -33,12 +34,17 @@ class Settings(BaseSettings):
     auth_jwt_issuer: str = "hring"
     auth_access_token_minutes: int = 15
     auth_refresh_token_days: int = 30
+    auth_security_token_pepper: SecretStr = SecretStr("development-security-token-pepper-change-me")
+    auth_password_reset_ttl_minutes: int = 30
+    auth_email_verify_ttl_hours: int = 24
 
     sms_provider: str = "disabled"
     sms_otp_pepper: SecretStr = SecretStr("development-sms-otp-pepper-change-me")
     sms_otp_ttl_seconds: int = 120
     sms_otp_max_attempts: int = 5
     sms_otp_resend_cooldown_seconds: int = 60
+
+    email_provider: str = "disabled"
 
     @model_validator(mode="after")
     def reject_default_production_secrets(self) -> "Settings":
@@ -50,17 +56,21 @@ class Settings(BaseSettings):
             "local-development",
             "development-only-change-me",
             "development-sms-otp-pepper-change-me",
+            "development-security-token-pepper-change-me",
         }
         secrets = {
             self.object_storage_secret_key.get_secret_value(),
             self.ai_api_key.get_secret_value(),
             self.auth_jwt_secret.get_secret_value(),
             self.sms_otp_pepper.get_secret_value(),
+            self.auth_security_token_pepper.get_secret_value(),
         }
         if secrets & insecure_values:
             raise ValueError("Production secrets must be supplied securely")
         if self.sms_provider.lower() == "development":
             raise ValueError("Development SMS provider is forbidden in production")
+        if self.email_provider.lower() == "development":
+            raise ValueError("Development email provider is forbidden in production")
         return self
 
 
