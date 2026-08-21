@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     recruiting_enrichment_provider: str = "perplexity"
     recruiting_enrichment_model: str = "sonar"
     recruiting_sourcing_webhook_url: SecretStr | None = None
+    recruiting_sourcing_webhook_bearer_token: SecretStr | None = None
     recruiting_web_enrichment_enabled: bool = True
     recruiting_analysis_max_candidates: int = Field(default=20, ge=1, le=100)
     recruiting_auto_source_max_candidates: int = Field(default=30, ge=1, le=100)
