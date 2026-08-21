@@ -112,6 +112,8 @@ class CurrentUserContextResponse(BaseModel):
     app_roles: list[str]
     company_id: UUID | None
     company_role: str | None
+    company_can_invite: bool
+    company_permissions: list[str]
     company_tier: str | None
     credits: int
     used_credits: int
