@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     auth_jwt_issuer: str = "hring"
     auth_access_token_minutes: int = 15
     auth_refresh_token_days: int = 30
+    auth_refresh_cookie_name: str = "hring_refresh"
+    auth_refresh_cookie_path: str = "/api/v1/auth"
+    auth_refresh_cookie_samesite: str = "lax"
+    auth_refresh_cookie_domain: str | None = None
     auth_security_token_pepper: SecretStr = SecretStr(
         "development-security-token-pepper-change-me"
     )
@@ -86,6 +90,8 @@ class Settings(BaseSettings):
             raise ValueError("Explicit trusted hosts are required in production")
         if not self.public_app_url.lower().startswith("https://"):
             raise ValueError("PUBLIC_APP_URL must use HTTPS in production")
+        if self.auth_refresh_cookie_samesite.lower() not in {"lax", "strict", "none"}:
+            raise ValueError("AUTH_REFRESH_COOKIE_SAMESITE is invalid")
         return self
 
 
