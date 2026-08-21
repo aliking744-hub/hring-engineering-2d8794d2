@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -19,6 +20,7 @@ from hring_api.domains.identity.security import decode_access_token
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
+PrincipalDependency = Callable[..., Awaitable["Principal"]]
 
 
 @dataclass(frozen=True)
@@ -70,7 +72,7 @@ async def get_current_principal(
     )
 
 
-def require_app_role(*allowed_roles: str):
+def require_app_role(*allowed_roles: str) -> PrincipalDependency:
     async def dependency(
         principal: Principal = Depends(get_current_principal),
     ) -> Principal:
@@ -81,7 +83,7 @@ def require_app_role(*allowed_roles: str):
     return dependency
 
 
-def require_company_role(company_id: UUID, *allowed_roles: str):
+def require_company_role(company_id: UUID, *allowed_roles: str) -> PrincipalDependency:
     async def dependency(
         principal: Principal = Depends(get_current_principal),
     ) -> Principal:
