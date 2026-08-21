@@ -109,6 +109,8 @@ export interface UserContext {
   appRoles: string[];
   companyId: string | null;
   companyRole: CompanyRole | null;
+  companyCanInvite: boolean;
+  companyPermissions: string[];
   companyTier: SubscriptionTier | null;
   credits: number;
   usedCredits: number;
