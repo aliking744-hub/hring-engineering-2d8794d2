@@ -75,7 +75,9 @@ class CompatFunctionUnavailableError(CompatFunctionError):
     pass
 
 
-def _company_id(principal: Principal) -> UUID | None:
+def _company_id(principal: Principal | None) -> UUID | None:
+    if principal is None:
+        return None
     for membership in principal.memberships:
         if membership.is_active:
             return membership.company_id
@@ -96,7 +98,7 @@ async def invoke_ai_function(
     *,
     name: str,
     body: Any,
-    principal: Principal,
+    principal: Principal | None,
     settings: Settings,
 ) -> Any:
     if name not in AI_FUNCTIONS:
@@ -122,7 +124,7 @@ async def invoke_ai_function(
     try:
         result = await generate_with_ai_gateway(
             feature_key=f"compat.{name}",
-            user_id=principal.user_id,
+            user_id=principal.user_id if principal is not None else None,
             company_id=_company_id(principal),
             provider=settings.recruiting_ai_provider,
             model=settings.recruiting_ai_model,
