@@ -1,0 +1,1 @@
+"""Recruiting campaign domain."""
