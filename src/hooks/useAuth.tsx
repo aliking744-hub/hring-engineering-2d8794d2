@@ -1,100 +1,183 @@
-import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  ApiError,
+  ApiUser,
+  AuthEnvelope,
+  authRequest,
+  refreshSession,
+  setAccessToken,
+} from '@/lib/api';
+
+export type AuthUser = ApiUser;
+
+export interface AuthSession {
+  access_token: string;
+  user: AuthUser;
+}
+
+interface SmsChallenge {
+  challenge_id: string;
+  expires_at: string;
+}
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
+  session: AuthSession | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null; user: User | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null; user: User | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    fullName?: string,
+  ) => Promise<{ error: Error | null; user: AuthUser | null }>;
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: Error | null; user: AuthUser | null }>;
+  requestSmsLogin: (phone: string) => Promise<{ error: Error | null; challenge: SmsChallenge | null }>;
+  verifySmsLogin: (
+    challengeId: string,
+    code: string,
+  ) => Promise<{ error: Error | null; user: AuthUser | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  restoreSession: () => Promise<AuthUser | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const toSession = (auth: AuthEnvelope): AuthSession => ({
+  access_token: auth.tokens.access_token,
+  user: auth.user,
+});
+
+const asError = (error: unknown) => {
+  if (error instanceof Error) return error;
+  return new Error('خطای ناشناخته در ارتباط با سرور');
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialCheckDoneRef = useRef(false);
+
+  const applyAuth = (auth: AuthEnvelope | null) => {
+    if (!auth) {
+      setAccessToken(null);
+      setUser(null);
+      setSession(null);
+      return null;
+    }
+    setAccessToken(auth.tokens.access_token);
+    setUser(auth.user);
+    setSession(toSession(auth));
+    return auth.user;
+  };
+
+  const restoreSession = async () => {
+    const auth = await refreshSession();
+    return applyAuth(auth);
+  };
 
   useEffect(() => {
-    // Set up the auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        // Always update on auth events after initial check
-        if (initialCheckDoneRef.current) {
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
-          setLoading(false);
-        }
-      }
-    );
-
-    // Then get the initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
-        initialCheckDoneRef.current = true;
-        setLoading(false);
-      } catch (error) {
-        console.error('Error getting initial session:', error);
-        initialCheckDoneRef.current = true;
-        setLoading(false);
-      }
+    let active = true;
+    const initialize = async () => {
+      const auth = await refreshSession();
+      if (!active) return;
+      applyAuth(auth);
+      setLoading(false);
     };
-
-    initializeAuth();
-
-    // Cleanup subscription on unmount
-    return () => subscription.unsubscribe();
-  }, []); // Empty dependency array - runs once
-
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    return { error, user: data?.user ?? null };
-  };
+    void initialize();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error, user: data?.user ?? null };
+    try {
+      const auth = await authRequest<AuthEnvelope>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      return { error: null, user: applyAuth(auth) };
+    } catch (error) {
+      return { error: asError(error), user: null };
+    }
   };
 
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`
-      }
-    });
-    return { error };
+  const signUp = async (email: string, password: string, fullName?: string) => {
+    try {
+      const auth = await authRequest<AuthEnvelope>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: fullName?.trim() || null,
+        }),
+      });
+      return { error: null, user: applyAuth(auth) };
+    } catch (error) {
+      return { error: asError(error), user: null };
+    }
   };
+
+  const requestSmsLogin = async (phone: string) => {
+    try {
+      const challenge = await authRequest<SmsChallenge>('/auth/sms/request', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      });
+      return { error: null, challenge };
+    } catch (error) {
+      return { error: asError(error), challenge: null };
+    }
+  };
+
+  const verifySmsLogin = async (challengeId: string, code: string) => {
+    try {
+      const auth = await authRequest<AuthEnvelope>('/auth/sms/verify', {
+        method: 'POST',
+        body: JSON.stringify({ challenge_id: challengeId, code }),
+      });
+      return { error: null, user: applyAuth(auth) };
+    } catch (error) {
+      return { error: asError(error), user: null };
+    }
+  };
+
+  const signInWithGoogle = async () => ({
+    error: new ApiError(
+      'ورود با گوگل در نسخه مستقل هنوز پیکربندی نشده است',
+      501,
+    ),
+  });
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await authRequest<void>('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    } finally {
+      applyAuth(null);
+    }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signInWithGoogle, signOut }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      loading,
+      signUp,
+      signIn,
+      requestSmsLogin,
+      verifySmsLogin,
+      signInWithGoogle,
+      signOut,
+      restoreSession,
+    }),
+    [user, session, loading],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

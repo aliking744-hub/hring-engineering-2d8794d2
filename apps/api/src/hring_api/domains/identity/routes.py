@@ -3,9 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
+from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
+from hring_api.domains.identity.models import Company, Profile
 from hring_api.domains.identity.schemas import (
     AuthResponse,
+    CurrentUserContextResponse,
     CurrentUserResponse,
     LoginRequest,
     LogoutRequest,
@@ -44,6 +47,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _client_ip(request: Request) -> str | None:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()[:64]
     return request.client.host if request.client else None
 
 
@@ -59,10 +65,46 @@ def _auth_response(result: AuthResult) -> AuthResponse:
     )
 
 
+def _set_refresh_cookie(response: Response, result: AuthResult, settings: Settings) -> None:
+    response.set_cookie(
+        key=settings.auth_refresh_cookie_name,
+        value=result.tokens.refresh_token,
+        max_age=settings.auth_refresh_token_days * 24 * 60 * 60,
+        expires=result.tokens.refresh_expires_at,
+        path=settings.auth_refresh_cookie_path,
+        domain=settings.auth_refresh_cookie_domain,
+        secure=settings.environment.lower() == "production",
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def _clear_refresh_cookie(response: Response, settings: Settings) -> None:
+    response.delete_cookie(
+        key=settings.auth_refresh_cookie_name,
+        path=settings.auth_refresh_cookie_path,
+        domain=settings.auth_refresh_cookie_domain,
+        secure=settings.environment.lower() == "production",
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def _request_refresh_token(
+    request: Request,
+    payload: RefreshRequest | LogoutRequest | None,
+    settings: Settings,
+) -> str | None:
+    if payload is not None:
+        return payload.refresh_token
+    return request.cookies.get(settings.auth_refresh_cookie_name)
+
+
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register_account(
     payload: RegisterRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> AuthResponse:
@@ -79,6 +121,7 @@ async def register_account(
             )
     except EmailAlreadyExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    _set_refresh_cookie(response, result, settings)
     return _auth_response(result)
 
 
@@ -86,6 +129,7 @@ async def register_account(
 async def login_account(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> AuthResponse:
@@ -104,6 +148,7 @@ async def login_account(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         ) from exc
+    _set_refresh_cookie(response, result, settings)
     return _auth_response(result)
 
 
@@ -132,6 +177,7 @@ async def request_sms_login(
 async def verify_sms_login(
     payload: SmsLoginVerifyRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> AuthResponse:
@@ -145,14 +191,13 @@ async def verify_sms_login(
             ip_address=_client_ip(request),
         )
     except InvalidSmsChallengeError as exc:
-        # Persist failed-attempt counters; rolling this transaction back would make
-        # the max-attempts control ineffective.
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired verification code",
         ) from exc
     await db.commit()
+    _set_refresh_cookie(response, result, settings)
     return _auth_response(result)
 
 
@@ -223,28 +268,42 @@ async def verify_phone(
 
 @router.post("/refresh", response_model=AuthResponse)
 async def refresh_session(
-    payload: RefreshRequest,
+    request: Request,
+    response: Response,
+    payload: RefreshRequest | None = None,
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> AuthResponse:
+    refresh_token = _request_refresh_token(request, payload, settings)
+    if refresh_token is None:
+        _clear_refresh_cookie(response, settings)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh session not found")
     try:
         async with db.begin():
-            result = await refresh(db, refresh_token=payload.refresh_token, settings=settings)
+            result = await refresh(db, refresh_token=refresh_token, settings=settings)
     except InvalidRefreshTokenError as exc:
+        _clear_refresh_cookie(response, settings)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token is invalid or expired",
         ) from exc
+    _set_refresh_cookie(response, result, settings)
     return _auth_response(result)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout_session(
-    payload: LogoutRequest,
+    request: Request,
+    response: Response,
+    payload: LogoutRequest | None = None,
     db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> Response:
-    async with db.begin():
-        await logout(db, refresh_token=payload.refresh_token)
+    refresh_token = _request_refresh_token(request, payload, settings)
+    if refresh_token is not None:
+        async with db.begin():
+            await logout(db, refresh_token=refresh_token)
+    _clear_refresh_cookie(response, settings)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -264,4 +323,35 @@ async def current_user(
             )
             for membership in principal.memberships
         ],
+    )
+
+
+@router.get("/context", response_model=CurrentUserContextResponse)
+async def current_user_context(
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> CurrentUserContextResponse:
+    profile = await db.get(Profile, principal.user_id)
+    membership = next((item for item in principal.memberships if item.is_active), None)
+    company = await db.get(Company, membership.company_id) if membership is not None else None
+    platform_roles = await list_platform_roles(db, principal.user_id)
+
+    return CurrentUserContextResponse(
+        user_id=principal.user_id,
+        email=principal.user.email,
+        user_type=profile.user_type if profile is not None else "individual",
+        subscription_tier=profile.subscription_tier if profile is not None else None,
+        is_admin=bool(platform_roles) or "admin" in principal.app_roles,
+        platform_roles=platform_roles,
+        app_roles=principal.app_roles,
+        company_id=membership.company_id if membership is not None else None,
+        company_role=membership.role if membership is not None else None,
+        company_tier=company.subscription_tier if company is not None else None,
+        credits=profile.monthly_credits if profile is not None else 50,
+        used_credits=profile.used_credits if profile is not None else 0,
+        company_credit_pool=int(company.credit_pool or 0) if company is not None else 0,
+        company_credit_pool_enabled=bool(company.credit_pool_enabled) if company is not None else False,
+        full_name=profile.full_name if profile is not None else None,
+        title=profile.title if profile is not None else None,
+        avatar_url=profile.avatar_url if profile is not None else None,
     )

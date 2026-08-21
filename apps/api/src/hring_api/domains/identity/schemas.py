@@ -102,6 +102,26 @@ class CurrentUserResponse(UserResponse):
     memberships: list[MembershipResponse]
 
 
+class CurrentUserContextResponse(BaseModel):
+    user_id: UUID
+    email: EmailStr
+    user_type: str
+    subscription_tier: str | None
+    is_admin: bool
+    platform_roles: list[str]
+    app_roles: list[str]
+    company_id: UUID | None
+    company_role: str | None
+    company_tier: str | None
+    credits: int
+    used_credits: int
+    company_credit_pool: int
+    company_credit_pool_enabled: bool
+    full_name: str | None
+    title: str | None
+    avatar_url: str | None
+
+
 class SessionResponse(BaseModel):
     id: UUID
     is_current: bool

@@ -2,7 +2,7 @@
 
 export type CompanyStatus = 'active' | 'suspended' | 'trial';
 
-export type SubscriptionTier = 
+export type SubscriptionTier =
   | 'individual_free'
   | 'individual_expert'
   | 'individual_pro'
@@ -12,7 +12,7 @@ export type SubscriptionTier =
   | 'corporate_decision_making';
 
 export type CompanyRole = 'ceo' | 'deputy' | 'manager' | 'employee';
-
+export type PlatformRole = 'super_admin' | 'platform_admin' | 'content_admin' | 'support_admin';
 export type UserType = 'individual' | 'corporate';
 
 export interface Company {
@@ -41,7 +41,6 @@ export interface CompanyMember {
   is_active: boolean;
   invited_by: string | null;
   joined_at: string;
-  // Joined data
   company?: Company;
   profile?: UserProfile;
 }
@@ -100,13 +99,14 @@ export interface CreditTransaction {
   created_at: string;
 }
 
-// User context for permission checking
 export interface UserContext {
   userId: string;
   email: string | null;
   userType: UserType;
   subscriptionTier: SubscriptionTier | null;
   isAdmin: boolean;
+  platformRoles: PlatformRole[];
+  appRoles: string[];
   companyId: string | null;
   companyRole: CompanyRole | null;
   companyTier: SubscriptionTier | null;
@@ -114,13 +114,11 @@ export interface UserContext {
   usedCredits: number;
   companyCreditPool: number;
   companyCreditPoolEnabled: boolean;
-  // Profile fields
   fullName: string | null;
   title: string | null;
   avatarUrl: string | null;
 }
 
-// Feature access result
 export interface FeatureAccess {
   hasAccess: boolean;
   canEdit: boolean;
@@ -128,7 +126,6 @@ export interface FeatureAccess {
   reason?: string;
 }
 
-// Tier display names
 export const TIER_NAMES: Record<SubscriptionTier, string> = {
   individual_free: 'رایگان',
   individual_expert: 'کارشناس',
@@ -139,7 +136,6 @@ export const TIER_NAMES: Record<SubscriptionTier, string> = {
   corporate_decision_making: 'شرکتی - تصمیم‌ساز',
 };
 
-// Role display names
 export const ROLE_NAMES: Record<CompanyRole, string> = {
   ceo: 'مدیرعامل',
   deputy: 'معاون',
@@ -147,7 +143,6 @@ export const ROLE_NAMES: Record<CompanyRole, string> = {
   employee: 'کارشناس',
 };
 
-// Status display names
 export const STATUS_NAMES: Record<CompanyStatus, string> = {
   active: 'فعال',
   suspended: 'معلق',
