@@ -109,7 +109,8 @@ async def validate_invite(
     if invite is None:
         raise InviteInvalidError("کد دعوت نامعتبر است")
     company = await _require_company(session, invite.company_id)
-    await _validate_invite_state(session, invite=invite, company=company)
+    _validate_invite_state(invite=invite, company=company)
+    await _require_available_seat(session, company)
     return invite, company
 
 
@@ -173,7 +174,7 @@ async def join_company_with_invite(
     if invite is None:
         raise InviteInvalidError("کد دعوت نامعتبر است")
     company = await _require_company(session, invite.company_id, for_update=True)
-    await _validate_invite_state(session, invite=invite, company=company)
+    _validate_invite_state(invite=invite, company=company)
 
     existing = await get_member_by_user(
         session,
@@ -426,12 +427,7 @@ async def _require_available_seat(session: AsyncSession, company: Company) -> No
         raise CompanyCapacityError("ظرفیت اعضای شرکت تکمیل شده است")
 
 
-async def _validate_invite_state(
-    session: AsyncSession,
-    *,
-    invite: CompanyInvite,
-    company: Company,
-) -> None:
+def _validate_invite_state(*, invite: CompanyInvite, company: Company) -> None:
     now = datetime.now(UTC)
     if not invite.is_active:
         raise InviteInvalidError("کد دعوت نامعتبر است")
@@ -440,7 +436,6 @@ async def _validate_invite_state(
     if invite.max_uses is not None and invite.used_count >= invite.max_uses:
         raise InviteInvalidError("ظرفیت استفاده از این کد دعوت پر شده است")
     _require_company_writable(company)
-    await _require_available_seat(session, company)
 
 
 async def _generate_unique_invite_code(session: AsyncSession) -> str:
