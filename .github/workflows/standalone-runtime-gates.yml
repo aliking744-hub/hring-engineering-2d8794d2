@@ -10,6 +10,7 @@ on:
       - ".env.standalone.example"
       - "infra/**"
       - "apps/api/Dockerfile"
+      - "services/ai-gateway/**"
       - "index.html"
       - "public/**"
       - "scripts/generate-sitemap.ts"
@@ -34,3 +35,6 @@ jobs:
 
       - name: Build standalone web image
         run: docker build --file infra/docker/web.Dockerfile --build-arg PUBLIC_BASE_URL=https://hring.ir --tag hring-web-ci .
+
+      - name: Build private AI gateway image
+        run: docker build --file services/ai-gateway/Dockerfile --tag hring-ai-gateway-ci services/ai-gateway
