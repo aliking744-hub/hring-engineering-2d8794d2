@@ -1,670 +1,479 @@
-import { useState, useEffect } from "react";
-import { Helmet } from "react-helmet-async";
-import { motion } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, Loader2, User, Building2, Users, CheckCircle } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import AuroraBackground from "@/components/AuroraBackground";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { ROLE_NAMES, CompanyRole } from "@/types/multiTenant";
-import { useSiteSettings, useLogos, useSiteName } from "@/hooks/useSiteSettings";
-import defaultLogo from "@/assets/logo.png";
-
-type AccountType = 'person' | 'company';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { motion } from 'framer-motion';
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+  MessageSquareText,
+  Phone,
+  User,
+} from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import AuroraBackground from '@/components/AuroraBackground';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { useLogos, useSiteName, useSiteSettings } from '@/hooks/useSiteSettings';
+import { apiRequest } from '@/lib/api';
+import { CompanyRole, ROLE_NAMES } from '@/types/multiTenant';
+import defaultLogo from '@/assets/logo.png';
 
 interface InviteInfo {
-  id: string;
-  invite_code: string;
+  invite_id: string | null;
   role: CompanyRole;
-  company_id: string;
+  company_id: string | null;
   company_name: string;
   is_valid: boolean;
-  error?: string;
+  error?: string | null;
 }
+
+interface InviteValidationResponse {
+  is_valid: boolean;
+  invite_id: string | null;
+  role: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  error: string | null;
+}
+
+interface JoinCompanyResponse {
+  company_id: string;
+  company_name: string;
+  member_id: string;
+  role: string;
+  already_member: boolean;
+}
+
+type LoginMethod = 'email' | 'sms';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
-  const inviteCode = searchParams.get('invite');
-  
-  const [accountType, setAccountType] = useState<AccountType>(inviteCode ? 'company' : 'person');
-  const [isLogin, setIsLogin] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
-  const [inviteLoading, setInviteLoading] = useState(!!inviteCode);
-  const { toast } = useToast();
-  const { signIn, signUp, signInWithGoogle, user } = useAuth();
+  const inviteCode = searchParams.get('invite')?.trim() || null;
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { getSetting } = useSiteSettings();
   const logos = useLogos();
   const siteName = useSiteName();
-  
-  // Use dynamic logo or fallback to default
+  const {
+    user,
+    signIn,
+    signUp,
+    requestSmsLogin,
+    verifySmsLogin,
+  } = useAuth();
+
+  const [isLogin, setIsLogin] = useState(true);
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [smsCode, setSmsCode] = useState('');
+  const [smsChallengeId, setSmsChallengeId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(Boolean(inviteCode));
+  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const joinAttemptedRef = useRef(false);
+
   const authLogo = logos.auth || logos.main || defaultLogo;
-
-  // Dynamic texts - use siteName for defaults
   const authTitle = getSetting('auth_title', `ورود به ${siteName}`);
-  const authSubtitle = getSetting('auth_subtitle', 'به پلتفرم مدیریت منابع انسانی خوش آمدید');
-  const authGoogleBtn = getSetting('auth_google_btn', 'ورود با گوگل');
-  const authLoginTab = getSetting('auth_login_tab', 'ورود');
-  const authSignupTab = getSetting('auth_signup_tab', 'ثبت‌نام');
+  const authSubtitle = getSetting(
+    'auth_subtitle',
+    'به پلتفرم مدیریت منابع انسانی خوش آمدید',
+  );
 
-  // Fetch invite info on mount
   useEffect(() => {
-    const fetchInviteInfo = async () => {
-      if (!inviteCode) return;
-      
+    if (!inviteCode) {
+      setInviteInfo(null);
+      setInviteLoading(false);
+      return;
+    }
+
+    let active = true;
+    const validate = async () => {
       setInviteLoading(true);
       try {
-        const { data: invite, error } = await supabase.functions.invoke(
-          "validate-invite-code",
-          { body: { inviteCode } },
+        const response = await apiRequest<InviteValidationResponse>(
+          '/company-invites/validate',
+          {
+            method: 'POST',
+            body: JSON.stringify({ invite_code: inviteCode }),
+          },
+          { auth: false, retryAuth: false },
         );
-
-        if (error || !invite) {
-          setInviteInfo({
-            id: '',
-            invite_code: inviteCode,
-            role: 'employee',
-            company_id: '',
-            company_name: '',
-            is_valid: false,
-            error: 'کد دعوت نامعتبر است'
-          });
-          return;
-        }
-
+        if (!active) return;
         setInviteInfo({
-          id: invite.id || '',
-          invite_code: inviteCode,
-          role: invite.role || 'employee',
-          company_id: invite.company_id || '',
-          company_name: invite.company_name || '',
-          is_valid: !!invite.is_valid,
-          error: invite.error,
+          invite_id: response.invite_id,
+          role: (response.role || 'employee') as CompanyRole,
+          company_id: response.company_id,
+          company_name: response.company_name || '',
+          is_valid: response.is_valid,
+          error: response.error,
         });
-
-        if (invite.is_valid) {
-          // Force signup mode for invite
-          setIsLogin(false);
-          setAccountType('company');
-        }
-      } catch (err) {
-        console.error('Error fetching invite:', err);
+        if (response.is_valid) setIsLogin(false);
+      } catch (error) {
+        if (!active) return;
+        console.error('Invite validation failed:', error);
         setInviteInfo({
-          id: '',
-          invite_code: inviteCode,
+          invite_id: null,
           role: 'employee',
-          company_id: '',
+          company_id: null,
           company_name: '',
           is_valid: false,
-          error: 'خطا در بررسی کد دعوت'
+          error: 'خطا در بررسی کد دعوت',
         });
       } finally {
-        setInviteLoading(false);
+        if (active) setInviteLoading(false);
       }
     };
-
-    fetchInviteInfo();
+    void validate();
+    return () => {
+      active = false;
+    };
   }, [inviteCode]);
 
-  // Handle joining company after authentication
-  const joinCompanyWithInvite = async (userId: string) => {
-    if (!inviteInfo?.is_valid) return;
+  const joinInvite = async () => {
+    if (!inviteCode || !inviteInfo?.is_valid) return;
+    const joined = await apiRequest<JoinCompanyResponse>(
+      `/company-invites/${encodeURIComponent(inviteCode)}/join`,
+      { method: 'POST' },
+    );
+    toast({
+      title: joined.already_member ? 'عضویت موجود' : 'عضویت موفق',
+      description: joined.already_member
+        ? `شما قبلاً عضو ${joined.company_name} هستید`
+        : `شما به ${joined.company_name} پیوستید`,
+    });
+  };
 
-    try {
-      // Check if user is already a member
-      const { data: existingMember } = await supabase
-        .from('company_members')
-        .select('id')
-        .eq('company_id', inviteInfo.company_id)
-        .eq('user_id', userId)
-        .single();
+  useEffect(() => {
+    if (!user) return;
+    if (!inviteCode) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+    if (!inviteInfo?.is_valid || joinAttemptedRef.current) return;
 
-      if (existingMember) {
+    joinAttemptedRef.current = true;
+    void joinInvite()
+      .catch((error) => {
+        console.error('Joining company failed:', error);
         toast({
-          title: "عضو موجود",
-          description: "شما قبلاً عضو این شرکت هستید",
+          title: 'خطا در عضویت',
+          description: error instanceof Error ? error.message : 'عضویت در شرکت انجام نشد',
+          variant: 'destructive',
+        });
+      })
+      .finally(() => navigate('/dashboard', { replace: true }));
+  }, [user, inviteCode, inviteInfo?.is_valid]);
+
+  const finishAuthenticatedFlow = async () => {
+    if (inviteInfo?.is_valid) await joinInvite();
+    navigate('/dashboard');
+  };
+
+  const handleEmailSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setIsLoading(true);
+    try {
+      const result = isLogin
+        ? await signIn(email.trim(), password)
+        : await signUp(email.trim(), password, fullName);
+
+      if (result.error) {
+        const message = result.error.message;
+        toast({
+          title: isLogin ? 'خطا در ورود' : 'خطا در ثبت‌نام',
+          description:
+            message.includes('Invalid email or password')
+              ? 'ایمیل یا رمز عبور اشتباه است'
+              : message.includes('already') || message.includes('registered')
+                ? 'این ایمیل قبلاً ثبت شده است'
+                : message,
+          variant: 'destructive',
         });
         return;
       }
 
-      // Add user to company
-      const { error: memberError } = await supabase
-        .from('company_members')
-        .insert({
-          company_id: inviteInfo.company_id,
-          user_id: userId,
-          role: inviteInfo.role,
-          can_invite: false,
-          is_active: true
-        });
-
-      if (memberError) throw memberError;
-
-      // Update invite used count
-      await supabase
-        .from('company_invites')
-        .update({ used_count: (await supabase.from('company_invites').select('used_count').eq('id', inviteInfo.id).single()).data?.used_count + 1 || 1 })
-        .eq('id', inviteInfo.id);
-
-      // Update user profile to corporate
-      await supabase
-        .from('profiles')
-        .update({ user_type: 'corporate' })
-        .eq('id', userId);
-
       toast({
-        title: "عضویت موفق",
-        description: `شما به ${inviteInfo.company_name} پیوستید`,
+        title: isLogin ? 'ورود موفق' : 'ثبت‌نام موفق',
+        description: inviteInfo?.is_valid
+          ? `به ${inviteInfo.company_name} خوش آمدید`
+          : `به ${siteName} خوش آمدید`,
       });
-    } catch (err) {
-      console.error('Error joining company:', err);
+      await finishAuthenticatedFlow();
+    } catch (error) {
       toast({
-        title: "خطا در عضویت",
-        description: "مشکلی در پیوستن به شرکت پیش آمد",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Redirect if already logged in
-  useEffect(() => {
-    const handleUserJoin = async () => {
-      if (user && inviteInfo?.is_valid) {
-        await joinCompanyWithInvite(user.id);
-        navigate('/dashboard', { replace: true });
-      } else if (user && !inviteCode) {
-        navigate('/dashboard', { replace: true });
-      }
-    };
-
-    handleUserJoin();
-  }, [user, inviteInfo]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      if (isLogin) {
-        const { error, user: signedInUser } = await signIn(email, password);
-        if (error) {
-          if (error.message.includes('Email not confirmed')) {
-            toast({
-              title: "تایید ایمیل",
-              description: "لطفاً ابتدا ایمیل خود را از طریق لینک ارسال شده تایید کنید",
-              variant: "destructive",
-            });
-          } else if (error.message.includes('Invalid login credentials')) {
-            toast({
-              title: "خطا در ورود",
-              description: "ایمیل یا رمز عبور اشتباه است",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "خطا",
-              description: error.message,
-              variant: "destructive",
-            });
-          }
-        } else {
-          // Handle invite join for existing user
-          if (inviteInfo?.is_valid && signedInUser) {
-            await joinCompanyWithInvite(signedInUser.id);
-          }
-          
-          toast({
-            title: "ورود موفق",
-            description: inviteInfo?.is_valid 
-              ? `به ${inviteInfo.company_name} خوش آمدید`
-              : accountType === 'person' 
-                ? `به داشبورد ${siteName} خوش آمدید` 
-                : "به پنل شرکت خوش آمدید",
-          });
-          navigate('/dashboard');
-        }
-      } else {
-        // Sign up with metadata
-        const { error: signUpError, user: signedUpUser } = await signUp(email, password);
-        if (signUpError) {
-          if (signUpError.message.includes('already registered')) {
-            toast({
-              title: "حساب موجود است",
-              description: "این ایمیل قبلاً ثبت‌نام شده. لطفاً وارد شوید",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "خطا در ثبت‌نام",
-              description: signUpError.message,
-              variant: "destructive",
-            });
-          }
-        } else {
-          // Update profile with name if provided
-          if (fullName && signedUpUser) {
-            await supabase
-              .from('profiles')
-              .update({ full_name: fullName })
-              .eq('id', signedUpUser.id);
-          }
-
-          // Handle invite join for new user
-          if (inviteInfo?.is_valid && signedUpUser) {
-            await joinCompanyWithInvite(signedUpUser.id);
-            toast({
-              title: "ثبت‌نام موفق",
-              description: `به ${inviteInfo.company_name} خوش آمدید`,
-            });
-            navigate('/dashboard');
-          } else {
-            toast({
-              title: "ثبت‌نام موفق",
-              description: `به ${siteName} خوش آمدید`,
-            });
-            navigate('/dashboard');
-          }
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "خطا",
-        description: error.message,
-        variant: "destructive",
+        title: 'خطا',
+        description: error instanceof Error ? error.message : 'ارتباط با سرور برقرار نشد',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const requestCode = async () => {
     setIsLoading(true);
     try {
-      // Store invite code in localStorage for after OAuth redirect
-      if (inviteCode) {
-        localStorage.setItem('pending_invite_code', inviteCode);
-      }
-      
-      const { error } = await signInWithGoogle();
-      if (error) {
+      const result = await requestSmsLogin(phone.trim());
+      if (result.error || !result.challenge) {
         toast({
-          title: "خطا در ورود با گوگل",
-          description: error.message,
-          variant: "destructive",
+          title: 'ارسال کد ناموفق بود',
+          description: result.error?.message || 'امکان ارسال کد وجود ندارد',
+          variant: 'destructive',
         });
+        return;
       }
-    } catch (error: any) {
+      setSmsChallengeId(result.challenge.challenge_id);
       toast({
-        title: "خطا",
-        description: error.message,
-        variant: "destructive",
+        title: 'کد ارسال شد',
+        description: 'کد شش‌رقمی را وارد کنید',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Invite Banner Component
+  const verifyCode = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!smsChallengeId) return;
+    setIsLoading(true);
+    try {
+      const result = await verifySmsLogin(smsChallengeId, smsCode.trim());
+      if (result.error) {
+        toast({
+          title: 'کد نامعتبر است',
+          description: result.error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'ورود موفق', description: `به ${siteName} خوش آمدید` });
+      await finishAuthenticatedFlow();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const InviteBanner = () => {
     if (!inviteCode) return null;
-
     if (inviteLoading) {
       return (
-        <div className="mb-6 p-4 bg-secondary/50 rounded-xl flex items-center justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-primary ml-2" />
-          <span className="text-muted-foreground">در حال بررسی کد دعوت...</span>
+        <div className="mb-5 flex items-center justify-center rounded-xl border border-border bg-secondary/30 p-4">
+          <Loader2 className="ml-2 h-5 w-5 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">در حال بررسی دعوت‌نامه...</span>
         </div>
       );
     }
-
     if (!inviteInfo?.is_valid) {
       return (
-        <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-xl">
-          <p className="text-destructive text-center font-medium">
-            {inviteInfo?.error || 'کد دعوت نامعتبر است'}
-          </p>
+        <div className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-center text-sm text-destructive">
+          {inviteInfo?.error || 'کد دعوت نامعتبر است'}
         </div>
       );
     }
-
     return (
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-xl"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-bold text-foreground">{inviteInfo.company_name}</p>
-              <CheckCircle className="w-4 h-4 text-green-500" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              دعوت به عنوان <Badge variant="secondary" className="mr-1">{ROLE_NAMES[inviteInfo.role]}</Badge>
-            </p>
-          </div>
+      <div className="mb-5 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/15">
+          <Building2 className="h-5 w-5 text-primary" />
         </div>
-      </motion.div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <strong className="truncate">{inviteInfo.company_name}</strong>
+            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            دعوت با نقش <Badge variant="secondary">{ROLE_NAMES[inviteInfo.role]}</Badge>
+          </p>
+        </div>
+      </div>
     );
   };
-
-  // Form for individuals (with Google, signup option)
-  const renderPersonForm = () => (
-    <>
-      {/* Invite Banner */}
-      <InviteBanner />
-
-      {/* Google Sign In */}
-      <Button 
-        type="button" 
-        variant="outline" 
-        className="w-full mb-4 gap-2 bg-secondary/50 border-border hover:bg-secondary"
-        onClick={handleGoogleSignIn}
-        disabled={isLoading || (!!inviteCode && !inviteInfo?.is_valid)}
-      >
-        <svg className="w-5 h-5" viewBox="0 0 24 24">
-          <path
-            fill="currentColor"
-            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-          />
-          <path
-            fill="currentColor"
-            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-          />
-          <path
-            fill="currentColor"
-            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-          />
-          <path
-            fill="currentColor"
-            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-          />
-        </svg>
-        {authGoogleBtn}
-      </Button>
-
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border"></div>
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">یا</span>
-        </div>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Full Name - only for signup with invite */}
-        {!isLogin && inviteInfo?.is_valid && (
-          <div className="relative">
-            <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="نام و نام خانوادگی"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="pr-10 bg-secondary/50 border-border focus:border-primary"
-              disabled={isLoading}
-            />
-          </div>
-        )}
-
-        <div className="relative">
-          <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="email"
-            placeholder="ایمیل"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pr-10 bg-secondary/50 border-border focus:border-primary"
-            required
-            disabled={isLoading || (!!inviteCode && !inviteInfo?.is_valid)}
-          />
-        </div>
-
-        <div className="relative">
-          <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type={showPassword ? "text" : "password"}
-            placeholder="رمز عبور"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="pr-10 pl-10 bg-secondary/50 border-border focus:border-primary"
-            required
-            disabled={isLoading || (!!inviteCode && !inviteInfo?.is_valid)}
-            minLength={6}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-          </button>
-        </div>
-
-        <Button 
-          type="submit" 
-          className="w-full glow-button text-foreground font-semibold py-6 gap-2"
-          disabled={isLoading || (!!inviteCode && !inviteInfo?.is_valid)}
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              {inviteInfo?.is_valid 
-                ? (isLogin ? "ورود و پیوستن به شرکت" : "ثبت‌نام و پیوستن به شرکت")
-                : (isLogin ? "ورود" : "ثبت‌نام")}
-              <ArrowLeft className="w-4 h-4" />
-            </>
-          )}
-        </Button>
-      </form>
-
-      {!isLogin && !inviteInfo?.is_valid && (
-        <p className="text-xs text-muted-foreground text-center mt-4">
-          پس از ثبت‌نام، لینک تایید به ایمیل شما ارسال می‌شود
-        </p>
-      )}
-
-      {/* Toggle */}
-      <div className="mt-6 text-center text-sm">
-        <span className="text-muted-foreground">
-          {isLogin ? "حساب کاربری ندارید؟" : "قبلاً ثبت‌نام کرده‌اید؟"}
-        </span>
-        <button
-          onClick={() => setIsLogin(!isLogin)}
-          className="text-primary hover:underline mr-2 font-medium"
-          disabled={isLoading}
-        >
-          {isLogin ? "ثبت‌نام کنید" : "وارد شوید"}
-        </button>
-      </div>
-    </>
-  );
-
-  // Form for companies (login only, no Google, no signup)
-  const renderCompanyForm = () => (
-    <>
-      {/* Info notice */}
-      <div className="mb-6 p-4 bg-secondary/50 border border-border rounded-xl">
-        <div className="flex items-center gap-3">
-          <Building2 className="w-6 h-6 text-primary shrink-0" />
-          <div>
-            <p className="text-sm text-muted-foreground">
-              ورود با اطلاعات دریافت شده از ادمین شرکت
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Form - Login only */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative">
-          <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type="email"
-            placeholder="ایمیل شرکتی"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pr-10 bg-secondary/50 border-border focus:border-primary"
-            required
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className="relative">
-          <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            type={showPassword ? "text" : "password"}
-            placeholder="رمز عبور"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="pr-10 pl-10 bg-secondary/50 border-border focus:border-primary"
-            required
-            disabled={isLoading}
-            minLength={6}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-          </button>
-        </div>
-
-        <Button 
-          type="submit" 
-          className="w-full glow-button text-foreground font-semibold py-6 gap-2"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              ورود به پنل شرکتی
-              <ArrowLeft className="w-4 h-4" />
-            </>
-          )}
-        </Button>
-      </form>
-
-      <p className="text-xs text-muted-foreground text-center mt-4">
-        برای دریافت دسترسی، با ادمین شرکت خود تماس بگیرید
-      </p>
-    </>
-  );
 
   return (
     <>
       <Helmet>
-        <title>
-          {inviteInfo?.is_valid 
-            ? `پیوستن به ${inviteInfo.company_name} | HRing`
-            : (isLogin ? "ورود به حساب" : "ثبت‌نام") + " | HRing"}
-        </title>
-        <meta 
-          name="description" 
-          content={isLogin 
-            ? "ورود به پنل مدیریت منابع انسانی HRing. به ابزارهای هوشمند استخدام و مدیریت تیم دسترسی پیدا کنید."
-            : "ایجاد حساب کاربری در HRing. همین حالا شروع کنید و از امکانات هوش مصنوعی برای استخدام بهره‌مند شوید."
-          } 
-        />
+        <title>{authTitle}</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      <div className="relative min-h-screen flex items-center justify-center p-4" dir="rtl">
+      <div className="relative min-h-screen overflow-hidden bg-background" dir="rtl">
         <AuroraBackground />
-      
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
-        <div className="glass-card p-8">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <Link to="/" className="inline-flex items-center justify-center gap-2 mb-4">
-              <img src={authLogo} alt="Logo" className="h-10 w-10 object-contain" />
-              <span className="text-3xl font-bold gradient-text-primary">hring</span>
-            </Link>
-            <h1 className="text-2xl font-semibold text-foreground">
-              {inviteInfo?.is_valid 
-                ? `پیوستن به ${inviteInfo.company_name}`
-                : (isLogin ? "ورود به حساب" : "ایجاد حساب کاربری")}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {inviteInfo?.is_valid 
-                ? "برای پیوستن به شرکت، ثبت‌نام یا وارد شوید"
-                : (isLogin 
-                    ? "خوش آمدید! لطفاً وارد شوید" 
-                    : "همین حالا شروع کنید")}
-            </p>
-          </div>
-
-          {/* Account Type Tabs - hide when invite is present */}
-          {!inviteCode ? (
-            <Tabs 
-              value={accountType} 
-              onValueChange={(v) => setAccountType(v as AccountType)}
-              className="mb-6"
-            >
-              <TabsList className="grid w-full grid-cols-2 bg-secondary/50">
-                <TabsTrigger 
-                  value="person" 
-                  className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  <User className="w-4 h-4" />
-                  اشخاص
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="company"
-                  className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  <Building2 className="w-4 h-4" />
-                  شرکت‌ها
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="person" className="mt-6">
-                {renderPersonForm()}
-              </TabsContent>
-              
-              <TabsContent value="company" className="mt-6">
-                {renderCompanyForm()}
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <div className="mt-6">
-              {renderPersonForm()}
+        <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-10">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md rounded-3xl border border-border/60 bg-background/80 p-6 shadow-2xl backdrop-blur-xl sm:p-8"
+          >
+            <div className="mb-6 text-center">
+              <img src={authLogo} alt={siteName} className="mx-auto mb-4 h-14 w-auto object-contain" />
+              <h1 className="text-2xl font-bold">{authTitle}</h1>
+              <p className="mt-2 text-sm text-muted-foreground">{authSubtitle}</p>
             </div>
-          )}
 
-          {/* Back Link */}
-          <div className="mt-8 text-center">
-            <Link 
-              to="/" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
-            >
-              بازگشت به خانه
-              <ArrowLeft className="w-4 h-4 rotate-180" />
-            </Link>
-          </div>
+            <InviteBanner />
+
+            <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-muted/60 p-1">
+              <Button
+                type="button"
+                variant={loginMethod === 'email' ? 'default' : 'ghost'}
+                onClick={() => setLoginMethod('email')}
+                className="gap-2"
+              >
+                <Mail className="h-4 w-4" /> ایمیل
+              </Button>
+              <Button
+                type="button"
+                variant={loginMethod === 'sms' ? 'default' : 'ghost'}
+                onClick={() => {
+                  setLoginMethod('sms');
+                  setIsLogin(true);
+                }}
+                className="gap-2"
+              >
+                <MessageSquareText className="h-4 w-4" /> پیامک
+              </Button>
+            </div>
+
+            {loginMethod === 'email' ? (
+              <Tabs value={isLogin ? 'login' : 'signup'} onValueChange={(v) => setIsLogin(v === 'login')}>
+                <TabsList className="mb-5 grid w-full grid-cols-2">
+                  <TabsTrigger value="login">ورود</TabsTrigger>
+                  <TabsTrigger value="signup">ثبت‌نام</TabsTrigger>
+                </TabsList>
+                <TabsContent value={isLogin ? 'login' : 'signup'} className="mt-0">
+                  <form onSubmit={handleEmailSubmit} className="space-y-4">
+                    {!isLogin && (
+                      <div className="relative">
+                        <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="نام و نام خانوادگی"
+                          className="pr-10"
+                          maxLength={200}
+                        />
+                      </div>
+                    )}
+                    <div className="relative">
+                      <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="ایمیل"
+                        className="pr-10"
+                        dir="ltr"
+                        required
+                      />
+                    </div>
+                    <div className="relative">
+                      <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="رمز عبور"
+                        className="px-10"
+                        minLength={isLogin ? 1 : 10}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((value) => !value)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        aria-label={showPassword ? 'مخفی کردن رمز' : 'نمایش رمز'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full gap-2"
+                      disabled={isLoading || (Boolean(inviteCode) && !inviteInfo?.is_valid)}
+                    >
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                      {isLogin ? 'ورود امن' : 'ساخت حساب'}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <form onSubmit={verifyCode} className="space-y-4">
+                <div className="relative">
+                  <Phone className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="شماره موبایل"
+                    className="pr-10"
+                    dir="ltr"
+                    disabled={Boolean(smsChallengeId)}
+                    required
+                  />
+                </div>
+                {smsChallengeId ? (
+                  <>
+                    <Input
+                      value={smsCode}
+                      onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="کد ۶ رقمی"
+                      inputMode="numeric"
+                      dir="ltr"
+                      className="text-center text-lg tracking-[0.35em]"
+                      required
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="submit" disabled={isLoading || smsCode.length !== 6}>
+                        {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                        تایید و ورود
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setSmsChallengeId(null);
+                          setSmsCode('');
+                        }}
+                      >
+                        تغییر شماره
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={requestCode}
+                    disabled={isLoading || phone.trim().length < 10}
+                  >
+                    {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                    دریافت کد ورود
+                  </Button>
+                )}
+              </form>
+            )}
+
+            <div className="mt-6 border-t border-border/60 pt-5 text-center">
+              <Button variant="ghost" asChild className="gap-2">
+                <Link to="/">
+                  بازگشت به سایت <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
       </div>
     </>
   );
