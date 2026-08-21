@@ -1,12 +1,46 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useCallback, useEffect, useState } from 'react';
+import { apiRequest } from '@/lib/api';
 import { useUserContext } from './useUserContext';
-import type { 
-  Company, 
-  CompanyMember, 
+import type {
+  Company,
   CompanyInvite,
-  CompanyRole 
+  CompanyMember,
+  CompanyRole,
+  UserProfile,
 } from '@/types/multiTenant';
+
+interface ApiCompany {
+  id: string;
+  name: string;
+  domain: string | null;
+  status: Company['status'];
+  subscription_tier: Company['subscription_tier'];
+  monthly_credits: number;
+  used_credits: number;
+  max_members: number;
+  credit_pool: number | null;
+  credit_pool_enabled: boolean | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ApiMember {
+  id: string;
+  company_id: string;
+  user_id: string;
+  role: CompanyRole;
+  can_invite: boolean;
+  is_active: boolean;
+  invited_by: string | null;
+  joined_at: string;
+  profile: {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    title: string | null;
+    avatar_url: string | null;
+  } | null;
+}
 
 interface UseCompanyReturn {
   company: Company | null;
@@ -23,6 +57,34 @@ interface UseCompanyReturn {
   refetch: () => Promise<void>;
 }
 
+const mapCompany = (item: ApiCompany): Company => ({
+  ...item,
+  credit_pool: item.credit_pool || 0,
+  credit_pool_enabled: Boolean(item.credit_pool_enabled),
+  last_credit_reset: null,
+  created_by: null,
+});
+
+const mapMember = (item: ApiMember): CompanyMember => {
+  let profile: UserProfile | undefined;
+  if (item.profile) {
+    profile = {
+      id: item.profile.id,
+      email: item.profile.email,
+      full_name: item.profile.full_name,
+      title: item.profile.title,
+      avatar_url: item.profile.avatar_url,
+      user_type: 'corporate',
+      subscription_tier: null,
+      monthly_credits: 0,
+      used_credits: 0,
+      is_active: item.is_active,
+      created_at: item.joined_at,
+    };
+  }
+  return { ...item, profile };
+};
+
 export const useCompany = (): UseCompanyReturn => {
   const { context, loading: contextLoading } = useUserContext();
   const [company, setCompany] = useState<Company | null>(null);
@@ -30,8 +92,9 @@ export const useCompany = (): UseCompanyReturn => {
   const [invites, setInvites] = useState<CompanyInvite[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchCompanyData = async () => {
-    if (!context?.companyId) {
+  const fetchCompanyData = useCallback(async () => {
+    const companyId = context?.companyId;
+    if (!companyId) {
       setCompany(null);
       setMembers([]);
       setInvites([]);
@@ -39,177 +102,140 @@ export const useCompany = (): UseCompanyReturn => {
       return;
     }
 
+    setLoading(true);
     try {
-      // Fetch company
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', context.companyId)
-        .single();
+      const [companyData, memberData] = await Promise.all([
+        apiRequest<ApiCompany>(`/companies/${companyId}`),
+        context.companyPermissions.includes('company.members.read')
+          ? apiRequest<ApiMember[]>(`/companies/${companyId}/members`)
+          : Promise.resolve([]),
+      ]);
+      setCompany(mapCompany(companyData));
+      setMembers(memberData.map(mapMember));
 
-      if (companyError) throw companyError;
-      setCompany(companyData as Company);
-
-      // Fetch members with profiles
-      const { data: membersData, error: membersError } = await supabase
-        .from('company_members')
-        .select(`
-          *,
-          profiles:user_id (
-            id,
-            email,
-            full_name,
-            title,
-            avatar_url
-          )
-        `)
-        .eq('company_id', context.companyId)
-        .eq('is_active', true);
-
-      if (membersError) throw membersError;
-      
-      const typedMembers = (membersData || []).map(m => ({
-        ...m,
-        profile: m.profiles as any,
-      })) as CompanyMember[];
-      
-      setMembers(typedMembers);
-
-      // Fetch invites if CEO or deputy
-      if (context.companyRole === 'ceo' || context.companyRole === 'deputy') {
-        const { data: invitesData, error: invitesError } = await supabase
-          .from('company_invites')
-          .select('*')
-          .eq('company_id', context.companyId)
-          .eq('is_active', true);
-
-        if (!invitesError && invitesData) {
-          setInvites(invitesData as CompanyInvite[]);
+      if (
+        context.companyPermissions.includes('company.invites.read') ||
+        context.companyPermissions.includes('company.invites.manage')
+      ) {
+        try {
+          const inviteData = await apiRequest<CompanyInvite[]>(`/companies/${companyId}/invites`);
+          setInvites(inviteData);
+        } catch (error) {
+          console.error('Unable to read company invites:', error);
+          setInvites([]);
         }
+      } else {
+        setInvites([]);
       }
     } catch (error) {
       console.error('Error fetching company data:', error);
+      setCompany(null);
+      setMembers([]);
+      setInvites([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [context?.companyId, context?.companyPermissions]);
 
   useEffect(() => {
-    if (!contextLoading) {
-      fetchCompanyData();
-    }
-  }, [context?.companyId, contextLoading]);
+    if (!contextLoading) void fetchCompanyData();
+  }, [contextLoading, fetchCompanyData]);
 
-  const generateInviteCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  };
+  const createInvite = useCallback(
+    async (
+      role: CompanyRole,
+      maxUses = 1,
+      expiresInDays = 7,
+    ): Promise<CompanyInvite | null> => {
+      if (!context?.companyId) return null;
+      try {
+        const invite = await apiRequest<CompanyInvite>(`/companies/${context.companyId}/invites`, {
+          method: 'POST',
+          body: JSON.stringify({
+            role,
+            max_uses: maxUses,
+            expires_in_days: expiresInDays,
+          }),
+        });
+        await fetchCompanyData();
+        return invite;
+      } catch (error) {
+        console.error('Error creating invite:', error);
+        return null;
+      }
+    },
+    [context?.companyId, fetchCompanyData],
+  );
 
-  const createInvite = useCallback(async (
-    role: CompanyRole, 
-    maxUses: number = 1, 
-    expiresInDays: number = 7
-  ): Promise<CompanyInvite | null> => {
-    if (!context?.companyId || !context?.userId) return null;
+  const removeMember = useCallback(
+    async (memberId: string) => {
+      if (!context?.companyId) return false;
+      try {
+        await apiRequest<void>(`/companies/${context.companyId}/members/${memberId}`, {
+          method: 'DELETE',
+        });
+        await fetchCompanyData();
+        return true;
+      } catch (error) {
+        console.error('Error removing member:', error);
+        return false;
+      }
+    },
+    [context?.companyId, fetchCompanyData],
+  );
 
-    try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+  const updateMemberRole = useCallback(
+    async (memberId: string, role: CompanyRole) => {
+      if (!context?.companyId) return false;
+      try {
+        await apiRequest(`/companies/${context.companyId}/members/${memberId}/role`, {
+          method: 'PATCH',
+          body: JSON.stringify({ role }),
+        });
+        await fetchCompanyData();
+        return true;
+      } catch (error) {
+        console.error('Error updating member role:', error);
+        return false;
+      }
+    },
+    [context?.companyId, fetchCompanyData],
+  );
 
-      const { data, error } = await supabase
-        .from('company_invites')
-        .insert({
-          company_id: context.companyId,
-          invite_code: generateInviteCode(),
-          role,
-          max_uses: maxUses,
-          expires_at: expiresAt.toISOString(),
-          created_by: context.userId,
-        })
-        .select()
-        .single();
+  const toggleInvitePermission = useCallback(
+    async (memberId: string, canInvite: boolean) => {
+      if (!context?.companyId) return false;
+      try {
+        await apiRequest(`/companies/${context.companyId}/members/${memberId}/invite-permission`, {
+          method: 'PATCH',
+          body: JSON.stringify({ can_invite: canInvite }),
+        });
+        await fetchCompanyData();
+        return true;
+      } catch (error) {
+        console.error('Error updating invite permission:', error);
+        return false;
+      }
+    },
+    [context?.companyId, fetchCompanyData],
+  );
 
-      if (error) throw error;
-      
-      await fetchCompanyData();
-      return data as CompanyInvite;
-    } catch (error) {
-      console.error('Error creating invite:', error);
-      return null;
-    }
-  }, [context?.companyId, context?.userId]);
-
-  const removeMember = useCallback(async (memberId: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('company_members')
-        .update({ is_active: false })
-        .eq('id', memberId);
-
-      if (error) throw error;
-      
-      await fetchCompanyData();
-      return true;
-    } catch (error) {
-      console.error('Error removing member:', error);
-      return false;
-    }
-  }, []);
-
-  const updateMemberRole = useCallback(async (memberId: string, role: CompanyRole): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('company_members')
-        .update({ role })
-        .eq('id', memberId);
-
-      if (error) throw error;
-      
-      await fetchCompanyData();
-      return true;
-    } catch (error) {
-      console.error('Error updating member role:', error);
-      return false;
-    }
-  }, []);
-
-  const toggleInvitePermission = useCallback(async (memberId: string, canInvite: boolean): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('company_members')
-        .update({ can_invite: canInvite })
-        .eq('id', memberId);
-
-      if (error) throw error;
-      
-      await fetchCompanyData();
-      return true;
-    } catch (error) {
-      console.error('Error toggling invite permission:', error);
-      return false;
-    }
-  }, []);
-
-  const deactivateInvite = useCallback(async (inviteId: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('company_invites')
-        .update({ is_active: false })
-        .eq('id', inviteId);
-
-      if (error) throw error;
-      
-      await fetchCompanyData();
-      return true;
-    } catch (error) {
-      console.error('Error deactivating invite:', error);
-      return false;
-    }
-  }, []);
+  const deactivateInvite = useCallback(
+    async (inviteId: string) => {
+      if (!context?.companyId) return false;
+      try {
+        await apiRequest<void>(`/companies/${context.companyId}/invites/${inviteId}`, {
+          method: 'DELETE',
+        });
+        await fetchCompanyData();
+        return true;
+      } catch (error) {
+        console.error('Error deactivating invite:', error);
+        return false;
+      }
+    },
+    [context?.companyId, fetchCompanyData],
+  );
 
   return {
     company,
@@ -217,7 +243,9 @@ export const useCompany = (): UseCompanyReturn => {
     invites,
     loading: loading || contextLoading,
     isCEO: context?.companyRole === 'ceo',
-    canInvite: context?.companyRole === 'ceo' || context?.companyRole === 'deputy',
+    canInvite: Boolean(
+      context?.companyPermissions.includes('company.invites.manage') || context?.companyCanInvite,
+    ),
     createInvite,
     removeMember,
     updateMemberRole,
