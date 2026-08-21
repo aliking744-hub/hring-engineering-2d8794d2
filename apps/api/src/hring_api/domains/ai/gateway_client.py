@@ -55,6 +55,7 @@ async def generate_with_ai_gateway(
     temperature: float | None = None,
     max_output_tokens: int | None = None,
     response_format: str = "text",
+    search_recency_filter: str | None = None,
 ) -> AiGatewayResult:
     """Call the internal provider hub and persist billing telemetry.
 
@@ -76,6 +77,8 @@ async def generate_with_ai_gateway(
         payload["temperature"] = temperature
     if max_output_tokens is not None:
         payload["max_output_tokens"] = max_output_tokens
+    if search_recency_filter is not None:
+        payload["search_recency_filter"] = search_recency_filter
 
     started = monotonic()
     url = f"{settings.ai_base_url.rstrip('/')}/generate"
