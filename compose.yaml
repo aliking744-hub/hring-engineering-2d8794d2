@@ -42,7 +42,7 @@ services:
     volumes:
       - hring_minio:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -94,7 +94,7 @@ services:
       SMS_PROVIDER: ${SMS_PROVIDER:-disabled}
       SMS_OTP_PEPPER: ${SMS_OTP_PEPPER:?set SMS_OTP_PEPPER}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-disabled}
-      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-["hring.ir","www.hring.ir","localhost"]}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-["hring.ir","www.hring.ir","localhost","127.0.0.1","api"]}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
     command:
       - /bin/sh
