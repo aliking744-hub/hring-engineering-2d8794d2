@@ -28,6 +28,8 @@ def enabled_provider_names(settings: GatewaySettings) -> list[str]:
         names.append("openai")
     if settings.gemini_api_key and settings.gemini_api_key.get_secret_value():
         names.append("gemini")
+    if settings.perplexity_api_key and settings.perplexity_api_key.get_secret_value():
+        names.append("perplexity")
     return names
 
 
@@ -49,6 +51,14 @@ def provider_config(settings: GatewaySettings, alias: str) -> ProviderConfig:
             base_url=settings.gemini_base_url.rstrip("/"),
             api_key=settings.gemini_api_key.get_secret_value(),
         )
+    if normalized == "perplexity":
+        if not settings.perplexity_api_key or not settings.perplexity_api_key.get_secret_value():
+            raise ProviderUnavailableError("Provider is not configured")
+        return ProviderConfig(
+            name="perplexity",
+            base_url=settings.perplexity_base_url.rstrip("/"),
+            api_key=settings.perplexity_api_key.get_secret_value(),
+        )
     raise ProviderUnavailableError("Unsupported provider alias")
 
 
@@ -67,13 +77,15 @@ def normalize_usage(body: dict[str, Any]) -> dict[str, int]:
     usage = body.get("usage")
     if not isinstance(usage, dict):
         return {}
+    reasoning_tokens = max(
+        _nested_int(usage, "completion_tokens_details", "reasoning_tokens"),
+        _nested_int(usage, "reasoning_tokens"),
+    )
     normalized = {
         "input_tokens": _nested_int(usage, "prompt_tokens"),
         "output_tokens": _nested_int(usage, "completion_tokens"),
         "cached_input_tokens": _nested_int(usage, "prompt_tokens_details", "cached_tokens"),
-        "reasoning_tokens": _nested_int(
-            usage, "completion_tokens_details", "reasoning_tokens"
-        ),
+        "reasoning_tokens": reasoning_tokens,
     }
     return {key: value for key, value in normalized.items() if value > 0}
 
@@ -108,11 +120,13 @@ async def generate_openai_compatible(
     if request.temperature is not None:
         payload["temperature"] = request.temperature
     if request.max_output_tokens is not None:
-        # Chat Completions compatibility remains the common denominator for
-        # initial providers. Individual adapters can translate this later.
         payload["max_completion_tokens"] = request.max_output_tokens
     if request.response_format == "json_object":
         payload["response_format"] = {"type": "json_object"}
+    if request.search_recency_filter is not None:
+        if provider.name != "perplexity":
+            raise ProviderUnavailableError("Search recency is only supported by research providers")
+        payload["search_recency_filter"] = request.search_recency_filter
 
     headers = {
         "Authorization": f"Bearer {provider.api_key}",
