@@ -2,6 +2,7 @@ import asyncio
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import delete
 
 from hring_api.db.session import SessionFactory
 from hring_api.domains.access.models import PlatformRoleAssignment
@@ -36,6 +37,17 @@ async def _grant_platform_role(user_id: UUID, role: str) -> None:
                     user_id=user_id,
                     role=role,
                     created_by=user_id,
+                )
+            )
+
+
+async def _keep_only_super_admin(user_id: UUID) -> None:
+    async with SessionFactory() as session:
+        async with session.begin():
+            await session.execute(
+                delete(PlatformRoleAssignment).where(
+                    PlatformRoleAssignment.role == "super_admin",
+                    PlatformRoleAssignment.user_id != user_id,
                 )
             )
 
@@ -89,7 +101,6 @@ def test_platform_and_product_admin_surfaces_are_separated() -> None:
         assert client.get(
             "/api/v1/admin/platform/overview", headers=_auth(content_admin)
         ).status_code == 403
-
         assert client.get(
             "/api/v1/admin/product/settings", headers=_auth(content_admin)
         ).status_code == 200
@@ -164,20 +175,16 @@ def test_platform_company_creation_provisions_an_isolated_ceo_account() -> None:
         beta_company_id = second["company"]["id"]
 
         own_company = client.get(
-            f"/api/v1/companies/{alpha_company_id}",
-            headers=_auth(alpha_owner),
+            f"/api/v1/companies/{alpha_company_id}", headers=_auth(alpha_owner)
         )
         assert own_company.status_code == 200, own_company.text
-
         other_company = client.get(
-            f"/api/v1/companies/{beta_company_id}",
-            headers=_auth(alpha_owner),
+            f"/api/v1/companies/{beta_company_id}", headers=_auth(alpha_owner)
         )
         assert other_company.status_code == 403
 
         members = client.get(
-            f"/api/v1/companies/{alpha_company_id}/members",
-            headers=_auth(alpha_owner),
+            f"/api/v1/companies/{alpha_company_id}/members", headers=_auth(alpha_owner)
         )
         assert members.status_code == 200, members.text
         owner_member = next(
@@ -192,7 +199,6 @@ def test_company_permission_override_is_tenant_scoped_and_non_ceo_cannot_edit_ma
         first = _create_company(client, platform_admin, "matrix-a")
         second = _create_company(client, platform_admin, "matrix-b")
         company_id = first["company"]["id"]
-
         ceo = _login(client, first["owner"]["email"])
         ceo_header = _auth(ceo)
 
@@ -223,11 +229,9 @@ def test_company_permission_override_is_tenant_scoped_and_non_ceo_cannot_edit_ma
         assert initially_forbidden.status_code == 403
 
         matrix = client.get(
-            f"/api/v1/company-admin/{company_id}/permissions",
-            headers=ceo_header,
+            f"/api/v1/company-admin/{company_id}/permissions", headers=ceo_header
         )
         assert matrix.status_code == 200, matrix.text
-
         override = client.put(
             f"/api/v1/company-admin/{company_id}/permissions",
             headers=ceo_header,
@@ -261,7 +265,6 @@ def test_company_permission_override_is_tenant_scoped_and_non_ceo_cannot_edit_ma
             },
         )
         assert manager_cannot_edit_policy.status_code == 403
-
         cross_tenant = client.get(
             f"/api/v1/company-admin/{second['company']['id']}/permissions",
             headers=ceo_header,
@@ -274,6 +277,7 @@ def test_last_super_admin_cannot_remove_own_super_admin_role_and_audit_is_writte
         super_admin = _register_with_platform_role(client, "last-super", "super_admin")
         user_id = super_admin["user"]["id"]
         header = _auth(super_admin)
+        asyncio.run(_keep_only_super_admin(UUID(user_id)))
 
         removal = client.put(
             f"/api/v1/admin/platform/users/{user_id}/roles",
