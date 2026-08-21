@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     object_storage_secret_key: SecretStr = SecretStr("change-me")
     ai_base_url: str = "http://ai:8000/v1"
     ai_api_key: SecretStr = SecretStr("local-development")
+    recruiting_ai_provider: str = "gemini"
+    recruiting_ai_model: str = "gemini-2.5-pro"
+    recruiting_enrichment_provider: str = "perplexity"
+    recruiting_enrichment_model: str = "sonar"
+    recruiting_sourcing_webhook_url: SecretStr | None = None
     cors_origins: list[str] = ["http://localhost:5173"]
 
     auth_jwt_secret: SecretStr = SecretStr("development-only-change-me")
