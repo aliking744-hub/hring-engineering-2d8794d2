@@ -8,6 +8,8 @@ on:
       - feature/**
     paths:
       - "apps/api/**"
+      - "services/ai-gateway/**"
+      - "compose.yaml"
       - "infra/compose/**"
       - ".github/workflows/backend-quality.yml"
   pull_request:
@@ -16,6 +18,8 @@ on:
       - engineering/foundation
     paths:
       - "apps/api/**"
+      - "services/ai-gateway/**"
+      - "compose.yaml"
       - "infra/compose/**"
       - ".github/workflows/backend-quality.yml"
 
@@ -83,3 +87,36 @@ jobs:
 
       - name: Build API container
         run: docker build -t hring-api-ci .
+
+  validate-ai-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-gateway
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/ai-gateway/pyproject.toml
+
+      - name: Install gateway with dev dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check src tests
+
+      - name: Mypy
+        run: mypy src
+
+      - name: Pytest
+        run: pytest -q
+
+      - name: Build AI gateway container
+        run: docker build -t hring-ai-gateway-ci .
