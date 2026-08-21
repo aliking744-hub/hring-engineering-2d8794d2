@@ -3,6 +3,7 @@ import { apiRequest } from '@/lib/api';
 import { useAuth } from './useAuth';
 import type {
   CompanyRole,
+  PlatformRole,
   SubscriptionTier,
   UserContext,
   UserType,
@@ -57,6 +58,8 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
         userType: data.user_type as UserType,
         subscriptionTier: data.subscription_tier as SubscriptionTier | null,
         isAdmin: data.is_admin,
+        platformRoles: data.platform_roles as PlatformRole[],
+        appRoles: data.app_roles,
         companyId: data.company_id,
         companyRole: data.company_role as CompanyRole | null,
         companyTier: data.company_tier as SubscriptionTier | null,
