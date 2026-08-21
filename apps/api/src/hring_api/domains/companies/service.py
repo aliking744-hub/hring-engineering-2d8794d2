@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hring_api.domains.access.policy import is_company_permission_allowed
 from hring_api.domains.companies.repository import (
     count_active_members,
     get_company,
@@ -73,7 +74,12 @@ async def get_company_for_member(
     company_id: UUID,
 ) -> Company:
     company = await _require_company(session, company_id)
-    await _require_active_membership(session, company_id=company_id, user_id=actor_user_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.profile.read",
+    )
     return company
 
 
@@ -83,7 +89,12 @@ async def get_company_members(
     actor_user_id: UUID,
     company_id: UUID,
 ) -> list[tuple[CompanyMember, Profile | None]]:
-    await _require_active_membership(session, company_id=company_id, user_id=actor_user_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.read",
+    )
     return await list_members_with_profiles(session, company_id)
 
 
@@ -93,10 +104,12 @@ async def get_company_invites(
     actor_user_id: UUID,
     company_id: UUID,
 ) -> list[CompanyInvite]:
-    membership = await _require_active_membership(
-        session, company_id=company_id, user_id=actor_user_id
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.invites.read",
     )
-    _require_invite_manager(membership)
     return await list_active_invites(session, company_id)
 
 
@@ -125,11 +138,18 @@ async def create_invite(
 ) -> CompanyInvite:
     company = await _require_company(session, company_id, for_update=True)
     _require_company_writable(company)
-    membership = await _require_active_membership(
-        session, company_id=company_id, user_id=actor_user_id
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.invites.manage",
     )
-    _require_invite_manager(membership)
     await _require_available_seat(session, company)
+
+    # CEO is never granted through an ordinary invitation. Platform provisioning
+    # creates the one protected CEO account for a tenant.
+    if role == "ceo":
+        raise CompanyAccessDeniedError("CEO role cannot be assigned through an invite")
 
     invite = CompanyInvite(
         company_id=company_id,
@@ -153,10 +173,12 @@ async def deactivate_invite(
     company_id: UUID,
     invite_id: UUID,
 ) -> None:
-    membership = await _require_active_membership(
-        session, company_id=company_id, user_id=actor_user_id
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.invites.manage",
     )
-    _require_invite_manager(membership)
     invite = await get_invite_by_id(session, company_id=company_id, invite_id=invite_id)
     if invite is None:
         raise InviteNotFoundError("Invite not found")
@@ -185,6 +207,8 @@ async def join_company_with_invite(
         return company, existing, True
 
     await _require_available_seat(session, company)
+    if invite.role == "ceo":
+        raise InviteInvalidError("CEO invitations are not supported")
 
     if existing is None:
         membership = CompanyMember(
@@ -207,6 +231,7 @@ async def join_company_with_invite(
     profile = await get_profile(session, actor_user_id)
     if profile is not None:
         profile.user_type = "corporate"
+        profile.subscription_tier = company.subscription_tier
 
     invite.used_count += 1
     if invite.max_uses is not None and invite.used_count >= invite.max_uses:
@@ -224,8 +249,15 @@ async def update_member_role(
     member_id: UUID,
     role: str,
 ) -> CompanyMember:
-    await _require_ceo(session, actor_user_id=actor_user_id, company_id=company_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
     member = await _require_managed_member(session, company_id=company_id, member_id=member_id)
+    if role == "ceo":
+        raise ProtectedMemberError("CEO role transfer requires a dedicated ownership workflow")
     member.role = role
     await session.flush()
     return member
@@ -239,7 +271,12 @@ async def update_member_invite_permission(
     member_id: UUID,
     can_invite: bool,
 ) -> CompanyMember:
-    await _require_ceo(session, actor_user_id=actor_user_id, company_id=company_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
     member = await _require_managed_member(session, company_id=company_id, member_id=member_id)
     member.can_invite = can_invite
     await session.flush()
@@ -253,7 +290,12 @@ async def deactivate_member(
     company_id: UUID,
     member_id: UUID,
 ) -> None:
-    await _require_ceo(session, actor_user_id=actor_user_id, company_id=company_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
     member = await _require_managed_member(session, company_id=company_id, member_id=member_id)
     member.is_active = False
     await revoke_all_user_sessions(session, user_id=member.user_id)
@@ -272,8 +314,15 @@ async def create_company_user(
 ) -> tuple[User, CompanyMember]:
     company = await _require_company(session, company_id, for_update=True)
     _require_company_writable(company)
-    await _require_ceo(session, actor_user_id=actor_user_id, company_id=company_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
     await _require_available_seat(session, company)
+    if role == "ceo":
+        raise ProtectedMemberError("CEO role cannot be provisioned by a company administrator")
 
     normalized_email = normalize_email(email)
     if await get_user_by_email(session, normalized_email) is not None:
@@ -289,6 +338,7 @@ async def create_company_user(
     profile = await get_profile(session, user.id)
     if profile is not None:
         profile.user_type = "corporate"
+        profile.subscription_tier = company.subscription_tier
 
     membership = CompanyMember(
         company_id=company_id,
@@ -311,7 +361,12 @@ async def reset_company_user_password(
     target_user_id: UUID,
     new_password: str,
 ) -> None:
-    await _require_ceo(session, actor_user_id=actor_user_id, company_id=company_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
     target_member = await get_member_by_user(
         session, company_id=company_id, user_id=target_user_id
     )
@@ -335,7 +390,12 @@ async def update_company_user_profile(
     full_name: str | None,
     title: str | None,
 ) -> Profile:
-    await _require_ceo(session, actor_user_id=actor_user_id, company_id=company_id)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
     target_member = await get_member_by_user(
         session, company_id=company_id, user_id=target_user_id
     )
@@ -350,6 +410,22 @@ async def update_company_user_profile(
         profile.title = title.strip() or None
     await session.flush()
     return profile
+
+
+async def require_company_ceo(
+    session: AsyncSession,
+    *,
+    actor_user_id: UUID,
+    company_id: UUID,
+) -> CompanyMember:
+    membership = await _require_active_membership(
+        session,
+        company_id=company_id,
+        user_id=actor_user_id,
+    )
+    if membership.role != "ceo":
+        raise CompanyAccessDeniedError("Only the company CEO can perform this action")
+    return membership
 
 
 async def _require_company(
@@ -386,25 +462,25 @@ async def _require_active_membership(
     return membership
 
 
-async def _require_ceo(
+async def _require_permission(
     session: AsyncSession,
     *,
     actor_user_id: UUID,
     company_id: UUID,
+    permission_key: str,
 ) -> CompanyMember:
     membership = await _require_active_membership(
         session,
         company_id=company_id,
         user_id=actor_user_id,
     )
-    if membership.role != "ceo":
-        raise CompanyAccessDeniedError("Only CEO can perform this action")
+    if not await is_company_permission_allowed(
+        session,
+        membership=membership,
+        permission_key=permission_key,
+    ):
+        raise CompanyAccessDeniedError("Forbidden")
     return membership
-
-
-def _require_invite_manager(membership: CompanyMember) -> None:
-    if membership.role not in {"ceo", "deputy"} and not membership.can_invite:
-        raise CompanyAccessDeniedError("Invite permission required")
 
 
 async def _require_managed_member(
