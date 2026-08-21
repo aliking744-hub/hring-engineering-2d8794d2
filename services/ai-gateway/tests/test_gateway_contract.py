@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
-from hring_ai_gateway.config import get_settings
+from hring_ai_gateway.config import GatewaySettings, get_settings
 from hring_ai_gateway.main import app
-from hring_ai_gateway.providers import normalize_usage
+from hring_ai_gateway.providers import normalize_usage, provider_config
 
 
 def test_gateway_requires_internal_bearer_key() -> None:
@@ -66,4 +66,34 @@ def test_openai_compatible_usage_is_normalized() -> None:
         "output_tokens": 30,
         "cached_input_tokens": 40,
         "reasoning_tokens": 5,
+    }
+
+
+def test_perplexity_sonar_uses_current_endpoint_and_token_field() -> None:
+    settings = GatewaySettings(
+        perplexity_api_key="perplexity-test-key",
+        perplexity_base_url="https://api.perplexity.ai",
+    )
+    provider = provider_config(settings, "perplexity")
+    assert provider.endpoint_path == "/v1/sonar"
+    assert provider.max_tokens_field == "max_tokens"
+
+
+def test_perplexity_usage_keeps_search_cost_drivers() -> None:
+    assert normalize_usage(
+        {
+            "usage": {
+                "prompt_tokens": 200,
+                "completion_tokens": 50,
+                "reasoning_tokens": 7,
+                "citation_tokens": 12,
+                "num_search_queries": 3,
+            }
+        }
+    ) == {
+        "input_tokens": 200,
+        "output_tokens": 50,
+        "reasoning_tokens": 7,
+        "citation_tokens": 12,
+        "search_queries": 3,
     }

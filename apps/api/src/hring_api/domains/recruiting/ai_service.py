@@ -30,7 +30,11 @@ class RecruitingSourcingUnavailableError(RecruitingAiError):
 
 SYSTEM_PROMPT = """تو یک استعدادیاب ارشد هستی. هر کاندیدا را فقط بر اساس داده‌های موجود و اطلاعات عمومی حرفه‌ای که در ورودی آمده در پنج لایه تحلیل کن:
 1) Activity & Sentiment، 2) Hard Skill Match، 3) Career Trajectory، 4) Culture Fit، 5) Risk & Opportunity.
-برای هر لایه امتیاز 0 تا 100 بده. Red Flag و Green Flag فقط وقتی بنویس که مستند به ورودی باشد؛ نبود اطلاعات را به عنوان هشدار نساز. matchScore باید 0 تا 100 و candidateTemperature یکی از hot/warm/cold باشد. پاسخ فقط JSON Array معتبر و بدون markdown باشد."""
+برای هر لایه امتیاز 0 تا 100 بده. Red Flag و Green Flag فقط وقتی بنویس که مستند به ورودی باشد؛ نبود اطلاعات را به عنوان هشدار نساز. matchScore باید 0 تا 100 و candidateTemperature یکی از hot/warm/cold باشد.
+
+اطلاعات هویتی و رزومه‌ای منبع حقیقت HRing هستند. نام، ایمیل، تلفن، تحصیلات، سابقه، شرکت، محل، لینکدین و مهارت‌ها را حدس نزن و بازنویسی نکن.
+برای هر ورودی فقط این فیلدها را برگردان: sourceIndex, matchScore, candidateTemperature, layerScores, redFlags, greenFlags, summary, recommendation.
+sourceIndex را دقیقاً بدون تغییر از همان ورودی برگردان. پاسخ فقط JSON Array معتبر و بدون markdown باشد."""
 
 
 def _job_text(job: JobRequirements) -> str:
@@ -55,6 +59,41 @@ def _extract_json_array(content: str) -> list[dict[str, Any]]:
     if not isinstance(parsed, list):
         raise RecruitingAiError("AI analysis must return a JSON array")
     return [item for item in parsed if isinstance(item, dict)]
+
+
+def _candidate_for_provider(candidate: CandidateAnalysisInput, source_index: int) -> dict[str, Any]:
+    # rawData may contain an entire imported source row or private HR material.
+    # It remains in HRing and is deliberately excluded from third-party AI calls.
+    row = candidate.model_dump(
+        by_alias=True,
+        exclude_none=True,
+        exclude={"raw_data"},
+    )
+    row["sourceIndex"] = source_index
+    return row
+
+
+def _skills_from_source(value: str | list[str] | None) -> list[str]:
+    if isinstance(value, list):
+        return [item.strip() for item in value if item.strip()]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return []
+
+
+def _analysis_for_source(
+    rows: list[dict[str, Any]],
+    *,
+    source_index: int,
+) -> dict[str, Any] | None:
+    for row in rows:
+        raw_index = row.get("sourceIndex")
+        if isinstance(raw_index, int) and raw_index == source_index:
+            return row
+    # Compatibility fallback for a provider that omits sourceIndex but keeps order.
+    if source_index < len(rows):
+        return rows[source_index]
+    return None
 
 
 async def _enrich_candidate(
@@ -113,8 +152,7 @@ async def analyze_candidates(
 
     prepared: list[dict[str, Any]] = []
     for index, candidate in enumerate(candidates):
-        row = candidate.model_dump(by_alias=True, exclude_none=True)
-        row["sourceIndex"] = index
+        row = _candidate_for_provider(candidate, index)
         if enable_web_search:
             web_info = await _enrich_candidate(
                 candidate=candidate,
@@ -127,7 +165,7 @@ async def analyze_candidates(
                 row["webResearchInfo"] = web_info
         prepared.append(row)
 
-    user_prompt = f"""الزامات شغلی:\n{_job_text(job)}\n\nکاندیداها:\n{json.dumps(prepared, ensure_ascii=False)}\n\nبرای هر کاندیدا این فیلدها را برگردان: name,email,phone,title,education,experience,lastCompany,location,linkedin,skills,matchScore,candidateTemperature,layerScores(activitySentiment,hardSkillMatch,careerTrajectory,cultureFit,riskOpportunity),redFlags,greenFlags,summary,recommendation. نتایج را بر اساس matchScore نزولی مرتب کن."""
+    user_prompt = f"""الزامات شغلی:\n{_job_text(job)}\n\nکاندیداها:\n{json.dumps(prepared, ensure_ascii=False)}\n\nبرای هر کاندیدا فقط تحلیل پنج‌لایه و sourceIndex خودش را برگردان. اطلاعات هویتی و رزومه‌ای را در پاسخ تولید نکن. نتایج می‌توانند بر اساس matchScore مرتب شوند چون تطبیق با sourceIndex انجام می‌شود."""
 
     try:
         result = await generate_with_ai_gateway(
@@ -147,27 +185,42 @@ async def analyze_candidates(
 
     raw_rows = _extract_json_array(result.content)
     processed: list[AnalyzedCandidate] = []
-    for index, raw in enumerate(raw_rows):
-        source = candidates[index] if index < len(candidates) else None
-        normalized: dict[str, Any] = dict(raw)
-        normalized.setdefault("name", source.name if source and source.name else f"کاندیدا {index + 1}")
-        normalized.setdefault("email", source.email if source and source.email else "")
-        normalized.setdefault("phone", source.phone if source and source.phone else "")
-        normalized.setdefault("location", source.location if source and source.location else job.city)
-        normalized.setdefault("skills", [])
-        normalized.setdefault("matchScore", 50)
-        normalized.setdefault("candidateTemperature", "cold")
-        normalized.setdefault("layerScores", {})
-        normalized.setdefault("redFlags", [])
-        normalized.setdefault("greenFlags", [])
-        normalized.setdefault("summary", "")
-        normalized.setdefault("recommendation", "در لیست انتظار")
-        if source is not None:
-            normalized["rawData"] = source.raw_data
+    for source_index, source in enumerate(candidates):
+        analysis = _analysis_for_source(raw_rows, source_index=source_index)
+        if analysis is None:
+            logger.warning("AI omitted recruiting candidate sourceIndex=%s", source_index)
+            continue
+
+        source_payload = source.model_dump(by_alias=True, exclude_none=True, exclude={"raw_data"})
+        source_title = source_payload.get("title")
+        normalized: dict[str, Any] = {
+            "name": source.name or f"کاندیدا {source_index + 1}",
+            "email": source.email or "",
+            "phone": source.phone or "",
+            "title": source_title if isinstance(source_title, str) and source_title else "نامشخص",
+            "education": source.education or "نامشخص",
+            "experience": source.experience or "نامشخص",
+            "lastCompany": source.last_company or "نامشخص",
+            "location": source.location or job.city,
+            "linkedin": source.linkedin or "",
+            "skills": _skills_from_source(source.skills),
+            "matchScore": analysis.get("matchScore", 50),
+            "candidateTemperature": analysis.get("candidateTemperature", "cold"),
+            "layerScores": analysis.get("layerScores", {}),
+            "redFlags": analysis.get("redFlags", []),
+            "greenFlags": analysis.get("greenFlags", []),
+            "summary": analysis.get("summary", ""),
+            "recommendation": analysis.get("recommendation", "در لیست انتظار"),
+            "rawData": source.raw_data,
+        }
         try:
             processed.append(AnalyzedCandidate.model_validate(normalized))
         except ValidationError:
-            logger.warning("Dropping malformed AI candidate row", exc_info=True)
+            logger.warning(
+                "Dropping malformed AI analysis for sourceIndex=%s",
+                source_index,
+                exc_info=True,
+            )
 
     if not processed:
         raise RecruitingAiError("نتیجه معتبر از تحلیل هوش مصنوعی دریافت نشد")

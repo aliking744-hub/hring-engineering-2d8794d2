@@ -20,6 +20,8 @@ class ProviderConfig:
     name: str
     base_url: str
     api_key: str
+    endpoint_path: str
+    max_tokens_field: str
 
 
 def enabled_provider_names(settings: GatewaySettings) -> list[str]:
@@ -42,6 +44,8 @@ def provider_config(settings: GatewaySettings, alias: str) -> ProviderConfig:
             name="openai",
             base_url=settings.openai_base_url.rstrip("/"),
             api_key=settings.openai_api_key.get_secret_value(),
+            endpoint_path="/chat/completions",
+            max_tokens_field="max_completion_tokens",
         )
     if normalized == "gemini":
         if not settings.gemini_api_key or not settings.gemini_api_key.get_secret_value():
@@ -50,6 +54,8 @@ def provider_config(settings: GatewaySettings, alias: str) -> ProviderConfig:
             name="gemini",
             base_url=settings.gemini_base_url.rstrip("/"),
             api_key=settings.gemini_api_key.get_secret_value(),
+            endpoint_path="/chat/completions",
+            max_tokens_field="max_completion_tokens",
         )
     if normalized == "perplexity":
         if not settings.perplexity_api_key or not settings.perplexity_api_key.get_secret_value():
@@ -58,6 +64,8 @@ def provider_config(settings: GatewaySettings, alias: str) -> ProviderConfig:
             name="perplexity",
             base_url=settings.perplexity_base_url.rstrip("/"),
             api_key=settings.perplexity_api_key.get_secret_value(),
+            endpoint_path="/v1/sonar",
+            max_tokens_field="max_tokens",
         )
     raise ProviderUnavailableError("Unsupported provider alias")
 
@@ -77,13 +85,17 @@ def normalize_usage(body: dict[str, Any]) -> dict[str, int]:
     usage = body.get("usage")
     if not isinstance(usage, dict):
         return {}
+    reasoning_tokens = max(
+        _nested_int(usage, "completion_tokens_details", "reasoning_tokens"),
+        _nested_int(usage, "reasoning_tokens"),
+    )
     normalized = {
         "input_tokens": _nested_int(usage, "prompt_tokens"),
         "output_tokens": _nested_int(usage, "completion_tokens"),
         "cached_input_tokens": _nested_int(usage, "prompt_tokens_details", "cached_tokens"),
-        "reasoning_tokens": _nested_int(
-            usage, "completion_tokens_details", "reasoning_tokens"
-        ),
+        "reasoning_tokens": reasoning_tokens,
+        "citation_tokens": _nested_int(usage, "citation_tokens"),
+        "search_queries": _nested_int(usage, "num_search_queries"),
     }
     return {key: value for key, value in normalized.items() if value > 0}
 
@@ -118,8 +130,12 @@ async def generate_openai_compatible(
     if request.temperature is not None:
         payload["temperature"] = request.temperature
     if request.max_output_tokens is not None:
-        payload["max_completion_tokens"] = request.max_output_tokens
+        payload[provider.max_tokens_field] = request.max_output_tokens
     if request.response_format == "json_object":
+        if provider.name == "perplexity":
+            raise ProviderUnavailableError(
+                "Perplexity structured output requires an explicit JSON schema"
+            )
         payload["response_format"] = {"type": "json_object"}
 
     headers = {
@@ -135,7 +151,7 @@ async def generate_openai_compatible(
     )
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(
-            f"{provider.base_url}/chat/completions",
+            f"{provider.base_url}{provider.endpoint_path}",
             json=payload,
             headers=headers,
         )
