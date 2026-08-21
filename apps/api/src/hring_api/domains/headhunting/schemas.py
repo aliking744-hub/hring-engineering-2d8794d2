@@ -150,3 +150,22 @@ class AnalysisStats(BaseModel):
 class AnalyzeCandidatesResponse(BaseModel):
     candidates: list[CandidateCreate]
     stats: AnalysisStats
+
+
+class AutoHeadhuntRequest(BaseModel):
+    campaign_id: UUID
+    job_requirements: JobRequirements
+
+
+class AutoHeadhuntStats(BaseModel):
+    total: int
+    hot: int
+    warm: int
+    cold: int
+    avg_score: int
+
+
+class AutoHeadhuntResponse(BaseModel):
+    success: bool
+    campaign_id: UUID
+    stats: AutoHeadhuntStats
