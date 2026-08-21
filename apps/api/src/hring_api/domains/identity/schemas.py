@@ -4,17 +4,18 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
+def _validate_password(value: str) -> str:
+    if value.strip() != value or not value.strip():
+        raise ValueError("Password cannot be blank or padded with whitespace")
+    return value
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=10, max_length=256)
     full_name: str | None = Field(default=None, max_length=200)
 
-    @field_validator("password")
-    @classmethod
-    def password_must_not_be_blank(cls, value: str) -> str:
-        if value.strip() != value or not value.strip():
-            raise ValueError("Password cannot be blank or padded with whitespace")
-        return value
+    _password_validation = field_validator("password")(_validate_password)
 
 
 class LoginRequest(BaseModel):
@@ -28,6 +29,28 @@ class RefreshRequest(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str = Field(min_length=40, max_length=512)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=40, max_length=512)
+    new_password: str = Field(min_length=10, max_length=256)
+
+    _password_validation = field_validator("new_password")(_validate_password)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=10, max_length=256)
+
+    _password_validation = field_validator("new_password")(_validate_password)
+
+
+class SecurityTokenRequest(BaseModel):
+    token: str = Field(min_length=40, max_length=512)
 
 
 class SmsLoginRequest(BaseModel):
@@ -77,3 +100,14 @@ class MembershipResponse(BaseModel):
 class CurrentUserResponse(UserResponse):
     app_roles: list[str]
     memberships: list[MembershipResponse]
+
+
+class SessionResponse(BaseModel):
+    id: UUID
+    is_current: bool
+    user_agent: str | None
+    ip_address: str | None
+    expires_at: datetime
+    revoked_at: datetime | None
+    last_seen_at: datetime
+    created_at: datetime

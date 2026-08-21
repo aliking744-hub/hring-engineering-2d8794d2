@@ -26,6 +26,7 @@ PrincipalDependency = Callable[..., Awaitable["Principal"]]
 @dataclass(frozen=True)
 class Principal:
     user: User
+    session_id: UUID
     app_roles: list[str]
     memberships: list[CompanyMember]
 
@@ -67,6 +68,7 @@ async def get_current_principal(
 
     return Principal(
         user=user,
+        session_id=user_session.id,
         app_roles=await list_user_roles(db, user.id),
         memberships=await list_company_memberships(db, user.id),
     )
