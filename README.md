@@ -1,73 +1,57 @@
-# Welcome to your Lovable project
+# HRing Engineering
 
-## Project info
+Subject: Re-Architect App to "Linear-Style" Website (Landing + Dashboard)
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+I need to restructure the project into a High-End SaaS Website inspired by the **Linear.app** design aesthetic.
+**Be strict with quality.** Do not use cheap effects.
 
-## How can I edit this code?
+**1. Architecture Update:**
+* **Home (`/`):** Premium Landing Page (Public).
+* **Dashboard (`/dashboard`):** Move the current app/modules here (Protected).
+* **Shop (`/shop`):** HR Document Marketplace.
+* **Auth (`/auth`):** Login/Signup.
 
-There are several ways of editing your application.
+**2. Design Language (The "Linear" Vibe):**
+* **Theme:** Deep Dark Blue/Black background (matching our brand).
+* **Background Effect:** NOT water. Use a **"Slow Moving Aurora Gradient"** (Mesh Gradient) in the background. It must feel "floating" and subtle, not distracting.
+* **Typography:** Clean, Sans-serif, High contrast text.
+* **Interactions:** Use `framer-motion` for everything.
+    * **Scroll Reveal:** Elements should fade up + scale up slightly as the user scrolls.
+    * **Mouse Spotlight:** On the Feature Cards, add a "Spotlight Effect" where a subtle glow follows the mouse cursor inside the card borders.
 
-**Use Lovable**
+**3. Landing Page Sections (`/`):**
+* **Hero:** Centered, Large Typography. "hring: سیستم مدیریت منابع انسانی نسل جدید". Subtext: "قدرت گرفته از هوش مصنوعی". CTA: "شروع کنید" (Glowing Button).
+* **Bento Grid Features:** Display our 4 modules (Job, Ad, Interview, Onboarding) in a "Bento Grid" layout. Glassmorphic cards with the spotlight effect.
+* **Interactive Preview:** A tilted 3D-style screenshot of the dashboard (Mockup) that floats slightly.
+* **Shop Teaser:** A horizontal scroll section showing contract templates.
+* **Footer:** Minimalist, containing the "Architected by Ali Dehghani & Gemini" credit.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+**4. Responsiveness:**
+* Must be flawless on mobile.
+* The Background Gradient should be optimized for mobile performance.
+* Navbar transforms into a smooth animated drawer on mobile.
 
-Changes made via Lovable will be committed automatically to this repo.
+**Action:** Refactor the app structure and build this premium landing page now.
 
-**Use your preferred IDE**
+This project was built with [Lovable](https://lovable.dev).
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+**Live app**: https://hring-engineering.lovable.app
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Build with Lovable
 
-Follow these steps:
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d680f6d4-60b9-4876-a097-5cdb1c5f57d8).
+
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+
+## Development
+
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+git clone <this-repository-url>
+cd <repository-name>
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
