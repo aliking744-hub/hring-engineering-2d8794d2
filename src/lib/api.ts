@@ -140,3 +140,77 @@ export const apiRequest = async <T>(
 
 export const authRequest = async <T>(path: string, init: RequestInit = {}) =>
   apiRequest<T>(path, init, { auth: false, retryAuth: false });
+
+const installLegacyFunctionFetchBridge = () => {
+  if (typeof window === 'undefined') return;
+  const marker = '__hringLegacyFunctionFetchInstalled';
+  const markedWindow = window as typeof window & Record<string, unknown>;
+  if (markedWindow[marker]) return;
+  markedWindow[marker] = true;
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const rawUrl = typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+    const match = rawUrl.match(/\/functions\/v1\/([A-Za-z0-9_-]+)/);
+    if (!match) return nativeFetch(input, init);
+
+    const functionName = match[1];
+    const headers = new Headers(init?.headers);
+    headers.delete('apikey');
+    headers.delete('Authorization');
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    headers.set('Content-Type', 'application/json');
+
+    let legacyBody: unknown = null;
+    if (typeof init?.body === 'string') {
+      try {
+        legacyBody = JSON.parse(init.body);
+      } catch {
+        legacyBody = init.body;
+      }
+    } else if (init?.body instanceof FormData) {
+      // Multipart legacy document imports use a dedicated HRing endpoint.
+      const uploadHeaders = new Headers();
+      if (accessToken) uploadHeaders.set('Authorization', `Bearer ${accessToken}`);
+      return nativeFetch(urlFor(`/compat/files/${encodeURIComponent(functionName)}`), {
+        method: init.method || 'POST',
+        body: init.body,
+        headers: uploadHeaders,
+        credentials: 'include',
+      });
+    }
+
+    const isPublicSupport = functionName === 'hring-support' && !accessToken;
+    const target = isPublicSupport
+      ? '/compat/public-functions/hring-support'
+      : `/compat/functions/${encodeURIComponent(functionName)}`;
+    const response = await nativeFetch(urlFor(target), {
+      ...init,
+      method: init?.method || 'POST',
+      headers,
+      body: JSON.stringify({ body: legacyBody }),
+      credentials: 'include',
+    });
+
+    if (functionName !== 'hring-support' || !response.ok) return response;
+
+    const envelope = await response.json() as { data?: unknown };
+    const value = envelope.data;
+    const content = typeof value === 'string'
+      ? value
+      : typeof value === 'object' && value !== null && 'content' in value && typeof (value as { content?: unknown }).content === 'string'
+        ? (value as { content: string }).content
+        : JSON.stringify(value ?? '');
+    const streamText = `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`;
+    return new Response(streamText, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+    });
+  };
+};
+
+installLegacyFunctionFetchBridge();

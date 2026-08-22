@@ -1,97 +1,391 @@
-// This file remains the compatibility boundary for legacy Supabase consumers.
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
-import { apiRequest } from '@/lib/api';
+// Temporary source-compatible facade for legacy UI code.
+// Despite the exported variable name, this module has ZERO Supabase runtime dependency.
+// All data/functions/storage/auth calls terminate at the independent HRing API.
+import {
+  ApiError,
+  ApiUser,
+  AuthEnvelope,
+  apiRequest,
+  authRequest,
+  getAccessToken,
+  setAccessToken,
+} from '@/lib/api';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+type JsonRecord = Record<string, any>;
+type QueryOperation = 'select' | 'insert' | 'update' | 'delete' | 'upsert';
+type FilterOperator = 'eq' | 'neq' | 'in' | 'is' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains';
 
-function isNewSupabaseApiKey(value: string): boolean {
-  return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
+interface QueryFilter {
+  column: string;
+  operator: FilterOperator;
+  value: unknown;
 }
 
-function createSupabaseFetch(supabaseKey: string): typeof fetch {
-  return (input, init) => {
-    const headers = new Headers(
-      typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
-    );
-
-    if (init?.headers) {
-      new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-    }
-
-    if (isNewSupabaseApiKey(supabaseKey) && headers.get('Authorization') === `Bearer ${supabaseKey}`) {
-      headers.delete('Authorization');
-    }
-
-    headers.set('apikey', supabaseKey);
-    return fetch(input, { ...init, headers });
-  };
+interface QueryOrder {
+  column: string;
+  ascending: boolean;
 }
 
-const legacySupabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  global: {
-    fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
-  },
-  auth: {
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+interface CompatEnvelope<T = any> {
+  data: T;
+  count?: number | null;
+}
+
+interface LegacyResult<T = any> {
+  data: T | null;
+  error: any | null;
+  count?: number | null;
+}
+
+const PUBLIC_READ_TABLES = new Set(['posts', 'testimonials', 'digital_products']);
+const PUBLIC_STORAGE_BUCKETS = new Set(['avatars', 'products', 'blog-images', 'site-assets']);
+
+const errorShape = (error: unknown) => ({
+  name: error instanceof Error ? error.name : 'HRingApiError',
+  message: error instanceof Error ? error.message : 'Independent HRing API request failed',
+  context: error,
 });
 
-const legacyFunctions = legacySupabase.functions;
-const recruitingFunctions = new Proxy(legacyFunctions, {
-  get(target, property, receiver) {
-    if (property !== 'invoke') {
-      const value = Reflect.get(target, property, receiver);
-      return typeof value === 'function' ? value.bind(target) : value;
+class QueryBuilder<T = any> implements PromiseLike<LegacyResult<T>> {
+  private operation: QueryOperation = 'select';
+  private columns = '*';
+  private values: any = null;
+  private filters: QueryFilter[] = [];
+  private queryOrder: QueryOrder | null = null;
+  private queryLimit: number | null = null;
+  private wantsSingle = false;
+  private wantsMaybeSingle = false;
+  private conflictTarget: string | null = null;
+
+  constructor(private readonly table: string) {}
+
+  select(columns = '*', options?: { count?: string; head?: boolean }) {
+    this.columns = columns;
+    if (this.operation !== 'insert' && this.operation !== 'update' && this.operation !== 'upsert') {
+      this.operation = 'select';
     }
+    if (options?.head) this.queryLimit = 1;
+    return this;
+  }
 
-    return async (functionName: string, options?: { body?: unknown }) => {
-      if (functionName !== 'auto-headhunt' && functionName !== 'analyze-candidates') {
-        return target.invoke(functionName, options);
-      }
+  insert(values: JsonRecord | JsonRecord[]) {
+    this.operation = 'insert';
+    this.values = values;
+    return this;
+  }
 
-      try {
-        const body = (options?.body || {}) as Record<string, unknown>;
-        if (functionName === 'auto-headhunt') {
-          const campaignId = body.campaignId;
-          if (typeof campaignId !== 'string' || !campaignId) {
-            throw new Error('campaignId is required');
-          }
-          const data = await apiRequest(`/recruiting/campaigns/${campaignId}/auto-source`, {
+  update(values: JsonRecord) {
+    this.operation = 'update';
+    this.values = values;
+    return this;
+  }
+
+  delete() {
+    this.operation = 'delete';
+    return this;
+  }
+
+  upsert(values: JsonRecord | JsonRecord[], options?: { onConflict?: string }) {
+    this.operation = 'upsert';
+    this.values = values;
+    this.conflictTarget = options?.onConflict || null;
+    return this;
+  }
+
+  eq(column: string, value: unknown) { return this.filter('eq', column, value); }
+  neq(column: string, value: unknown) { return this.filter('neq', column, value); }
+  in(column: string, value: unknown[]) { return this.filter('in', column, value); }
+  is(column: string, value: unknown) { return this.filter('is', column, value); }
+  gt(column: string, value: unknown) { return this.filter('gt', column, value); }
+  gte(column: string, value: unknown) { return this.filter('gte', column, value); }
+  lt(column: string, value: unknown) { return this.filter('lt', column, value); }
+  lte(column: string, value: unknown) { return this.filter('lte', column, value); }
+  contains(column: string, value: unknown) { return this.filter('contains', column, value); }
+
+  private filter(operator: FilterOperator, column: string, value: unknown) {
+    this.filters.push({ column, operator, value });
+    return this;
+  }
+
+  order(column: string, options?: { ascending?: boolean }) {
+    this.queryOrder = { column, ascending: options?.ascending !== false };
+    return this;
+  }
+
+  limit(value: number) {
+    this.queryLimit = value;
+    return this;
+  }
+
+  range(from: number, to: number) {
+    // The compatibility API currently implements bounded result size rather than offset.
+    // Existing HRing callers use range primarily to cap dashboards, so preserve that safely.
+    this.queryLimit = Math.max(1, to - from + 1);
+    return this;
+  }
+
+  single() {
+    this.wantsSingle = true;
+    this.wantsMaybeSingle = false;
+    return this;
+  }
+
+  maybeSingle() {
+    this.wantsMaybeSingle = true;
+    this.wantsSingle = false;
+    return this;
+  }
+
+  then<TResult1 = LegacyResult<T>, TResult2 = never>(
+    onfulfilled?: ((value: LegacyResult<T>) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    return this.execute().then(onfulfilled, onrejected);
+  }
+
+  private async execute(): Promise<LegacyResult<T>> {
+    try {
+      const payload = {
+        table: this.table,
+        operation: this.operation,
+        columns: this.columns,
+        values: this.values,
+        filters: this.filters,
+        order: this.queryOrder,
+        limit: this.queryLimit,
+        single: this.wantsSingle,
+        maybe_single: this.wantsMaybeSingle,
+        on_conflict: this.conflictTarget,
+      };
+      const usePublic = this.operation === 'select' && PUBLIC_READ_TABLES.has(this.table) && !getAccessToken();
+      const envelope = usePublic
+        ? await apiRequest<CompatEnvelope<T>>('/compat/public/query', {
             method: 'POST',
-            body: JSON.stringify({ jobRequirements: body.jobRequirements }),
+            body: JSON.stringify(payload),
+          }, { auth: false, retryAuth: false })
+        : await apiRequest<CompatEnvelope<T>>('/compat/query', {
+            method: 'POST',
+            body: JSON.stringify(payload),
           });
-          return { data, error: null };
-        }
+      return { data: envelope.data ?? null, error: null, count: envelope.count ?? null };
+    } catch (error) {
+      return { data: null, error: errorShape(error), count: null };
+    }
+  }
+}
 
-        const data = await apiRequest('/recruiting/analyze-candidates', {
+const invokeFunction = async (functionName: string, options?: { body?: unknown }): Promise<LegacyResult> => {
+  try {
+    const body = (options?.body || {}) as Record<string, any>;
+
+    if (functionName === 'auto-headhunt') {
+      const campaignId = body.campaignId;
+      if (typeof campaignId !== 'string' || !campaignId) throw new Error('campaignId is required');
+      const data = await apiRequest(`/recruiting/campaigns/${campaignId}/auto-source`, {
+        method: 'POST',
+        body: JSON.stringify({ jobRequirements: body.jobRequirements }),
+      });
+      return { data, error: null };
+    }
+    if (functionName === 'analyze-candidates') {
+      const data = await apiRequest('/recruiting/analyze-candidates', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      return { data, error: null };
+    }
+    if (functionName === 'validate-invite-code') {
+      const inviteCode = body.invite_code ?? body.inviteCode ?? body.code;
+      const data = await apiRequest('/company-invites/validate', {
+        method: 'POST',
+        body: JSON.stringify({ invite_code: inviteCode }),
+      }, { auth: false, retryAuth: false });
+      return { data, error: null };
+    }
+    if (functionName === 'zarinpal-payment') {
+      if (body.action === 'init') {
+        if (typeof body.plan_type !== 'string' || !body.plan_type) throw new Error('plan_type is required');
+        const data = await apiRequest('/billing/payments/init', {
           method: 'POST',
-          body: JSON.stringify(body),
+          body: JSON.stringify({ plan_type: body.plan_type }),
         });
         return { data, error: null };
-      } catch (error) {
-        return {
-          data: null,
-          error: {
-            name: 'HRingApiError',
-            message: error instanceof Error ? error.message : 'Independent HRing API request failed',
-            context: error,
-          },
-        };
       }
-    };
+      if (body.action === 'verify') {
+        if (typeof body.authority !== 'string' || !body.authority) throw new Error('authority is required');
+        const data = await apiRequest('/billing/payments/verify', {
+          method: 'POST',
+          body: JSON.stringify({ authority: body.authority }),
+        });
+        return { data, error: null };
+      }
+      throw new Error('Invalid payment action');
+    }
+
+    const envelope = await apiRequest<CompatEnvelope>(`/compat/functions/${encodeURIComponent(functionName)}`, {
+      method: 'POST',
+      body: JSON.stringify({ body: options?.body ?? null }),
+    });
+    return { data: envelope.data ?? null, error: null, count: envelope.count ?? null };
+  } catch (error) {
+    return { data: null, error: errorShape(error) };
+  }
+};
+
+const rpc = async (name: string, args: JsonRecord = {}): Promise<LegacyResult> => {
+  try {
+    const envelope = await apiRequest<CompatEnvelope>('/compat/rpc', {
+      method: 'POST',
+      body: JSON.stringify({ name, args }),
+    });
+    return { data: envelope.data ?? null, error: null, count: envelope.count ?? null };
+  } catch (error) {
+    return { data: null, error: errorShape(error) };
+  }
+};
+
+const storageBucket = (bucket: string) => ({
+  upload: async (path: string, file: Blob | File, options?: { contentType?: string; upsert?: boolean }): Promise<LegacyResult> => {
+    try {
+      const form = new FormData();
+      const filename = path.split('/').pop() || 'upload.bin';
+      form.append('file', file, filename);
+      const envelope = await apiRequest<any>(`/compat/storage/${encodeURIComponent(bucket)}/upload/${path.split('/').map(encodeURIComponent).join('/')}`, {
+        method: 'POST',
+        body: form,
+      });
+      return { data: envelope, error: null };
+    } catch (error) {
+      return { data: null, error: errorShape(error) };
+    }
   },
+  remove: async (paths: string[]): Promise<LegacyResult> => {
+    try {
+      const data = await apiRequest(`/compat/storage/${encodeURIComponent(bucket)}/remove`, {
+        method: 'POST',
+        body: JSON.stringify({ paths }),
+      });
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: errorShape(error) };
+    }
+  },
+  list: async (prefix = '', options?: { limit?: number }): Promise<LegacyResult> => {
+    try {
+      const data = await apiRequest<{ data: any[] }>(`/compat/storage/${encodeURIComponent(bucket)}/list`, {
+        method: 'POST',
+        body: JSON.stringify({ prefix, limit: options?.limit ?? 100 }),
+      });
+      return { data: data.data, error: null };
+    } catch (error) {
+      return { data: null, error: errorShape(error) };
+    }
+  },
+  getPublicUrl: (path: string) => ({
+    data: {
+      publicUrl: PUBLIC_STORAGE_BUCKETS.has(bucket)
+        ? `/api/v1/compat/storage/public/${encodeURIComponent(bucket)}/${path.split('/').map(encodeURIComponent).join('/')}`
+        : `/api/v1/compat/storage/private/${encodeURIComponent(bucket)}/${path.split('/').map(encodeURIComponent).join('/')}`,
+    },
+  }),
+  createSignedUrl: async (path: string, _expiresIn: number): Promise<LegacyResult> => ({
+    data: { signedUrl: `/api/v1/compat/storage/private/${encodeURIComponent(bucket)}/${path.split('/').map(encodeURIComponent).join('/')}` },
+    error: null,
+  }),
 });
 
-// Legacy callers keep the same import while selected domains are strangled
-// over to HRing API. New code must use domain/API adapters directly.
-export const supabase = new Proxy(legacySupabase, {
-  get(target, property, receiver) {
-    if (property === 'functions') return recruitingFunctions;
-    const value = Reflect.get(target, property, receiver);
-    return typeof value === 'function' ? value.bind(target) : value;
+const auth = {
+  getUser: async () => {
+    try {
+      const data = await apiRequest<{ user_id: string; email: string }>('/auth/context');
+      const user: ApiUser = {
+        id: data.user_id,
+        email: data.email,
+        is_active: true,
+        email_verified_at: null,
+        created_at: '',
+      };
+      return { data: { user }, error: null };
+    } catch (error) {
+      return { data: { user: null }, error: errorShape(error) };
+    }
   },
-}) as typeof legacySupabase;
+  getSession: async () => ({
+    data: {
+      session: getAccessToken() ? { access_token: getAccessToken() } : null,
+    },
+    error: null,
+  }),
+  signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
+    try {
+      const envelope = await authRequest<AuthEnvelope>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      setAccessToken(envelope.tokens.access_token);
+      return { data: { user: envelope.user, session: { access_token: envelope.tokens.access_token } }, error: null };
+    } catch (error) {
+      return { data: { user: null, session: null }, error: errorShape(error) };
+    }
+  },
+  signUp: async ({ email, password, options }: { email: string; password: string; options?: { data?: JsonRecord } }) => {
+    try {
+      const envelope = await authRequest<AuthEnvelope>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, full_name: options?.data?.full_name ?? null }),
+      });
+      setAccessToken(envelope.tokens.access_token);
+      return { data: { user: envelope.user, session: { access_token: envelope.tokens.access_token } }, error: null };
+    } catch (error) {
+      return { data: { user: null, session: null }, error: errorShape(error) };
+    }
+  },
+  signOut: async () => {
+    try {
+      await authRequest<void>('/auth/logout', { method: 'POST' });
+      setAccessToken(null);
+      return { error: null };
+    } catch (error) {
+      setAccessToken(null);
+      return { error: errorShape(error) };
+    }
+  },
+  onAuthStateChange: (_callback: (...args: any[]) => void) => ({
+    data: { subscription: { unsubscribe: () => undefined } },
+  }),
+};
+
+class PollingChannel {
+  private timer: number | null = null;
+  private handlers: Array<() => void> = [];
+  on(_type: string, _filter: unknown, callback: () => void) {
+    this.handlers.push(callback);
+    return this;
+  }
+  subscribe(callback?: (status: string) => void) {
+    callback?.('SUBSCRIBED');
+    // Realtime is intentionally emulated by low-frequency invalidation, not an external socket.
+    this.timer = window.setInterval(() => this.handlers.forEach((handler) => handler()), 30_000);
+    return this;
+  }
+  unsubscribe() {
+    if (this.timer !== null) window.clearInterval(this.timer);
+    this.timer = null;
+  }
+}
+
+export const supabase = {
+  from: <T = any>(table: string) => new QueryBuilder<T>(table),
+  functions: { invoke: invokeFunction },
+  rpc,
+  storage: { from: storageBucket },
+  auth,
+  channel: (_name: string) => new PollingChannel(),
+  removeChannel: (channel: PollingChannel) => {
+    channel.unsubscribe();
+    return Promise.resolve('ok');
+  },
+};
+
+export type HringCompatibilityClient = typeof supabase;
+export { ApiError };

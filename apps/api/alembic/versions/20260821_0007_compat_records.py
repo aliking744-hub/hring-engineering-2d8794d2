@@ -1,0 +1,56 @@
+"""HRing compatibility record store.
+
+Revision ID: 20260821_0007
+Revises: 20260821_0006
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
+
+
+revision: str = "20260821_0007"
+down_revision: str | None = "20260821_0006"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "compat_records",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column("table_name", sa.String(length=120), nullable=False),
+        sa.Column("record_id", sa.String(length=160), nullable=False),
+        sa.Column("owner_user_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("company_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("data", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.ForeignKeyConstraint(["owner_user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),
+        sa.UniqueConstraint("table_name", "record_id", name="uq_compat_records_table_record"),
+    )
+    op.create_index("ix_compat_records_table_name", "compat_records", ["table_name"])
+    op.create_index("ix_compat_records_owner_user_id", "compat_records", ["owner_user_id"])
+    op.create_index("ix_compat_records_company_id", "compat_records", ["company_id"])
+    op.create_index(
+        "ix_compat_records_table_owner",
+        "compat_records",
+        ["table_name", "owner_user_id"],
+    )
+    op.create_index(
+        "ix_compat_records_table_company",
+        "compat_records",
+        ["table_name", "company_id"],
+    )
+
+
+def downgrade() -> None:
+    op.drop_index("ix_compat_records_table_company", table_name="compat_records")
+    op.drop_index("ix_compat_records_table_owner", table_name="compat_records")
+    op.drop_index("ix_compat_records_company_id", table_name="compat_records")
+    op.drop_index("ix_compat_records_owner_user_id", table_name="compat_records")
+    op.drop_index("ix_compat_records_table_name", table_name="compat_records")
+    op.drop_table("compat_records")

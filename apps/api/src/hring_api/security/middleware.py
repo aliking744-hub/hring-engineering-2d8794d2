@@ -64,6 +64,10 @@ class SensitiveRouteRateLimitMiddleware(BaseHTTPMiddleware):
                 "email_verify",
                 settings.rate_limit_recovery_per_minute,
             ),
+            ("POST", f"{prefix}/compat/public-functions/hring-support"): (
+                "public_support",
+                settings.rate_limit_register_per_minute,
+            ),
         }
 
     async def dispatch(self, request: Request, call_next: CallNext) -> Response:
@@ -84,12 +88,12 @@ class SensitiveRouteRateLimitMiddleware(BaseHTTPMiddleware):
             if current == 1:
                 await self.redis.expire(key, 75)
         except RedisError:
-            # Authentication brute-force protection is security-critical in
-            # production; do not silently bypass it if the rate-limit store is down.
+            # Authentication brute-force protection and public AI cost controls are
+            # security-sensitive in production; fail closed if Redis is unavailable.
             if self.settings.environment.lower() == "production":
                 return JSONResponse(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    content={"detail": "Authentication protection temporarily unavailable"},
+                    content={"detail": "Request protection temporarily unavailable"},
                     headers={"Retry-After": "30"},
                 )
             return await call_next(request)

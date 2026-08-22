@@ -23,3 +23,12 @@ class EmailProvider(Protocol):
         ttl_hours: int,
     ) -> None:
         """Deliver an email-verification link without owning verification logic."""
+
+    async def send_html_email(
+        self,
+        *,
+        to_email: str,
+        subject: str,
+        html: str,
+    ) -> str | None:
+        """Deliver application-owned HTML and return the provider message id when available."""

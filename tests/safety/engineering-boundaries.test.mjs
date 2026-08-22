@@ -11,10 +11,11 @@ test('engineering mirror never contains production CloudIva deploy command', asy
   assert.match(workflow, /production deploy disabled/i);
 });
 
-test('engineering mirror points to engineering Supabase project, not production', async () => {
+test('engineering browser runtime uses HRing API and no Supabase environment', async () => {
   const env = await read('.env');
-  assert.match(env, /lfiptdlxqefjxbhsqcrx/);
-  assert.equal(env.includes('pvtppgnwhkbihsnfzvym'), false);
+  assert.match(env, /VITE_API_BASE_URL/);
+  assert.equal(env.includes('VITE_SUPABASE_'), false);
+  assert.equal(env.includes('.supabase.co'), false);
 });
 
 test('agent constitution preserves isolated mirror boundary', async () => {

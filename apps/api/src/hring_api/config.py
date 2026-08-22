@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     sms_otp_resend_cooldown_seconds: int = 60
 
     email_provider: str = "disabled"
+    email_resend_api_key: SecretStr | None = None
+    email_from: str = "HRing <noreply@hring.ir>"
+
+    payment_provider: str = "disabled"
+    zarinpal_merchant_id: SecretStr | None = None
+    payment_callback_path: str = "/upgrade"
 
     rate_limit_enabled: bool = True
     rate_limit_login_per_minute: int = 12
@@ -93,6 +99,10 @@ class Settings(BaseSettings):
             raise ValueError("Development SMS provider is forbidden in production")
         if self.email_provider.lower() == "development":
             raise ValueError("Development email provider is forbidden in production")
+        if self.email_provider.lower() == "resend" and self.email_resend_api_key is None:
+            raise ValueError("EMAIL_RESEND_API_KEY is required when EMAIL_PROVIDER=resend")
+        if self.payment_provider.lower() == "zarinpal" and self.zarinpal_merchant_id is None:
+            raise ValueError("ZARINPAL_MERCHANT_ID is required when PAYMENT_PROVIDER=zarinpal")
         if "*" in self.cors_origins:
             raise ValueError("Wildcard CORS is forbidden in production")
         if not self.trusted_hosts or "*" in self.trusted_hosts:
@@ -101,6 +111,8 @@ class Settings(BaseSettings):
             raise ValueError("PUBLIC_APP_URL must use HTTPS in production")
         if self.auth_refresh_cookie_samesite.lower() not in {"lax", "strict", "none"}:
             raise ValueError("AUTH_REFRESH_COOKIE_SAMESITE is invalid")
+        if not self.payment_callback_path.startswith("/"):
+            raise ValueError("PAYMENT_CALLBACK_PATH must be an absolute application path")
         return self
 
 
