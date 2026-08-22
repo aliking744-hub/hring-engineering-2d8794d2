@@ -1,0 +1,36 @@
+services:
+  vllm:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.20.1}
+    profiles: ["local-ai-vllm"]
+    restart: unless-stopped
+    ipc: host
+    gpus: all
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - hring_huggingface:/root/.cache/huggingface
+    command:
+      - --model
+      - ${VLLM_MODEL:?set VLLM_MODEL before including compose.vllm.yaml}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --api-key
+      - ${VLLM_API_KEY:?set VLLM_API_KEY before including compose.vllm.yaml}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    networks: [hring_internal]
+
+volumes:
+  hring_huggingface:

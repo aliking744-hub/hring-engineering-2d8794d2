@@ -3,9 +3,10 @@ name: standalone-runtime-gates
 on:
   pull_request:
     branches:
+      - main
       - engineering/foundation
     paths:
-      - "compose.yaml"
+      - "compose*.yaml"
       - ".dockerignore"
       - ".env.standalone.example"
       - "infra/**"
@@ -31,7 +32,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate Compose configuration
-        run: docker compose --env-file .env.standalone.example config --quiet
+        run: |
+          docker compose --env-file .env.standalone.example config --quiet
+          docker compose \
+            --env-file .env.standalone.example \
+            -f compose.yaml \
+            -f compose.local-ai.yaml \
+            --profile local-ai \
+            config --quiet
+          VLLM_MODEL=Qwen/Qwen3-0.6B \
+          VLLM_API_KEY=ci-only-local-key \
+          docker compose \
+            --env-file .env.standalone.example \
+            -f compose.yaml \
+            -f compose.vllm.yaml \
+            --profile local-ai-vllm \
+            config --quiet
 
       - name: Build standalone web image
         run: docker build --file infra/docker/web.Dockerfile --build-arg PUBLIC_BASE_URL=https://hring.ir --tag hring-web-ci .

@@ -1,6 +1,7 @@
 import asyncio
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -13,6 +14,7 @@ from hring_api.domains.integrations.security import (
     IntegrationSecurityError,
     normalize_provider_base_url,
 )
+from hring_api.domains.integrations.service import _evaluate_local_ai_inventory
 from hring_api.main import app
 
 
@@ -235,3 +237,37 @@ def test_provider_url_policy_blocks_external_ssrf_targets() -> None:
         is_internal=True,
         allowed_internal_hosts=settings.integration_internal_hosts,
     ) == "http://ollama:11434/v1"
+
+
+def test_local_ai_inventory_requires_the_configured_model() -> None:
+    response = httpx.Response(
+        200,
+        json={
+            "object": "list",
+            "data": [
+                {"id": "qwen-local", "object": "model"},
+                {"id": "embedding-local", "object": "model"},
+            ],
+        },
+    )
+    healthy, message = _evaluate_local_ai_inventory(
+        response,
+        configured_model="qwen-local",
+    )
+    assert healthy is True
+    assert "2 model" in message
+
+    healthy, message = _evaluate_local_ai_inventory(
+        response,
+        configured_model="missing-model",
+    )
+    assert healthy is False
+    assert "missing-model" in message
+
+    malformed = httpx.Response(200, json={"data": []})
+    healthy, message = _evaluate_local_ai_inventory(
+        malformed,
+        configured_model=None,
+    )
+    assert healthy is False
+    assert "no models" in message.lower()

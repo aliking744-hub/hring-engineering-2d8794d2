@@ -377,6 +377,40 @@ def _probe_headers(provider: IntegrationProvider, secret: str | None) -> dict[st
     }
 
 
+def _evaluate_local_ai_inventory(
+    response: httpx.Response,
+    *,
+    configured_model: str | None,
+) -> tuple[bool, str]:
+    if not 200 <= response.status_code < 300:
+        return False, f"Provider returned HTTP {response.status_code}"
+    try:
+        body = response.json()
+    except ValueError:
+        return False, "Local AI runtime returned malformed model inventory"
+    data = body.get("data") if isinstance(body, dict) else None
+    if not isinstance(data, list):
+        return False, "Local AI runtime returned malformed model inventory"
+    model_ids = sorted(
+        {
+            item["id"]
+            for item in data
+            if isinstance(item, dict)
+            and isinstance(item.get("id"), str)
+            and item["id"].strip()
+        }
+    )
+    if not model_ids:
+        return False, "Local AI runtime reports no models"
+    if configured_model and configured_model not in model_ids:
+        return (
+            False,
+            f"Configured model '{configured_model}' is not available; "
+            f"runtime reports {len(model_ids)} model(s)",
+        )
+    return True, f"Connection succeeded; runtime reports {len(model_ids)} model(s)"
+
+
 async def test_provider_connection(
     session: AsyncSession,
     *,
@@ -436,6 +470,11 @@ async def test_provider_connection(
                 and returned.get("status") == 200
             )
             message = "Connection succeeded" if healthy else f"Provider returned HTTP {http_status}"
+        elif provider.adapter in {"ollama", "vllm"}:
+            healthy, message = _evaluate_local_ai_inventory(
+                response,
+                configured_model=provider.default_model,
+            )
         else:
             healthy = 200 <= response.status_code < 300
             message = "Connection succeeded" if healthy else f"Provider returned HTTP {http_status}"
