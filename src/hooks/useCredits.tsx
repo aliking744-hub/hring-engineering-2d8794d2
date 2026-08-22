@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-
-// Father Admin email for bypass
-const FATHER_ADMIN_EMAIL = 'ali_king744@yahoo.com';
+import { useSuperAdmin } from './useSuperAdmin';
 
 // Diamond costs for different AI operations
 export const DIAMOND_COSTS = {
@@ -12,18 +10,18 @@ export const DIAMOND_COSTS = {
   INTERVIEW_GUIDE: 5,
   INTERVIEW_KIT: 5,
   SMART_AD_TEXT: 5,
-  
+
   // Medium Text Generation - 15 Diamonds
   ONBOARDING_PLAN: 15,
-  
+
   // Complex Analysis - 20 Diamonds
   STRATEGIC_ANALYSIS: 20,
-  
+
   // Image Generation - 25 Diamonds
   SMART_AD_IMAGE: 25,
   HR_DASHBOARD: 25,
   ANALYTICS_HUB: 25,
-  
+
   // Premium Deep Search (Perplexity + Gemini Pro) - 60 Diamonds
   HEADHUNTING: 60,
 } as const;
@@ -57,9 +55,11 @@ export const useCredits = () => {
   const [credits, setCredits] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { isSuperAdmin } = useSuperAdmin();
 
-  // Check if current user is Father Admin (bypasses all credit restrictions)
-  const isFatherAdmin = user?.email?.toLowerCase() === FATHER_ADMIN_EMAIL.toLowerCase();
+  // Kept only as a source-compatible alias for legacy consumers.
+  // Authorization and billing bypasses must be decided server-side, never from browser identity data.
+  const isFatherAdmin = isSuperAdmin;
 
   const fetchCredits = async () => {
     if (!user) {
@@ -70,7 +70,7 @@ export const useCredits = () => {
 
     try {
       const { data, error } = await supabase.rpc('get_user_credits');
-      
+
       if (error) throw error;
       setCredits(data ?? 0);
     } catch (error) {
@@ -82,15 +82,10 @@ export const useCredits = () => {
   };
 
   useEffect(() => {
-    fetchCredits();
+    void fetchCredits();
   }, [user]);
 
   const deductCredits = async (amount: number, featureKey?: string): Promise<boolean> => {
-    // Father Admin bypasses credit deduction
-    if (isFatherAdmin) {
-      return true;
-    }
-
     try {
       const { data, error } = await supabase.rpc('deduct_credits', {
         amount,
@@ -112,10 +107,6 @@ export const useCredits = () => {
   };
 
   const hasEnoughCredits = (operation: CreditOperation): boolean => {
-    // Father Admin always has enough credits
-    if (isFatherAdmin) {
-      return true;
-    }
     return credits >= CREDIT_COSTS[operation];
   };
 
@@ -132,10 +123,6 @@ export const useCredits = () => {
   };
 
   const deductForOperation = async (operation: CreditOperation): Promise<boolean> => {
-    // Father Admin bypasses credit deduction
-    if (isFatherAdmin) {
-      return true;
-    }
     const cost = CREDIT_COSTS[operation];
     if (credits < cost) {
       return false;
@@ -143,10 +130,10 @@ export const useCredits = () => {
     return deductCredits(cost, operation);
   };
 
-  return { 
-    credits: isFatherAdmin ? 999999 : credits, // Father Admin sees "infinite" credits
-    loading, 
-    deductCredits, 
+  return {
+    credits,
+    loading,
+    deductCredits,
     deductForOperation,
     hasEnoughCredits,
     getCost,
