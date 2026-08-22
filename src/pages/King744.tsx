@@ -25,9 +25,6 @@ import KnowledgeBaseStatus from '@/components/admin/KnowledgeBaseStatus';
 import LegalImporter from '@/components/admin/LegalImporter';
 import ChatbotManager from '@/components/admin/ChatbotManager';
 
-// Super Admin credentials
-const SUPER_ADMIN_EMAIL = 'ali_king744@yahoo.com';
-
 // Lockout settings
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -76,7 +73,6 @@ const King744 = () => {
       if (state.lockoutUntil) {
         const remaining = state.lockoutUntil - Date.now();
         if (remaining <= 0) {
-          // Lockout expired, reset
           clearAuthState();
           setAuthStateLocal({ attempts: 0, lockoutUntil: null });
           setRemainingTime(0);
@@ -103,7 +99,6 @@ const King744 = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check if locked out
     if (isLockedOut) {
       toast.error('حساب قفل شده است. لطفاً صبر کنید.');
       return;
@@ -115,7 +110,6 @@ const King744 = () => {
       const { error } = await signIn(email, password);
       
       if (error) {
-        // Increment failed attempts
         const newAttempts = authState.attempts + 1;
         let newLockoutUntil = null;
 
@@ -132,37 +126,19 @@ const King744 = () => {
         return;
       }
 
-      // Check if the logged in user is super admin
-      if (email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()) {
-        // Increment failed attempts for wrong email too
-        const newAttempts = authState.attempts + 1;
-        let newLockoutUntil = null;
-
-        if (newAttempts >= MAX_ATTEMPTS) {
-          newLockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
-          toast.error(`دسترسی غیرمجاز. حساب برای ۱۵ دقیقه قفل شد.`);
-        } else {
-          toast.error(`دسترسی غیرمجاز. ${MAX_ATTEMPTS - newAttempts} تلاش باقی‌مانده.`);
-        }
-
-        const newState = { attempts: newAttempts, lockoutUntil: newLockoutUntil };
-        setAuthState(newState);
-        setAuthStateLocal(newState);
-        return;
-      }
-
-      // Successful login - clear attempts
+      // Authentication is complete. Authorization is resolved only from
+      // server-side platform roles via useSuperAdmin; the browser never grants
+      // admin access based on an email address.
       clearAuthState();
       setAuthStateLocal({ attempts: 0, lockoutUntil: null });
-      toast.success('ورود موفق');
-    } catch (err) {
+      toast.success('ورود انجام شد؛ سطح دسترسی در حال بررسی است');
+    } catch {
       toast.error('خطا در ورود');
     } finally {
       setLoginLoading(false);
     }
   };
 
-  // Show loading state
   if (authLoading || superAdminLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -171,7 +147,7 @@ const King744 = () => {
     );
   }
 
-  // If not super admin, show login form
+  // The server-issued super_admin role is the only authorization boundary.
   if (!session || !isSuperAdmin) {
     return (
       <>
@@ -236,7 +212,6 @@ const King744 = () => {
                     />
                   </div>
 
-                  {/* Warning for remaining attempts */}
                   {!isLockedOut && authState.attempts > 0 && (
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                       <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
@@ -269,7 +244,6 @@ const King744 = () => {
     );
   }
 
-  // Super admin dashboard
   return (
     <>
       <Helmet>
@@ -278,7 +252,6 @@ const King744 = () => {
       </Helmet>
       
       <div className="min-h-screen bg-background" dir="rtl">
-        {/* Header */}
         <header className="sticky top-0 z-50 glass-card border-b border-border/50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -298,7 +271,6 @@ const King744 = () => {
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="container mx-auto px-4 py-6 max-w-[1920px]">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <div className="overflow-x-auto pb-2">
