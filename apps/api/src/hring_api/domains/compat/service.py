@@ -7,16 +7,29 @@ from uuid import UUID, uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hring_api.domains.access.repository import list_platform_roles
+from hring_api.domains.admin.models import SiteSetting
+from hring_api.domains.compat.access import (
+    CompatAccessForbiddenError,
+    can_read_record,
+    ensure_record_mutation_allowed,
+    ensure_table_operation_allowed,
+    is_compat_admin,
+    metadata_for_insert,
+)
 from hring_api.domains.compat.models import CompatRecord
 from hring_api.domains.compat.schemas import CompatQueryRequest, QueryFilter
 from hring_api.domains.identity.dependencies import Principal
 from hring_api.domains.identity.models import FeaturePermission, Profile
 
 
-PUBLIC_READ_TABLES = frozenset({"posts", "testimonials", "digital_products"})
-GLOBAL_CONTENT_TABLES = frozenset({"posts", "testimonials", "digital_products"})
-GLOBAL_CONTENT_WRITE_ROLES = frozenset({"super_admin", "platform_admin", "content_admin"})
+PUBLIC_READ_TABLES = frozenset(
+    {"posts", "testimonials", "digital_products", "site_settings", "feature_permissions"}
+)
+OWNER_MANAGED_COMPASS_FIELDS: dict[str, str] = {
+    "behaviors": "deputy_id",
+    "bet_allocations": "user_id",
+    "scenario_responses": "user_id",
+}
 
 
 class CompatError(RuntimeError):
@@ -29,13 +42,6 @@ class CompatForbiddenError(CompatError):
 
 def active_company_ids(principal: Principal) -> set[UUID]:
     return {membership.company_id for membership in principal.memberships if membership.is_active}
-
-
-def primary_company_id(principal: Principal) -> UUID | None:
-    for membership in principal.memberships:
-        if membership.is_active:
-            return membership.company_id
-    return None
 
 
 def _value(row: dict[str, Any], column: str) -> Any:
@@ -155,6 +161,20 @@ def _feature_payload(item: FeaturePermission) -> dict[str, Any]:
     }
 
 
+def _site_setting_payload(item: SiteSetting) -> dict[str, Any]:
+    return {
+        "id": str(item.id),
+        "key": item.key,
+        "value": item.value,
+        "label": item.label,
+        "category": item.category,
+        "value_type": item.value_type,
+        "is_public": item.is_public,
+        "created_at": item.created_at.isoformat(),
+        "updated_at": item.updated_at.isoformat(),
+    }
+
+
 async def _query_profiles(
     db: AsyncSession,
     *,
@@ -195,27 +215,119 @@ async def _query_feature_permissions(
     return _shape(_apply_filters(rows, request), request)
 
 
+async def _query_site_settings(
+    db: AsyncSession,
+    *,
+    request: CompatQueryRequest,
+    principal: Principal | None,
+    public: bool,
+) -> Any:
+    is_admin = principal is not None and await is_compat_admin(db, principal)
+    result = await db.execute(select(SiteSetting))
+    items = list(result.scalars().all())
+    if public or not is_admin:
+        items = [item for item in items if item.is_public]
+    rows = [_site_setting_payload(item) for item in items]
+    selected = _apply_filters(rows, request)
+
+    if request.operation == "select":
+        return _shape(selected, request)
+    if principal is None or not is_admin:
+        raise CompatForbiddenError("Site setting mutations require content-admin access")
+
+    if request.operation in {"insert", "upsert"}:
+        if request.values is None:
+            raise CompatError("Site setting insert requires values")
+        raw_values = request.values if isinstance(request.values, list) else [request.values]
+        created: list[dict[str, Any]] = []
+        for raw in raw_values:
+            values = dict(raw)
+            key = str(values.get("key") or "").strip()
+            if not key:
+                raise CompatError("Site setting key is required")
+            existing = await db.scalar(select(SiteSetting).where(SiteSetting.key == key))
+            if existing is not None:
+                if request.operation != "upsert":
+                    raise CompatError("duplicate key value violates unique constraint")
+                existing.value = values.get("value")
+                existing.label = values.get("label")
+                existing.category = str(values.get("category") or existing.category)
+                existing.value_type = str(values.get("value_type") or existing.value_type)
+                if "is_public" in values:
+                    existing.is_public = bool(values["is_public"])
+                existing.updated_by = principal.user_id
+                await db.flush()
+                created.append(_site_setting_payload(existing))
+                continue
+            item = SiteSetting(
+                key=key,
+                value=values.get("value"),
+                label=values.get("label"),
+                category=str(values.get("category") or "general"),
+                value_type=str(values.get("value_type") or "text"),
+                # Legacy site_settings were public-by-default; preserve that contract.
+                is_public=bool(values.get("is_public", True)),
+                updated_by=principal.user_id,
+            )
+            db.add(item)
+            await db.flush()
+            created.append(_site_setting_payload(item))
+        await db.commit()
+        return _shape(created, request)
+
+    selected_ids = {str(row.get("id")) for row in selected if row.get("id") is not None}
+    matched = [item for item in items if str(item.id) in selected_ids]
+    if request.operation == "update":
+        if not isinstance(request.values, dict):
+            raise CompatError("Site setting update requires an object")
+        allowed = {"value", "label", "category", "value_type", "is_public"}
+        updated: list[dict[str, Any]] = []
+        for item in matched:
+            for key, value in request.values.items():
+                if key in allowed:
+                    setattr(item, key, value)
+            item.updated_by = principal.user_id
+            updated.append(_site_setting_payload(item))
+        await db.commit()
+        return _shape(updated, request)
+    if request.operation == "delete":
+        deleted = [_site_setting_payload(item) for item in matched]
+        for item in matched:
+            await db.delete(item)
+        await db.commit()
+        return _shape(deleted, request)
+    raise CompatError("Unsupported site settings operation")
+
+
 async def _load_compat_rows(
     db: AsyncSession,
     *,
     table: str,
     principal: Principal | None,
     public: bool,
+    is_admin: bool,
 ) -> list[CompatRecord]:
     result = await db.execute(select(CompatRecord).where(CompatRecord.table_name == table))
     records = list(result.scalars().all())
     if public:
-        return [record for record in records if record.owner_user_id is None and record.company_id is None]
+        return [
+            record
+            for record in records
+            if record.owner_user_id is None and record.company_id is None
+        ]
     if principal is None:
         raise CompatForbiddenError("Authentication required")
-    companies = active_company_ids(principal)
-    return [
-        record
-        for record in records
-        if record.owner_user_id == principal.user_id
-        or (record.company_id is not None and record.company_id in companies)
-        or (record.owner_user_id is None and record.company_id is None)
-    ]
+    visible: list[CompatRecord] = []
+    for record in records:
+        if await can_read_record(
+            db,
+            principal=principal,
+            table=table,
+            record=record,
+            is_admin=is_admin,
+        ):
+            visible.append(record)
+    return visible
 
 
 def _record_payload(record: CompatRecord) -> dict[str, Any]:
@@ -226,20 +338,16 @@ def _record_payload(record: CompatRecord) -> dict[str, Any]:
     return row
 
 
-async def _ensure_global_write_allowed(
-    db: AsyncSession,
-    *,
-    principal: Principal,
-    table: str,
-    operation: str,
-) -> None:
-    if table not in GLOBAL_CONTENT_TABLES or operation == "select":
+def _ensure_owner_managed_insert(values: dict[str, Any], *, table: str, principal: Principal, is_admin: bool) -> None:
+    field = OWNER_MANAGED_COMPASS_FIELDS.get(table)
+    if field is None or is_admin:
         return
-    if "admin" in principal.app_roles:
+    raw = values.get(field)
+    if raw is None:
+        values[field] = str(principal.user_id)
         return
-    platform_roles = set(await list_platform_roles(db, principal.user_id))
-    if platform_roles.isdisjoint(GLOBAL_CONTENT_WRITE_ROLES):
-        raise CompatForbiddenError("Global product/content writes require product administration access")
+    if str(raw) != str(principal.user_id):
+        raise CompatForbiddenError("Owner-managed Strategic Compass records cannot be assigned to another user")
 
 
 async def execute_query(
@@ -251,26 +359,44 @@ async def execute_query(
 ) -> Any:
     if public and (request.operation != "select" or request.table not in PUBLIC_READ_TABLES):
         raise CompatForbiddenError("Public compatibility query is not allowed")
+
     if request.table == "profiles":
         if principal is None:
             raise CompatForbiddenError("Authentication required")
         return await _query_profiles(db, principal=principal, request=request)
     if request.table == "feature_permissions":
         return await _query_feature_permissions(db, request=request)
-
-    if principal is not None:
-        await _ensure_global_write_allowed(
+    if request.table == "site_settings":
+        return await _query_site_settings(
             db,
+            request=request,
             principal=principal,
-            table=request.table,
-            operation=request.operation,
+            public=public,
         )
+
+    if principal is None:
+        if not public:
+            raise CompatForbiddenError("Authentication required")
+        is_admin = False
+    else:
+        is_admin = await is_compat_admin(db, principal)
+        try:
+            await ensure_table_operation_allowed(
+                db,
+                principal=principal,
+                table=request.table,
+                operation=request.operation,
+                is_admin=is_admin,
+            )
+        except CompatAccessForbiddenError as exc:
+            raise CompatForbiddenError(str(exc)) from exc
 
     records = await _load_compat_rows(
         db,
         table=request.table,
         principal=principal,
         public=public,
+        is_admin=is_admin,
     )
     payloads = [_record_payload(record) for record in records]
     selected_payloads = _apply_filters(payloads, request)
@@ -288,6 +414,12 @@ async def execute_query(
         created_rows: list[dict[str, Any]] = []
         for raw in values_list:
             row = dict(raw)
+            _ensure_owner_managed_insert(
+                row,
+                table=request.table,
+                principal=principal,
+                is_admin=is_admin,
+            )
             record_id = str(row.get("id") or uuid4())
             row["id"] = record_id
             row.setdefault("created_at", now)
@@ -302,16 +434,47 @@ async def execute_query(
             if existing is not None:
                 if request.operation != "upsert":
                     raise CompatError("duplicate key value violates unique constraint")
+                if not await can_read_record(
+                    db,
+                    principal=principal,
+                    table=request.table,
+                    record=existing,
+                    is_admin=is_admin,
+                ):
+                    # Do not reveal whether a foreign record with this ID exists.
+                    raise CompatError("duplicate key value violates unique constraint")
+                try:
+                    await ensure_record_mutation_allowed(
+                        db,
+                        principal=principal,
+                        table=request.table,
+                        operation="upsert",
+                        record=existing,
+                        new_values=row,
+                        is_admin=is_admin,
+                    )
+                except CompatAccessForbiddenError as exc:
+                    raise CompatForbiddenError(str(exc)) from exc
                 existing.data = row
                 created_rows.append(row)
                 continue
-            global_content = request.table in GLOBAL_CONTENT_TABLES
+            try:
+                owner_user_id, company_id = await metadata_for_insert(
+                    db,
+                    principal=principal,
+                    table=request.table,
+                    values=row,
+                    is_admin=is_admin,
+                )
+            except CompatAccessForbiddenError as exc:
+                raise CompatForbiddenError(str(exc)) from exc
             db.add(
                 CompatRecord(
                     table_name=request.table,
                     record_id=record_id,
-                    owner_user_id=None if global_content else principal.user_id,
-                    company_id=None if global_content else primary_company_id(principal),
+                    owner_user_id=owner_user_id,
+                    # Generic compatibility records never infer tenant sharing from membership.
+                    company_id=company_id,
                     data=row,
                 )
             )
@@ -328,6 +491,18 @@ async def execute_query(
         now = datetime.now(UTC).isoformat()
         updated_rows: list[dict[str, Any]] = []
         for record in matched_records:
+            try:
+                await ensure_record_mutation_allowed(
+                    db,
+                    principal=principal,
+                    table=request.table,
+                    operation="update",
+                    record=record,
+                    new_values=request.values,
+                    is_admin=is_admin,
+                )
+            except CompatAccessForbiddenError as exc:
+                raise CompatForbiddenError(str(exc)) from exc
             row = dict(record.data)
             row.update(request.values)
             row["id"] = record.record_id
@@ -338,8 +513,23 @@ async def execute_query(
         return _shape(updated_rows, request)
 
     if request.operation == "delete":
-        deleted_rows = [_record_payload(record) for record in matched_records]
-        ids = [record.id for record in matched_records]
+        deleted_rows: list[dict[str, Any]] = []
+        ids: list[UUID] = []
+        for record in matched_records:
+            try:
+                await ensure_record_mutation_allowed(
+                    db,
+                    principal=principal,
+                    table=request.table,
+                    operation="delete",
+                    record=record,
+                    new_values=None,
+                    is_admin=is_admin,
+                )
+            except CompatAccessForbiddenError as exc:
+                raise CompatForbiddenError(str(exc)) from exc
+            deleted_rows.append(_record_payload(record))
+            ids.append(record.id)
         if ids:
             await db.execute(delete(CompatRecord).where(CompatRecord.id.in_(ids)))
             await db.commit()
@@ -375,7 +565,9 @@ async def deduct_user_credits(
 
     company_ids = active_company_ids(principal)
     for company_id in company_ids:
-        result = await db.execute(select(Company).where(Company.id == company_id).with_for_update())
+        result = await db.execute(
+            select(Company).where(Company.id == company_id).with_for_update()
+        )
         company = result.scalar_one_or_none()
         if company is not None and company.credit_pool_enabled:
             available = int(company.credit_pool or 0)
@@ -386,7 +578,9 @@ async def deduct_user_credits(
             await db.commit()
             return True
 
-    result = await db.execute(select(Profile).where(Profile.id == principal.user_id).with_for_update())
+    result = await db.execute(
+        select(Profile).where(Profile.id == principal.user_id).with_for_update()
+    )
     profile = result.scalar_one_or_none()
     if profile is None or profile.monthly_credits - profile.used_credits < amount:
         await db.rollback()
