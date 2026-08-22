@@ -202,6 +202,25 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
       }, { auth: false, retryAuth: false });
       return { data, error: null };
     }
+    if (functionName === 'zarinpal-payment') {
+      if (body.action === 'init') {
+        if (typeof body.plan_type !== 'string' || !body.plan_type) throw new Error('plan_type is required');
+        const data = await apiRequest('/billing/payments/init', {
+          method: 'POST',
+          body: JSON.stringify({ plan_type: body.plan_type }),
+        });
+        return { data, error: null };
+      }
+      if (body.action === 'verify') {
+        if (typeof body.authority !== 'string' || !body.authority) throw new Error('authority is required');
+        const data = await apiRequest('/billing/payments/verify', {
+          method: 'POST',
+          body: JSON.stringify({ authority: body.authority }),
+        });
+        return { data, error: null };
+      }
+      throw new Error('Invalid payment action');
+    }
 
     const envelope = await apiRequest<CompatEnvelope>(`/compat/functions/${encodeURIComponent(functionName)}`, {
       method: 'POST',
