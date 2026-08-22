@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,14 @@ from hring_api.domains.compat.functions import (
     CompatFunctionError,
     CompatFunctionUnavailableError,
     invoke_ai_function,
+)
+from hring_api.domains.compat.legal_import import (
+    LegalImportError,
+    LegalImportForbiddenError,
+    extract_document_text,
+    fetch_public_legal_source,
+    html_to_text,
+    save_legal_text,
 )
 from hring_api.domains.compat.schemas import (
     CompatFunctionRequest,
@@ -45,13 +53,13 @@ router = APIRouter(prefix="/compat", tags=["compatibility"])
 
 
 def _compat_http_error(exc: Exception) -> HTTPException:
-    if isinstance(exc, CompatForbiddenError):
+    if isinstance(exc, (CompatForbiddenError, LegalImportForbiddenError)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, CompatFunctionUnavailableError):
         return HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     if isinstance(exc, CompatFunctionError):
         return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-    if isinstance(exc, StorageCompatError):
+    if isinstance(exc, (StorageCompatError, LegalImportError)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
@@ -123,6 +131,30 @@ async def public_support(
     return CompatQueryResponse(data=data, count=1)
 
 
+@router.post("/files/extract-document-text")
+async def import_legal_document(
+    file: UploadFile = File(...),
+    category: str = Form(...),
+    source_url: str = Form("uploaded-document", alias="sourceUrl"),
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, object]:
+    try:
+        raw = await file.read(10 * 1024 * 1024 + 1)
+        text = extract_document_text(file.filename or "document", raw)
+        result = await save_legal_text(
+            db,
+            principal=principal,
+            text=text,
+            category=category,
+            source_url=source_url,
+            source_type="upload",
+        )
+    except (LegalImportError, LegalImportForbiddenError) as exc:
+        raise _compat_http_error(exc) from exc
+    return result.as_payload()
+
+
 @router.post("/functions/{name}", response_model=CompatQueryResponse)
 async def execute_compat_function(
     name: str,
@@ -148,6 +180,33 @@ async def execute_compat_function(
         except CompatError as exc:
             raise _compat_http_error(exc) from exc
         return CompatQueryResponse(data={"success": True, "record": data}, count=1)
+    if name in {"process-legal-html", "scrape-legal-docs"}:
+        if not isinstance(payload.body, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid legal import payload")
+        category = payload.body.get("category")
+        source_url = payload.body.get("sourceUrl")
+        if not isinstance(category, str) or not isinstance(source_url, str):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="category and sourceUrl are required")
+        try:
+            if name == "process-legal-html":
+                raw_html = payload.body.get("htmlContent")
+                if not isinstance(raw_html, str):
+                    raise LegalImportError("htmlContent is required")
+                text = html_to_text(raw_html)
+                source_type = "manual-html"
+            else:
+                text, source_type = await fetch_public_legal_source(source_url)
+            result = await save_legal_text(
+                db,
+                principal=principal,
+                text=text,
+                category=category,
+                source_url=source_url,
+                source_type=source_type,
+            )
+        except (LegalImportError, LegalImportForbiddenError) as exc:
+            raise _compat_http_error(exc) from exc
+        return CompatQueryResponse(data=result.as_payload(), count=result.saved_count)
     if name in NON_AI_SPECIAL_FUNCTIONS:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
