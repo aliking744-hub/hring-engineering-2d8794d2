@@ -49,6 +49,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const ProductAdmin = lazy(() => import("./pages/ProductAdmin"));
 const IntegrationCenter = lazy(() => import("./pages/IntegrationCenter"));
+const PromptRegistry = lazy(() => import("./pages/PromptRegistry"));
 const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
 const LearningPath = lazy(() => import("./pages/LearningPath"));
 
@@ -293,6 +294,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <IntegrationCenter />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/prompts" 
+                element={
+                  <ProtectedRoute>
+                    <PromptRegistry />
                   </ProtectedRoute>
                 } 
               />

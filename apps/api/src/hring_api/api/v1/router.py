@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from hring_api.api.v1.health import router as health_router
 from hring_api.domains.access.routes import router as access_router
 from hring_api.domains.admin.routes import router as admin_router
+from hring_api.domains.ai.prompt_routes import router as prompt_router
 from hring_api.domains.ai.routes import router as ai_router
 from hring_api.domains.billing.routes import router as billing_router
 from hring_api.domains.companies.routes import router as companies_router
@@ -25,6 +26,7 @@ api_router.include_router(company_settings_router)
 api_router.include_router(access_router)
 api_router.include_router(admin_router)
 api_router.include_router(ai_router)
+api_router.include_router(prompt_router)
 api_router.include_router(billing_router)
 api_router.include_router(integrations_router)
 api_router.include_router(internal_integrations_router)
