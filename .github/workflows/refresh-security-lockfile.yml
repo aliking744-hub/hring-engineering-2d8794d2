@@ -32,8 +32,11 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - name: Regenerate lockfile from declared secure dependency ranges
+      - name: Sync lockfile with declared dependency ranges
         run: npm install --package-lock-only --ignore-scripts
+
+      - name: Apply non-breaking advisory fixes to lockfile
+        run: npm audit fix --package-lock-only --ignore-scripts || true
 
       - name: Require clean production high/critical audit
         run: npm audit --omit=dev --audit-level=high
