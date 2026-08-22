@@ -94,12 +94,9 @@ const LegalImporter = () => {
       formData.append('sourceUrl', docSourceUrl || 'uploaded-document');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-document-text`,
+        '/functions/v1/extract-document-text',
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
           body: formData,
         }
       );
