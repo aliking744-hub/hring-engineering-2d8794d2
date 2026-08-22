@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Building2, ChevronLeft, Package, PlugZap, ShieldCheck, UsersRound } from 'lucide-react';
+import { Building2, ChevronLeft, FileCode2, Package, PlugZap, ShieldCheck, UsersRound } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ const Admin = () => {
   const canOpenPlatform = roles.some((role) => ['super_admin', 'platform_admin', 'support_admin'].includes(role)) || hasLegacyAdmin;
   const canOpenProduct = roles.some((role) => ['super_admin', 'content_admin'].includes(role));
   const canOpenIntegrations = roles.some((role) => ['super_admin', 'platform_admin', 'support_admin'].includes(role)) || hasLegacyAdmin;
+  const canOpenPrompts = roles.some((role) => ['super_admin', 'platform_admin', 'content_admin'].includes(role)) || hasLegacyAdmin;
   const canOpenCompany = Boolean(context?.companyId);
 
   const panels = [
@@ -36,6 +37,13 @@ const Admin = () => {
       icon: PlugZap,
       href: '/admin/integrations',
       badge: 'Secrets & APIs',
+    },
+    canOpenPrompts && {
+      title: 'Prompt Registry',
+      description: 'ساخت، تست، انتشار، مقایسه و Rollback پرامپت‌ها با انتخاب Provider و مدل برای هر قابلیت.',
+      icon: FileCode2,
+      href: '/admin/prompts',
+      badge: 'AI Prompts',
     },
     canOpenProduct && {
       title: 'Product & Content Admin',
@@ -87,7 +95,7 @@ const Admin = () => {
             </div>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             {panels.map((panel) => (
               <Card key={panel.href} className="flex h-full flex-col">
                 <CardHeader>

@@ -55,6 +55,7 @@ async def generate_with_ai_gateway(
     temperature: float | None = None,
     max_output_tokens: int | None = None,
     response_format: str = "text",
+    metadata_json: dict[str, object] | None = None,
 ) -> AiGatewayResult:
     """Call the internal provider hub and persist billing telemetry.
 
@@ -100,7 +101,7 @@ async def generate_with_ai_gateway(
         provider_cost = _optional_int(body.get("provider_cost_microusd"))
         latency_ms = round((monotonic() - started) * 1000)
         gateway_request_id = body.get("provider_request_id")
-        metadata: dict[str, object] = {}
+        metadata: dict[str, object] = dict(metadata_json or {})
         if isinstance(gateway_request_id, str):
             metadata["provider_request_id"] = gateway_request_id[:200]
 
@@ -150,7 +151,7 @@ async def generate_with_ai_gateway(
             latency_ms=latency_ms,
             status="failure",
             error_code=error_code,
-            metadata_json={},
+            metadata_json=dict(metadata_json or {}),
         )
         if isinstance(exc, AiGatewayError):
             raise
