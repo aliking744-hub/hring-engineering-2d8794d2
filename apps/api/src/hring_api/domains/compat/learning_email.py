@@ -12,6 +12,10 @@ class LearningEmailError(RuntimeError):
     pass
 
 
+class LearningEmailUnavailableError(LearningEmailError):
+    pass
+
+
 def _safe(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -90,7 +94,11 @@ async def send_learning_path_email(*, body: object, settings: Settings) -> dict[
     result = body.get("result")
     if not isinstance(employee_email, str) or not employee_email.strip():
         raise LearningEmailError("Employee email is required")
-    if not isinstance(employee_name, str) or not isinstance(job_title, str) or not isinstance(result, dict):
+    if (
+        not isinstance(employee_name, str)
+        or not isinstance(job_title, str)
+        or not isinstance(result, dict)
+    ):
         raise LearningEmailError("employeeName, jobTitle and result are required")
 
     message_html = build_learning_path_html(
@@ -105,5 +113,7 @@ async def send_learning_path_email(*, body: object, settings: Settings) -> dict[
             html=message_html,
         )
     except EmailDeliveryError as exc:
-        raise LearningEmailError("Email service is not configured or unavailable") from exc
+        raise LearningEmailUnavailableError(
+            "Email service is not configured or unavailable"
+        ) from exc
     return {"success": True, "id": message_id}
