@@ -13,11 +13,45 @@ from hring_api.domains.compat.storage_policy import (
     authorize_storage_object,
     validate_storage_upload,
 )
+from hring_api.domains.compat.table_scope import TableScopeError, personal_owner_id, scope_for
 
 
 def test_compat_query_rejects_invalid_table_names() -> None:
     with pytest.raises(ValueError):
         CompatQueryRequest(table="posts;drop table users", operation="select")
+
+
+def test_compat_tables_are_deny_by_default() -> None:
+    with pytest.raises(TableScopeError):
+        scope_for("future_unreviewed_table")
+
+
+def test_personal_compat_records_cannot_be_assigned_to_another_user() -> None:
+    current_user = uuid4()
+    foreign_user = uuid4()
+    values = {"user_id": str(foreign_user)}
+    with pytest.raises(TableScopeError):
+        personal_owner_id(
+            values=values,
+            owner_field="user_id",
+            principal_id=current_user,
+        )
+
+
+def test_personal_scope_does_not_infer_company_sharing() -> None:
+    assert scope_for("notifications").scope == "personal"
+    assert scope_for("hr_uploads").scope == "personal"
+    assert scope_for("learning_path_records").scope == "personal"
+    assert scope_for("strategic_radar_analyses").scope == "personal"
+    assert scope_for("unicorn_analyses").scope == "personal"
+
+
+def test_dedicated_domains_cannot_fall_through_generic_query_bridge() -> None:
+    assert scope_for("campaigns").scope == "dedicated"
+    assert scope_for("candidates").scope == "dedicated"
+    assert scope_for("companies").scope == "dedicated"
+    assert scope_for("company_members").scope == "dedicated"
+    assert scope_for("payment_transactions").scope == "dedicated"
 
 
 def test_storage_compat_rejects_path_traversal() -> None:
