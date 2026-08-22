@@ -52,17 +52,14 @@ BLOCKED_SENSITIVE_FUNCTIONS = frozenset(
     }
 )
 
+# These legacy names are intentionally routed to dedicated independent APIs by the
+# browser facade rather than executed as generic compatibility functions.
 NON_AI_SPECIAL_FUNCTIONS = frozenset(
     {
-        "download-product",
-        "extract-document-text",
-        "process-legal-html",
-        "scrape-legal-docs",
-        "send-learning-path-email",
-        "submit-feedback",
         "validate-invite-code",
         "auto-headhunt",
         "analyze-candidates",
+        "extract-document-text",
     }
 )
 
