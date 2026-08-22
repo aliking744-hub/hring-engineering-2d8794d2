@@ -58,6 +58,14 @@ from hring_api.domains.compat.storage import (
     put_object,
     read_object,
 )
+from hring_api.domains.compat.storage_policy import (
+    StoragePolicyError,
+    StoragePolicyForbiddenError,
+    authorize_storage_list_prefix,
+    authorize_storage_object,
+    is_storage_admin,
+    validate_storage_upload,
+)
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 
 
@@ -67,7 +75,12 @@ router = APIRouter(prefix="/compat", tags=["compatibility"])
 def _compat_http_error(exc: Exception) -> HTTPException:
     if isinstance(
         exc,
-        (CompatForbiddenError, LegalImportForbiddenError, ProductDownloadForbiddenError),
+        (
+            CompatForbiddenError,
+            LegalImportForbiddenError,
+            ProductDownloadForbiddenError,
+            StoragePolicyForbiddenError,
+        ),
     ):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, (CompatFunctionUnavailableError, LearningEmailUnavailableError)):
@@ -76,10 +89,38 @@ def _compat_http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     if isinstance(
         exc,
-        (StorageCompatError, LegalImportError, ProductDownloadError, LearningEmailError),
+        (
+            StorageCompatError,
+            StoragePolicyError,
+            LegalImportError,
+            ProductDownloadError,
+            LearningEmailError,
+        ),
     ):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+def _upload_size(file: UploadFile) -> int:
+    declared_size = getattr(file, "size", None)
+    if isinstance(declared_size, int):
+        return declared_size
+    current = file.file.tell()
+    file.file.seek(0, 2)
+    size = file.file.tell()
+    file.file.seek(current)
+    return int(size)
+
+
+async def _storage_admin_for_bucket(
+    db: AsyncSession,
+    *,
+    principal: Principal,
+    logical_bucket: str,
+) -> bool:
+    if logical_bucket != "products":
+        return False
+    return await is_storage_admin(db, principal)
 
 
 @router.post("/query", response_model=CompatQueryResponse)
@@ -302,51 +343,96 @@ async def upload_compat_object(
     logical_bucket: str,
     object_path: str,
     file: UploadFile = File(...),
-    _principal: Principal = Depends(get_current_principal),
+    principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, object]:
     try:
+        is_admin = await _storage_admin_for_bucket(
+            db,
+            principal=principal,
+            logical_bucket=logical_bucket,
+        )
+        safe_path = authorize_storage_object(
+            logical_bucket=logical_bucket,
+            object_path=object_path,
+            user_id=principal.user_id,
+            is_admin=is_admin,
+        )
+        validate_storage_upload(
+            logical_bucket=logical_bucket,
+            object_path=safe_path,
+            content_type=file.content_type,
+            size_bytes=_upload_size(file),
+        )
         key = put_object(
             settings,
             logical_bucket=logical_bucket,
-            path=object_path,
+            path=safe_path,
             stream=file.file,
             content_type=file.content_type,
         )
-    except StorageCompatError as exc:
+    except (StorageCompatError, StoragePolicyError) as exc:
         raise _compat_http_error(exc) from exc
-    return {"path": object_path, "key": key}
+    return {"path": safe_path, "key": key}
 
 
 @router.post("/storage/{logical_bucket}/remove")
 async def remove_compat_objects(
     logical_bucket: str,
     payload: StorageDeleteRequest,
-    _principal: Principal = Depends(get_current_principal),
+    principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, object]:
     try:
-        delete_objects(settings, logical_bucket=logical_bucket, paths=payload.paths)
-    except StorageCompatError as exc:
+        is_admin = await _storage_admin_for_bucket(
+            db,
+            principal=principal,
+            logical_bucket=logical_bucket,
+        )
+        safe_paths = [
+            authorize_storage_object(
+                logical_bucket=logical_bucket,
+                object_path=path,
+                user_id=principal.user_id,
+                is_admin=is_admin,
+            )
+            for path in payload.paths
+        ]
+        delete_objects(settings, logical_bucket=logical_bucket, paths=safe_paths)
+    except (StorageCompatError, StoragePolicyError) as exc:
         raise _compat_http_error(exc) from exc
-    return {"removed": len(payload.paths)}
+    return {"removed": len(safe_paths)}
 
 
 @router.post("/storage/{logical_bucket}/list")
 async def list_compat_objects(
     logical_bucket: str,
     payload: StorageListRequest,
-    _principal: Principal = Depends(get_current_principal),
+    principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, object]:
     try:
+        is_admin = await _storage_admin_for_bucket(
+            db,
+            principal=principal,
+            logical_bucket=logical_bucket,
+        )
+        safe_prefix = authorize_storage_list_prefix(
+            logical_bucket=logical_bucket,
+            prefix=payload.prefix,
+            user_id=principal.user_id,
+            is_admin=is_admin,
+        )
         rows = list_objects(
             settings,
             logical_bucket=logical_bucket,
-            prefix=payload.prefix,
+            prefix=safe_prefix,
             limit=payload.limit,
         )
-    except StorageCompatError as exc:
+    except (StorageCompatError, StoragePolicyError) as exc:
         raise _compat_http_error(exc) from exc
     return {"data": rows}
 
@@ -375,14 +461,9 @@ async def read_private_compat_object(
     logical_bucket: str,
     object_path: str,
     _principal: Principal = Depends(get_current_principal),
-    settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    try:
-        stream, content_type = read_object(
-            settings,
-            logical_bucket=logical_bucket,
-            path=object_path,
-        )
-    except StorageCompatError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found") from exc
-    return StreamingResponse(stream, media_type=content_type)
+    _ = (logical_bucket, object_path)
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Private storage requires a dedicated HRing download endpoint",
+    )
