@@ -27,8 +27,8 @@ from hring_api.domains.identity.session_repository import (
     list_user_sessions,
     revoke_all_user_sessions,
 )
-from hring_api.integrations.email.base import EmailDeliveryError
-from hring_api.integrations.email.providers import get_email_provider
+from hring_api.integrations.email.base import EmailDeliveryError, EmailProvider
+from hring_api.integrations.email.providers import DisabledEmailProvider, get_email_provider
 
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ async def request_password_reset(
     email: str,
     settings: Settings,
 ) -> None:
-    _ensure_email_configured(settings)
+    provider = await _configured_email_provider(session, settings)
     user = await get_user_by_email(session, normalize_email(email))
     if user is None or not user.is_active:
         return
@@ -76,7 +76,7 @@ async def request_password_reset(
     )
     reset_url = _build_app_url(settings, mode="reset-password", token=raw_token)
     try:
-        await get_email_provider(settings).send_password_reset(
+        await provider.send_password_reset(
             email=user.email,
             reset_url=reset_url,
             ttl_minutes=settings.auth_password_reset_ttl_minutes,
@@ -131,7 +131,7 @@ async def request_email_verification(
 ) -> None:
     if user.email_verified_at is not None:
         return
-    _ensure_email_configured(settings)
+    provider = await _configured_email_provider(session, settings)
     await invalidate_security_tokens(session, user_id=user.id, purpose="email_verify")
     raw_token = generate_security_token()
     await create_security_token(
@@ -143,7 +143,7 @@ async def request_email_verification(
     )
     verification_url = _build_app_url(settings, mode="verify-email", token=raw_token)
     try:
-        await get_email_provider(settings).send_email_verification(
+        await provider.send_email_verification(
             email=user.email,
             verification_url=verification_url,
             ttl_hours=settings.auth_email_verify_ttl_hours,
@@ -194,9 +194,17 @@ async def logout_all_sessions(session: AsyncSession, *, user_id: UUID) -> None:
     await revoke_all_user_sessions(session, user_id=user_id)
 
 
-def _ensure_email_configured(settings: Settings) -> None:
-    if settings.email_provider.strip().lower() in {"", "disabled"}:
+async def _configured_email_provider(
+    session: AsyncSession,
+    settings: Settings,
+) -> EmailProvider:
+    try:
+        provider = await get_email_provider(session, settings)
+    except EmailDeliveryError as exc:
+        raise RecoveryUnavailableError("Email delivery is not configured") from exc
+    if isinstance(provider, DisabledEmailProvider):
         raise RecoveryUnavailableError("Email delivery is not configured")
+    return provider
 
 
 def _build_app_url(settings: Settings, *, mode: str, token: str) -> str:

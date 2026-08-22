@@ -284,7 +284,11 @@ async def execute_compat_function(
         return CompatQueryResponse(data={"url": url}, count=1)
     if name == "send-learning-path-email":
         try:
-            data = await send_learning_path_email(body=payload.body, settings=settings)
+            data = await send_learning_path_email(
+                body=payload.body,
+                settings=settings,
+                session=db,
+            )
         except (LearningEmailError, LearningEmailUnavailableError) as exc:
             raise _compat_http_error(exc) from exc
         return CompatQueryResponse(data=data, count=1)

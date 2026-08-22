@@ -1,9 +1,16 @@
 import html
 import logging
+from urllib.parse import urlsplit
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
+from hring_api.domains.integrations.runtime import (
+    RuntimeProviderConfigurationError,
+    resolve_runtime_provider,
+    string_setting,
+)
 from hring_api.integrations.email.base import EmailDeliveryError, EmailProvider
 
 
@@ -55,18 +62,39 @@ class DevelopmentEmailProvider:
         return "development-message"
 
 
+def _resend_base_url(value: str | None) -> str:
+    normalized = (value or "https://api.resend.com").rstrip("/")
+    parsed = urlsplit(normalized)
+    if parsed.scheme != "https" or parsed.hostname != "api.resend.com":
+        raise EmailDeliveryError("Resend must use the official HTTPS API host")
+    if parsed.path not in {"", "/"}:
+        raise EmailDeliveryError("Resend base URL path is invalid")
+    return normalized
+
+
 class ResendEmailProvider:
-    def __init__(self, *, api_key: str, from_address: str) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        from_address: str,
+        base_url: str | None = None,
+        timeout_seconds: float = 15.0,
+    ) -> None:
         if not api_key:
             raise EmailDeliveryError("Resend API key is not configured")
+        if not from_address.strip():
+            raise EmailDeliveryError("Email sender address is not configured")
         self.api_key = api_key
-        self.from_address = from_address
+        self.from_address = from_address.strip()
+        self.base_url = _resend_base_url(base_url)
+        self.timeout_seconds = timeout_seconds
 
     async def _deliver(self, *, to_email: str, subject: str, html_body: str) -> str | None:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
                 response = await client.post(
-                    "https://api.resend.com/emails",
+                    f"{self.base_url}/emails",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json",
@@ -80,8 +108,8 @@ class ResendEmailProvider:
                 )
                 response.raise_for_status()
                 payload = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise EmailDeliveryError("Email provider rejected the message") from exc
+        except (httpx.HTTPError, ValueError):
+            raise EmailDeliveryError("Email provider rejected the message") from None
         message_id = payload.get("id") if isinstance(payload, dict) else None
         return str(message_id) if message_id else None
 
@@ -118,7 +146,34 @@ class ResendEmailProvider:
         return await self._deliver(to_email=to_email, subject=subject, html_body=html)
 
 
-def get_email_provider(settings: Settings) -> EmailProvider:
+async def get_email_provider(
+    session: AsyncSession,
+    settings: Settings,
+) -> EmailProvider:
+    try:
+        runtime = await resolve_runtime_provider(
+            session,
+            provider_type="email",
+            adapters=frozenset({"resend"}),
+            settings=settings,
+        )
+    except RuntimeProviderConfigurationError as exc:
+        raise EmailDeliveryError("Email provider secret is unavailable") from exc
+    if runtime is not None:
+        if runtime.secret is None:
+            raise EmailDeliveryError("Resend API key is not configured")
+        return ResendEmailProvider(
+            api_key=runtime.secret,
+            from_address=string_setting(
+                runtime,
+                "from_address",
+                default=settings.email_from,
+            )
+            or settings.email_from,
+            base_url=runtime.base_url,
+            timeout_seconds=float(runtime.timeout_seconds),
+        )
+
     provider = settings.email_provider.strip().lower()
     if provider == "development":
         if settings.environment.lower() == "production":

@@ -20,6 +20,8 @@ class PaymentVerifyResult:
 
 
 class PaymentProvider(Protocol):
+    name: str
+
     async def request_payment(
         self,
         *,

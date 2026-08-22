@@ -83,10 +83,15 @@ async def initialize_payment(
         if company_id is None:
             raise BillingForbiddenError("Corporate plans require CEO or deputy access")
 
+    try:
+        payment_provider = await get_payment_provider(db, settings)
+    except PaymentProviderError as exc:
+        raise BillingUnavailableError("Payment provider is not configured or unavailable") from exc
+
     transaction = PaymentTransaction(
         user_id=principal.user_id,
         company_id=company_id,
-        provider=settings.payment_provider or "disabled",
+        provider=payment_provider.name,
         amount_toman=plan.price_toman,
         plan_type=plan.plan_type,
         status="pending",
@@ -96,7 +101,7 @@ async def initialize_payment(
     await db.commit()
 
     try:
-        requested = await get_payment_provider(settings).request_payment(
+        requested = await payment_provider.request_payment(
             amount_rial=plan.price_toman * 10,
             description=transaction.description or f"HRing {plan.plan_type}",
             callback_url=_callback_url(settings),
@@ -137,7 +142,8 @@ async def verify_payment(
         raise PaymentVerificationError("Payment transaction is not pending")
 
     try:
-        verified = await get_payment_provider(settings).verify_payment(
+        payment_provider = await get_payment_provider(db, settings)
+        verified = await payment_provider.verify_payment(
             amount_rial=transaction.amount_toman * 10,
             authority=authority,
         )

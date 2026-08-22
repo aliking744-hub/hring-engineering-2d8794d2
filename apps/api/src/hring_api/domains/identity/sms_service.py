@@ -21,8 +21,8 @@ from hring_api.domains.identity.sms_security import (
     normalize_phone_e164,
     verify_otp_code,
 )
-from hring_api.integrations.sms.base import SmsDeliveryError
-from hring_api.integrations.sms.providers import get_sms_provider
+from hring_api.integrations.sms.base import SmsDeliveryError, SmsProvider
+from hring_api.integrations.sms.providers import DisabledSmsProvider, get_sms_provider
 
 
 class SmsAuthError(Exception):
@@ -57,7 +57,7 @@ async def request_login_otp(
     phone: str,
     settings: Settings,
 ) -> SmsChallengeResult:
-    _ensure_sms_configured(settings)
+    provider = await _configured_sms_provider(session, settings)
     phone_e164 = normalize_phone_e164(phone)
     await _ensure_not_rate_limited(session, phone_e164=phone_e164, settings=settings)
 
@@ -72,7 +72,12 @@ async def request_login_otp(
     )
 
     if phone_identity is not None:
-        await _deliver_code(phone_e164=phone_e164, code=code, settings=settings)
+        await _deliver_code(
+            provider=provider,
+            phone_e164=phone_e164,
+            code=code,
+            settings=settings,
+        )
 
     return SmsChallengeResult(challenge_id=challenge.id, expires_at=challenge.expires_at)
 
@@ -122,7 +127,7 @@ async def request_phone_verification_otp(
     phone: str,
     settings: Settings,
 ) -> SmsChallengeResult:
-    _ensure_sms_configured(settings)
+    provider = await _configured_sms_provider(session, settings)
     phone_e164 = normalize_phone_e164(phone)
     existing = await get_phone_identity_by_phone(session, phone_e164)
     if existing is not None and existing.user_id != user_id:
@@ -136,7 +141,12 @@ async def request_phone_verification_otp(
         purpose="verify_phone",
         settings=settings,
     )
-    await _deliver_code(phone_e164=phone_e164, code=code, settings=settings)
+    await _deliver_code(
+        provider=provider,
+        phone_e164=phone_e164,
+        code=code,
+        settings=settings,
+    )
     return SmsChallengeResult(challenge_id=challenge.id, expires_at=challenge.expires_at)
 
 
@@ -174,9 +184,17 @@ async def verify_phone_otp(
     return challenge.phone_e164
 
 
-def _ensure_sms_configured(settings: Settings) -> None:
-    if settings.sms_provider.strip().lower() in {"", "disabled"}:
+async def _configured_sms_provider(
+    session: AsyncSession,
+    settings: Settings,
+) -> SmsProvider:
+    try:
+        provider = await get_sms_provider(session, settings)
+    except SmsDeliveryError as exc:
+        raise SmsUnavailableError("SMS login is not configured") from exc
+    if isinstance(provider, DisabledSmsProvider):
         raise SmsUnavailableError("SMS login is not configured")
+    return provider
 
 
 async def _ensure_not_rate_limited(
@@ -221,9 +239,15 @@ async def _create_challenge(
     return challenge, code
 
 
-async def _deliver_code(*, phone_e164: str, code: str, settings: Settings) -> None:
+async def _deliver_code(
+    *,
+    provider: SmsProvider,
+    phone_e164: str,
+    code: str,
+    settings: Settings,
+) -> None:
     try:
-        await get_sms_provider(settings).send_otp(
+        await provider.send_otp(
             phone_e164=phone_e164,
             code=code,
             ttl_seconds=settings.sms_otp_ttl_seconds,
