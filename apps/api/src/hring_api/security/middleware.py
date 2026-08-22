@@ -23,7 +23,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Cache-Control"] = "no-store"
+        cache_control = response.headers.get("Cache-Control", "")
+        cache_directives = {
+            directive.strip().lower()
+            for directive in cache_control.split(",")
+            if directive.strip()
+        }
+        if "no-store" not in cache_directives:
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 
