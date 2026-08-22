@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Building2, ChevronLeft, Package, ShieldCheck, UsersRound } from 'lucide-react';
+import { Building2, ChevronLeft, Package, PlugZap, ShieldCheck, UsersRound } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,7 @@ const Admin = () => {
   const hasLegacyAdmin = context?.appRoles.includes('admin') || false;
   const canOpenPlatform = roles.some((role) => ['super_admin', 'platform_admin', 'support_admin'].includes(role)) || hasLegacyAdmin;
   const canOpenProduct = roles.some((role) => ['super_admin', 'content_admin'].includes(role));
+  const canOpenIntegrations = roles.some((role) => ['super_admin', 'platform_admin', 'support_admin'].includes(role)) || hasLegacyAdmin;
   const canOpenCompany = Boolean(context?.companyId);
 
   const panels = [
@@ -28,6 +29,13 @@ const Admin = () => {
       icon: ShieldCheck,
       href: '/admin/platform',
       badge: 'Platform',
+    },
+    canOpenIntegrations && {
+      title: 'Integration Center',
+      description: 'مدیریت امن AI، مدل لوکال، درگاه، پیامک، ایمیل، وب‌هوک و تست سلامت اتصال‌ها.',
+      icon: PlugZap,
+      href: '/admin/integrations',
+      badge: 'Secrets & APIs',
     },
     canOpenProduct && {
       title: 'Product & Content Admin',

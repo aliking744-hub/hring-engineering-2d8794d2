@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     zarinpal_merchant_id: SecretStr | None = None
     payment_callback_path: str = "/upgrade"
 
+    integration_secret_encryption_key: SecretStr | None = None
+    integration_internal_hosts: list[str] = ["ai", "ollama", "vllm"]
+
     rate_limit_enabled: bool = True
     rate_limit_login_per_minute: int = 12
     rate_limit_register_per_minute: int = 6
