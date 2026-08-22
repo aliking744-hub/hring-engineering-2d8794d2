@@ -32,8 +32,8 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - name: Refresh vulnerable dependencies inside declared semver ranges
-        run: npm audit fix --package-lock-only
+      - name: Regenerate lockfile from declared secure dependency ranges
+        run: npm install --package-lock-only --ignore-scripts
 
       - name: Require clean production high/critical audit
         run: npm audit --omit=dev --audit-level=high
