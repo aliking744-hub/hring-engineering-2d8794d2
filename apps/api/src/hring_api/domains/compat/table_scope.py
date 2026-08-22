@@ -5,7 +5,14 @@ from typing import Any, Literal
 from uuid import UUID
 
 
-Scope = Literal["personal", "global_public", "global_authenticated", "compass", "admin_only", "dedicated"]
+Scope = Literal[
+    "personal",
+    "global_public",
+    "global_authenticated",
+    "compass",
+    "admin_only",
+    "dedicated",
+]
 
 
 @dataclass(frozen=True)
@@ -26,12 +33,12 @@ TABLE_SCOPES: dict[str, TableScope] = {
     "payment_transactions": TableScope("dedicated"),
     "profiles": TableScope("dedicated"),
     "feature_permissions": TableScope("dedicated"),
+    "site_settings": TableScope("dedicated"),
 
     # Public website/product content. Mutations are separately admin-gated.
     "posts": TableScope("global_public"),
     "testimonials": TableScope("global_public"),
     "digital_products": TableScope("global_public"),
-    "site_settings": TableScope("global_public"),
 
     # Global knowledge that legacy RLS exposed only to authenticated users.
     "legal_docs": TableScope("global_authenticated"),
@@ -48,14 +55,13 @@ TABLE_SCOPES: dict[str, TableScope] = {
     "user_credits": TableScope("personal", "user_id"),
     "user_purchases": TableScope("personal", "user_id"),
     "user_roles": TableScope("personal", "user_id"),
-    "scenario_responses": TableScope("personal", "user_id"),
-    "bet_allocations": TableScope("personal", "user_id"),
-    "behaviors": TableScope("personal", "deputy_id"),
 
-    # These require relationship/CEO/assignee rules. They are filtered by
-    # table-specific logic and must never inherit company-wide visibility.
+    # Relationship/CEO/assignee rules. These must never inherit company-wide visibility.
+    "behaviors": TableScope("compass"),
+    "bet_allocations": TableScope("compass"),
     "decision_journals": TableScope("compass"),
     "intent_assignments": TableScope("compass"),
+    "scenario_responses": TableScope("compass"),
     "scenarios": TableScope("compass"),
     "strategic_achievements": TableScope("compass"),
     "strategic_bets": TableScope("compass"),
