@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -8,12 +9,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
+from hring_api.domains.compat.downloads import (
+    ProductDownloadError,
+    ProductDownloadForbiddenError,
+    create_product_download_url,
+    decode_product_download_token,
+)
 from hring_api.domains.compat.functions import (
     BLOCKED_SENSITIVE_FUNCTIONS,
     NON_AI_SPECIAL_FUNCTIONS,
     CompatFunctionError,
     CompatFunctionUnavailableError,
     invoke_ai_function,
+)
+from hring_api.domains.compat.learning_email import (
+    LearningEmailError,
+    LearningEmailUnavailableError,
+    send_learning_path_email,
 )
 from hring_api.domains.compat.legal_import import (
     LegalImportError,
@@ -53,13 +65,19 @@ router = APIRouter(prefix="/compat", tags=["compatibility"])
 
 
 def _compat_http_error(exc: Exception) -> HTTPException:
-    if isinstance(exc, (CompatForbiddenError, LegalImportForbiddenError)):
+    if isinstance(
+        exc,
+        (CompatForbiddenError, LegalImportForbiddenError, ProductDownloadForbiddenError),
+    ):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
-    if isinstance(exc, CompatFunctionUnavailableError):
+    if isinstance(exc, (CompatFunctionUnavailableError, LearningEmailUnavailableError)):
         return HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     if isinstance(exc, CompatFunctionError):
         return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-    if isinstance(exc, (StorageCompatError, LegalImportError)):
+    if isinstance(
+        exc,
+        (StorageCompatError, LegalImportError, ProductDownloadError, LearningEmailError),
+    ):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
@@ -155,6 +173,36 @@ async def import_legal_document(
     return result.as_payload()
 
 
+@router.get("/downloads/{token}")
+async def download_product_file(
+    token: str,
+    settings: Settings = Depends(get_settings),
+) -> StreamingResponse:
+    try:
+        file_path, file_name = decode_product_download_token(token, settings)
+        stream, content_type = read_object(
+            settings,
+            logical_bucket="product-files",
+            path=file_path,
+        )
+    except (ProductDownloadError, StorageCompatError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Download link is invalid, expired, or unavailable",
+        ) from exc
+    encoded_name = quote(file_name, safe="")
+    return StreamingResponse(
+        stream,
+        media_type=content_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=download; filename*=UTF-8''{encoded_name}"
+            ),
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
 @router.post("/functions/{name}", response_model=CompatQueryResponse)
 async def execute_compat_function(
     name: str,
@@ -180,13 +228,38 @@ async def execute_compat_function(
         except CompatError as exc:
             raise _compat_http_error(exc) from exc
         return CompatQueryResponse(data={"success": True, "record": data}, count=1)
+    if name == "download-product":
+        if not isinstance(payload.body, dict) or not isinstance(payload.body.get("productId"), str):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="productId is required")
+        try:
+            url = await create_product_download_url(
+                db,
+                principal=principal,
+                product_id=payload.body["productId"],
+                settings=settings,
+            )
+        except (ProductDownloadError, ProductDownloadForbiddenError) as exc:
+            raise _compat_http_error(exc) from exc
+        return CompatQueryResponse(data={"url": url}, count=1)
+    if name == "send-learning-path-email":
+        try:
+            data = await send_learning_path_email(body=payload.body, settings=settings)
+        except (LearningEmailError, LearningEmailUnavailableError) as exc:
+            raise _compat_http_error(exc) from exc
+        return CompatQueryResponse(data=data, count=1)
     if name in {"process-legal-html", "scrape-legal-docs"}:
         if not isinstance(payload.body, dict):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid legal import payload")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid legal import payload",
+            )
         category = payload.body.get("category")
         source_url = payload.body.get("sourceUrl")
         if not isinstance(category, str) or not isinstance(source_url, str):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="category and sourceUrl are required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="category and sourceUrl are required",
+            )
         try:
             if name == "process-legal-html":
                 raw_html = payload.body.get("htmlContent")
