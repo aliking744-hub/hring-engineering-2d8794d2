@@ -7,7 +7,7 @@ from typing import Any, BinaryIO
 from hring_api.config import Settings
 
 
-PUBLIC_LOGICAL_BUCKETS = frozenset({"avatars", "products", "blog-images", "site-assets"})
+PUBLIC_LOGICAL_BUCKETS = frozenset({"avatars", "products"})
 
 
 class StorageCompatError(RuntimeError):
