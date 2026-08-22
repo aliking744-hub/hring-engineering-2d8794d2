@@ -1,7 +1,7 @@
 # HRing — ماتریس شکاف RFP و وضعیت فعلی Staging
 
 **تاریخ ممیزی:** 2026-08-22  
-**منبع وضعیت اجرا:** staging روی commit `1532fc25e908067f5186b955151d68683da4ff61` (`fix/public-npm-registry`)  
+**منبع وضعیت اجرا:** staging روی commit `1532fc25e908067f5186b955151d68683da4ff61`؛ `main` پس از رفع CI روی commit `d20bf3322166261fc8d6b5f38cde3a2ca5945951`  
 **مبنای الزامات:** `HRing_Independent_Reengineering_RFP_FA_v1.0` و اسناد معماری مخزن  
 **مرز ایمنی:** این سند صرفاً ممیزی است. هیچ تغییر یا استقراری روی Production مجاز نیست.
 
@@ -26,8 +26,8 @@ HRing در staging یک زیربنای مستقل واقعی شامل React/Vite
 | کد | حوزه | وضعیت | شواهد فعلی | شکاف تا پذیرش |
 |---|---|---|---|---|
 | A01 | نصب مستقل | 🟡 | `compose.yaml` و staging مستقل فعال است | نصب روی سرور تمیز فقط با مستندات، ثبت زمان و مدرک تکرارپذیری انجام نشده |
-| A02 | حذف Lovable/Supabase Runtime | 🟡 | `@supabase/supabase-js` از dependency فعال حذف و facade به API مستقل متصل شده | PR #21 هنوز باز و CI قرمز است؛ اسکن نهایی سورس/build/network و پاکسازی متن‌های قدیمی README لازم است |
-| A03 | دیتابیس، Migration و CI | 🟡 | PostgreSQL/pgvector و Alembic وجود دارد؛ staging بالا آمده | CI فعلی شکست‌خورده و اجرای schema/migration از صفر در CI مدرک نهایی ندارد |
+| A02 | حذف Lovable/Supabase Runtime | 🟡 | `@supabase/supabase-js` از dependency فعال حذف، lockfile از cache خصوصی Lovable پاک و PR #21 با CI سبز merge شده است | اسکن نهایی سورس/build/network و پاکسازی متن‌های قدیمی README لازم است |
+| A03 | دیتابیس، Migration و CI | 🟡 | PostgreSQL/pgvector و Alembic وجود دارد؛ frontend quality gates پس از PR #21 سبز است | اجرای schema/migration از صفر و backend/container gates کامل در CI هنوز مدرک نهایی ندارد |
 | A04 | Auth و MFA | 🟡 | ثبت‌نام، ورود، refresh، reset، session revoke و logout-all در Backend دیده می‌شود | MFA اجباری مدیران و E2E کامل Auth تحویل نشده |
 | A05 | Tenant Isolation | 🟡 | عضویت شرکت و کنترل‌های server-side برای چند مسیر وجود دارد | پوشش همه منابع، تست IDOR و اثبات عدم دسترسی متقاطع کامل نیست |
 | A06 | RBAC | 🟡 | Platform permissions و کنترل نقش‌های شرکتی وجود دارد | ماتریس کامل endpointها، نقش‌های Finance/Content/Support و تست جامع مجوزها ناقص است |
@@ -91,17 +91,19 @@ HRing در staging یک زیربنای مستقل واقعی شامل React/Vite
 3. `SMS_PROVIDER` و `EMAIL_PROVIDER` در نمونه تنظیمات غیرفعال‌اند.
 4. `RECRUITING_SOURCING_WEBHOOK_URL` خالی است.
 5. Backend زرین‌پال را می‌شناسد، اما متغیرهای Payment در `.env.standalone.example` کامل ارائه نشده و staging غیرفعال است.
-6. PR #21 باز است و workflow `engineering-quality-gates` روی commit staging با نتیجه failure پایان یافته.
+6. PR #21 پس از پاکسازی ۳۱ URL خصوصی Lovable با CI سبز merge شد؛ staging هنوز باید به commit جدید `main` همگام و دوباره بررسی شود.
 
 ## ترتیب اجرایی مصوب پیشنهادی
 
+
+
 ### گام ۱ — تثبیت Baseline
 
-- رفع CI مربوط به PR #21
-- سبزشدن Build/Test
-- Merge به `main`
-- بازگرداندن staging به commit ادغام‌شده‌ی `main`
-- بدون هیچ تغییر Production
+- [x] رفع CI مربوط به PR #21
+- [x] سبزشدن Build/Test
+- [x] Merge به `main`
+- [ ] بازگرداندن staging به commit ادغام‌شده‌ی `main`
+- [x] بدون هیچ تغییر Production
 
 ### گام ۲ — Integration Center
 
@@ -137,7 +139,7 @@ HRing در staging یک زیربنای مستقل واقعی شامل React/Vite
 
 ## تصمیم بعدی
 
-اولین تغییر فنی پس از تأیید این ماتریس باید فقط رفع CI و نهایی‌کردن PR #21 باشد. توسعه Integration Center باید بعد از تثبیت baseline و در یک PR مستقل آغاز شود.
+رفع CI و Merge PR #21 انجام شد. اقدام بعدی همگام‌سازی و Smoke Test staging روی `main` است؛ سپس توسعه Integration Center باید در یک PR مستقل آغاز شود.
 
 ## شواهد بررسی‌شده
 
