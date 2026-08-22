@@ -27,6 +27,8 @@ PLATFORM_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "platform.audit.read",
             "platform.ai_usage.read",
             "platform.ai_rates.manage",
+            "platform.billing.read",
+            "platform.billing.manage",
         }
     ),
     "content_admin": frozenset(
@@ -43,6 +45,7 @@ PLATFORM_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "platform.users.read",
             "platform.companies.read",
             "platform.audit.read",
+            "platform.billing.read",
         }
     ),
 }
