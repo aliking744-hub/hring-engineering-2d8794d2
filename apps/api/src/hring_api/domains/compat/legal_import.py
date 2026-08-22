@@ -4,8 +4,10 @@ import asyncio
 import ipaddress
 import re
 import socket
+from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
+from typing import cast
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -14,7 +16,7 @@ from bs4 import BeautifulSoup
 from docx import Document
 from pypdf import PdfReader
 from sqlalchemy.ext.asyncio import AsyncSession
-from striprtf.striprtf import rtf_to_text  # type: ignore[import-untyped]
+from striprtf.striprtf import rtf_to_text
 
 from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.compat.models import CompatRecord
@@ -25,6 +27,7 @@ MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 ALLOWED_ADMIN_ROLES = frozenset({"super_admin", "platform_admin", "content_admin"})
 ARTICLE_PATTERN = re.compile(r"(?=ماده\s+[\u06F0-\u06F9۰-۹0-9]+)")
 ARTICLE_NUMBER_PATTERN = re.compile(r"^ماده\s+([\u06F0-\u06F9۰-۹0-9]+)")
+_typed_rtf_to_text = cast(Callable[[str], str], rtf_to_text)
 
 
 class LegalImportError(RuntimeError):
@@ -90,13 +93,19 @@ def extract_document_text(filename: str, raw: bytes) -> str:
             return "\n\n".join((page.extract_text() or "").strip() for page in reader.pages).strip()
         if suffix == ".docx":
             document = Document(BytesIO(raw))
-            return "\n".join(paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip())
+            return "\n".join(
+                paragraph.text.strip()
+                for paragraph in document.paragraphs
+                if paragraph.text.strip()
+            )
         if suffix == ".txt":
             return raw.decode("utf-8-sig", errors="replace").strip()
         if suffix == ".rtf":
-            return rtf_to_text(raw.decode("utf-8", errors="replace")).strip()
+            return _typed_rtf_to_text(raw.decode("utf-8", errors="replace")).strip()
         if suffix == ".doc":
-            raise LegalImportError("Legacy .doc is not safely parseable; save it as .docx and upload again")
+            raise LegalImportError(
+                "Legacy .doc is not safely parseable; save it as .docx and upload again"
+            )
     except LegalImportError:
         raise
     except Exception as exc:
@@ -133,7 +142,9 @@ def smart_chunk(content: str) -> list[LegalChunk]:
     for paragraph in paragraphs:
         projected = current_length + len(paragraph) + (2 if current else 0)
         if current and projected > 2000:
-            chunks.append(LegalChunk(content="\n\n".join(current), article_number=f"بخش {section}"))
+            chunks.append(
+                LegalChunk(content="\n\n".join(current), article_number=f"بخش {section}")
+            )
             section += 1
             current = [paragraph]
             current_length = len(paragraph)
@@ -141,7 +152,9 @@ def smart_chunk(content: str) -> list[LegalChunk]:
             current.append(paragraph)
             current_length = projected
     if current:
-        chunks.append(LegalChunk(content="\n\n".join(current), article_number=f"بخش {section}"))
+        chunks.append(
+            LegalChunk(content="\n\n".join(current), article_number=f"بخش {section}")
+        )
     return chunks
 
 
@@ -216,10 +229,14 @@ async def _validate_public_url(url: str) -> str:
     if hostname in {"localhost", "localhost.localdomain"}:
         raise LegalImportError("Local source URLs are not allowed")
     try:
-        infos = await asyncio.to_thread(socket.getaddrinfo, hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+        infos = await asyncio.to_thread(
+            socket.getaddrinfo,
+            hostname,
+            parsed.port or (443 if parsed.scheme == "https" else 80),
+        )
     except socket.gaierror as exc:
         raise LegalImportError("Source host could not be resolved") from exc
-    addresses = {item[4][0] for item in infos}
+    addresses = {str(item[4][0]) for item in infos}
     if not addresses or any(_forbidden_address(address) for address in addresses):
         raise LegalImportError("Private or reserved source addresses are not allowed")
     return parsed.geturl()
