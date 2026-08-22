@@ -101,6 +101,8 @@ interface EditorState {
   timeoutSeconds: number;
   maxRetries: number;
   capabilities: string;
+  routingAliases: string;
+  fallbackFor: string;
   settings: string;
   quota: string;
 }
@@ -150,6 +152,8 @@ const emptyEditor: EditorState = {
   timeoutSeconds: 15,
   maxRetries: 2,
   capabilities: '',
+  routingAliases: '',
+  fallbackFor: '',
   settings: '{}',
   quota: '{}',
 };
@@ -174,6 +178,12 @@ const parseObject = (value: string, label: string): Record<string, unknown> => {
     throw new Error(`${label} باید یک JSON object باشد`);
   }
   return parsed as Record<string, unknown>;
+};
+
+const stringListSetting = (settings: Record<string, unknown>, key: string): string => {
+  const value = settings[key];
+  if (!Array.isArray(value)) return '';
+  return value.filter((item): item is string => typeof item === 'string').join(', ');
 };
 
 const IntegrationCenter = () => {
@@ -232,7 +242,7 @@ const IntegrationCenter = () => {
     setEditorOpen(true);
   };
 
-  const applyPreset = (adapter: 'zarinpal' | 'kavenegar' | 'resend') => {
+  const applyPreset = (adapter: 'zarinpal' | 'kavenegar' | 'resend' | 'openai' | 'gemini' | 'ollama') => {
     const presets: Record<typeof adapter, Partial<EditorState>> = {
       zarinpal: {
         providerKey: 'zarinpal.primary',
@@ -241,6 +251,9 @@ const IntegrationCenter = () => {
         adapter: 'zarinpal',
         baseUrl: 'https://api.zarinpal.com/pg/v4/payment',
         authScheme: 'none',
+        isInternal: false,
+        routingAliases: '',
+        fallbackFor: '',
         settings: '{}',
       },
       kavenegar: {
@@ -250,6 +263,9 @@ const IntegrationCenter = () => {
         adapter: 'kavenegar',
         baseUrl: 'https://api.kavenegar.com/v1',
         authScheme: 'none',
+        isInternal: false,
+        routingAliases: '',
+        fallbackFor: '',
         settings: '{\n  "otp_template": "hringotp"\n}',
       },
       resend: {
@@ -259,7 +275,46 @@ const IntegrationCenter = () => {
         adapter: 'resend',
         baseUrl: 'https://api.resend.com',
         authScheme: 'bearer',
+        isInternal: false,
+        routingAliases: '',
+        fallbackFor: '',
         settings: '{\n  "from_address": "HRing <noreply@hring.ir>"\n}',
+      },
+      openai: {
+        providerKey: 'openai.primary',
+        displayName: 'OpenAI اصلی',
+        providerType: 'llm',
+        adapter: 'openai',
+        baseUrl: 'https://api.openai.com/v1',
+        authScheme: 'bearer',
+        isInternal: false,
+        routingAliases: 'openai',
+        fallbackFor: '',
+        settings: '{}',
+      },
+      gemini: {
+        providerKey: 'gemini.primary',
+        displayName: 'Gemini اصلی',
+        providerType: 'llm',
+        adapter: 'gemini_openai',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        authScheme: 'bearer',
+        isInternal: false,
+        routingAliases: 'gemini',
+        fallbackFor: '',
+        settings: '{}',
+      },
+      ollama: {
+        providerKey: 'ollama.local',
+        displayName: 'مدل لوکال Ollama',
+        providerType: 'llm',
+        adapter: 'ollama',
+        baseUrl: 'http://ollama:11434/v1',
+        authScheme: 'none',
+        isInternal: true,
+        routingAliases: 'ollama',
+        fallbackFor: 'gemini, openai',
+        settings: '{}',
       },
     };
     setEditor((current) => ({ ...current, ...presets[adapter] }));
@@ -282,6 +337,8 @@ const IntegrationCenter = () => {
       timeoutSeconds: provider.timeout_seconds,
       maxRetries: provider.max_retries,
       capabilities: provider.capabilities.join(', '),
+      routingAliases: stringListSetting(provider.settings, 'aliases'),
+      fallbackFor: stringListSetting(provider.settings, 'fallback_for'),
       settings: JSON.stringify(provider.settings, null, 2),
       quota: JSON.stringify(provider.quota, null, 2),
     });
@@ -298,6 +355,10 @@ const IntegrationCenter = () => {
       toast.error('نام نمایشی و Adapter الزامی است');
       return;
     }
+    if (['llm', 'embedding', 'image'].includes(editor.providerType) && !editor.defaultModel.trim()) {
+      toast.error('برای اتصال هوش مصنوعی، نام مدل پیش‌فرض را وارد کنید');
+      return;
+    }
 
     let settings: Record<string, unknown>;
     let quota: Record<string, unknown>;
@@ -308,6 +369,12 @@ const IntegrationCenter = () => {
       toast.error(error instanceof Error ? error.message : 'JSON نامعتبر است');
       return;
     }
+    const aliases = editor.routingAliases.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+    const fallbackFor = editor.fallbackFor.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+    if (aliases.length) settings.aliases = Array.from(new Set(aliases));
+    else delete settings.aliases;
+    if (fallbackFor.length) settings.fallback_for = Array.from(new Set(fallbackFor));
+    else delete settings.fallback_for;
 
     setBusyKey('save');
     try {
@@ -530,6 +597,9 @@ const IntegrationCenter = () => {
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('zarinpal')}>زرین‌پال</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('kavenegar')}>کاوه‌نگار OTP</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('resend')}>Resend</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('openai')}>OpenAI</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('gemini')}>Gemini</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('ollama')}>Ollama لوکال</Button>
               </div>
             )}
             <div className="grid gap-4 md:grid-cols-2">
@@ -552,6 +622,12 @@ const IntegrationCenter = () => {
               <div className="grid gap-2"><Label>تعداد Retry</Label><Input type="number" min={0} max={10} value={editor.maxRetries} onChange={(event) => setEditor((current) => ({ ...current, maxRetries: Number(event.target.value) }))} /></div>
             </div>
             <div className="grid gap-2"><Label>قابلیت‌ها (با کاما جدا کنید)</Label><Input dir="ltr" value={editor.capabilities} onChange={(event) => setEditor((current) => ({ ...current, capabilities: event.target.value }))} placeholder="chat, embedding, vision" /></div>
+            {['llm', 'embedding', 'image'].includes(editor.providerType) && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2"><Label>نام‌های مسیریابی Primary</Label><Input dir="ltr" value={editor.routingAliases} onChange={(event) => setEditor((current) => ({ ...current, routingAliases: event.target.value }))} placeholder="gemini, default" /><p className="text-xs text-muted-foreground">قابلیت‌هایی که مستقیماً این Provider را صدا می‌زنند.</p></div>
+                <div className="grid gap-2"><Label>Fallback برای</Label><Input dir="ltr" value={editor.fallbackFor} onChange={(event) => setEditor((current) => ({ ...current, fallbackFor: event.target.value }))} placeholder="gemini, openai" /><p className="text-xs text-muted-foreground">در صورت خطای Provider اصلی، این اتصال با مدل خودش استفاده می‌شود.</p></div>
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2"><Label>تنظیمات غیرمحرمانه (JSON)</Label><Textarea dir="ltr" rows={5} value={editor.settings} onChange={(event) => setEditor((current) => ({ ...current, settings: event.target.value }))} /></div>
               <div className="grid gap-2"><Label>سقف مصرف (JSON)</Label><Textarea dir="ltr" rows={5} value={editor.quota} onChange={(event) => setEditor((current) => ({ ...current, quota: event.target.value }))} /></div>

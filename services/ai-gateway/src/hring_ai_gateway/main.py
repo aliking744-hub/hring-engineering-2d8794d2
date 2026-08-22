@@ -59,6 +59,11 @@ async def generate(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="AI provider timed out",
         ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI provider connection failed",
+        ) from exc
     except httpx.HTTPStatusError as exc:
         # Do not proxy provider response bodies: they can contain account or
         # request details that should not cross the internal service boundary.
