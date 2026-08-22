@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     sms_otp_resend_cooldown_seconds: int = 60
 
     email_provider: str = "disabled"
+    email_resend_api_key: SecretStr | None = None
+    email_from: str = "HRing <noreply@hring.ir>"
 
     rate_limit_enabled: bool = True
     rate_limit_login_per_minute: int = 12
@@ -93,6 +95,8 @@ class Settings(BaseSettings):
             raise ValueError("Development SMS provider is forbidden in production")
         if self.email_provider.lower() == "development":
             raise ValueError("Development email provider is forbidden in production")
+        if self.email_provider.lower() == "resend" and self.email_resend_api_key is None:
+            raise ValueError("EMAIL_RESEND_API_KEY is required when EMAIL_PROVIDER=resend")
         if "*" in self.cors_origins:
             raise ValueError("Wildcard CORS is forbidden in production")
         if not self.trusted_hosts or "*" in self.trusted_hosts:
