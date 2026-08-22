@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from hring_api.config import Settings
 from hring_api.integrations.email.base import EmailDeliveryError
 from hring_api.integrations.email.providers import get_email_provider
@@ -85,7 +87,12 @@ def build_learning_path_html(*, employee_name: str, job_title: str, result: dict
 این نقشه راه توسط HRing تولید شده است.</div></div></body></html>"""
 
 
-async def send_learning_path_email(*, body: object, settings: Settings) -> dict[str, object]:
+async def send_learning_path_email(
+    *,
+    body: object,
+    settings: Settings,
+    session: AsyncSession,
+) -> dict[str, object]:
     if not isinstance(body, dict):
         raise LearningEmailError("Invalid learning-path email payload")
     employee_email = body.get("employeeEmail")
@@ -107,7 +114,8 @@ async def send_learning_path_email(*, body: object, settings: Settings) -> dict[
         result=result,
     )
     try:
-        message_id = await get_email_provider(settings).send_html_email(
+        provider = await get_email_provider(session, settings)
+        message_id = await provider.send_html_email(
             to_email=employee_email.strip(),
             subject=f"نقشه راه آموزشی شما – {job_title}",
             html=message_html,

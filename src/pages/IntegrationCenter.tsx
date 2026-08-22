@@ -232,6 +232,39 @@ const IntegrationCenter = () => {
     setEditorOpen(true);
   };
 
+  const applyPreset = (adapter: 'zarinpal' | 'kavenegar' | 'resend') => {
+    const presets: Record<typeof adapter, Partial<EditorState>> = {
+      zarinpal: {
+        providerKey: 'zarinpal.primary',
+        displayName: 'زرین‌پال اصلی',
+        providerType: 'payment',
+        adapter: 'zarinpal',
+        baseUrl: 'https://api.zarinpal.com/pg/v4/payment',
+        authScheme: 'none',
+        settings: '{}',
+      },
+      kavenegar: {
+        providerKey: 'kavenegar.otp',
+        displayName: 'پیامک OTP کاوه‌نگار',
+        providerType: 'sms',
+        adapter: 'kavenegar',
+        baseUrl: 'https://api.kavenegar.com/v1',
+        authScheme: 'none',
+        settings: '{\n  "otp_template": "hringotp"\n}',
+      },
+      resend: {
+        providerKey: 'resend.transactional',
+        displayName: 'ایمیل تراکنشی Resend',
+        providerType: 'email',
+        adapter: 'resend',
+        baseUrl: 'https://api.resend.com',
+        authScheme: 'bearer',
+        settings: '{\n  "from_address": "HRing <noreply@hring.ir>"\n}',
+      },
+    };
+    setEditor((current) => ({ ...current, ...presets[adapter] }));
+  };
+
   const openEdit = (provider: IntegrationProvider) => {
     setEditingId(provider.id);
     setEditor({
@@ -331,7 +364,11 @@ const IntegrationCenter = () => {
         { method: 'POST' },
       );
       if (result.healthy) {
-        toast.success(`اتصال سالم است${result.latency_ms !== null ? ` (${result.latency_ms}ms)` : ''}`);
+        toast.success(
+          provider.adapter === 'zarinpal'
+            ? 'درگاه رسمی در دسترس است و قالب Merchant ID معتبر است؛ برای ایمنی هیچ تراکنشی در تست ساخته نشد'
+            : `اتصال سالم است${result.latency_ms !== null ? ` (${result.latency_ms}ms)` : ''}`,
+        );
       } else {
         toast.error(result.message);
       }
@@ -487,6 +524,14 @@ const IntegrationCenter = () => {
         <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader><DialogTitle>{editingId ? 'ویرایش اتصال' : 'اتصال جدید'}</DialogTitle><DialogDescription>کلید محرمانه رمزنگاری و فقط روی سرور ذخیره می‌شود. URL خارجی باید HTTPS باشد؛ سرویس لوکال فقط از hostهای allowlist پذیرفته می‌شود.</DialogDescription></DialogHeader>
           <div className="grid gap-4 py-2">
+            {!editingId && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+                <span className="text-xs text-muted-foreground">قالب آماده:</span>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('zarinpal')}>زرین‌پال</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('kavenegar')}>کاوه‌نگار OTP</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('resend')}>Resend</Button>
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2"><Label>کلید یکتا</Label><Input dir="ltr" disabled={Boolean(editingId)} value={editor.providerKey} onChange={(event) => setEditor((current) => ({ ...current, providerKey: event.target.value.toLowerCase() }))} placeholder="openai.primary" /></div>
               <div className="grid gap-2"><Label>نام نمایشی</Label><Input value={editor.displayName} onChange={(event) => setEditor((current) => ({ ...current, displayName: event.target.value }))} placeholder="OpenAI اصلی" /></div>

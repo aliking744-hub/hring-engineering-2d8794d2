@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 import httpx
@@ -303,9 +304,41 @@ async def revoke_provider_secret(
     return provider
 
 
-def _probe_url(provider: IntegrationProvider) -> str:
+def _validate_zarinpal_probe(provider: IntegrationProvider, secret: str | None) -> None:
+    if secret is None:
+        raise IntegrationValidationError("Zarinpal merchant id is not configured")
+    try:
+        UUID(secret.strip())
+    except ValueError as exc:
+        raise IntegrationValidationError(
+            "Zarinpal merchant id must be a 36-character UUID"
+        ) from exc
+    if len(secret.strip()) != 36:
+        raise IntegrationValidationError("Zarinpal merchant id must be a 36-character UUID")
     if provider.base_url is None:
         raise IntegrationValidationError("Provider base URL is not configured")
+    parsed = urlsplit(provider.base_url)
+    if parsed.hostname not in {
+        "api.zarinpal.com",
+        "payment.zarinpal.com",
+        "sandbox.zarinpal.com",
+    } or parsed.path.rstrip("/") != "/pg/v4/payment":
+        raise IntegrationValidationError("Zarinpal base URL is not an official payment endpoint")
+
+
+def _probe_url(provider: IntegrationProvider, secret: str | None) -> str:
+    if provider.base_url is None:
+        raise IntegrationValidationError("Provider base URL is not configured")
+    if provider.adapter == "zarinpal":
+        _validate_zarinpal_probe(provider, secret)
+        return f"{provider.base_url.rstrip('/')}/request.json"
+    if provider.adapter == "kavenegar":
+        if not secret:
+            raise IntegrationValidationError("Kavenegar API key is not configured")
+        parsed = urlsplit(provider.base_url)
+        if parsed.hostname != "api.kavenegar.com" or parsed.path.rstrip("/") != "/v1":
+            raise IntegrationValidationError("Kavenegar base URL is not the official API endpoint")
+        return f"{provider.base_url.rstrip('/')}/{quote(secret, safe='')}/account/info.json"
     if provider.adapter in {
         "openai",
         "openai_compatible",
@@ -321,6 +354,8 @@ def _probe_url(provider: IntegrationProvider) -> str:
 
 
 def _probe_headers(provider: IntegrationProvider, secret: str | None) -> dict[str, str]:
+    if provider.adapter in {"zarinpal", "kavenegar"}:
+        return {"Accept": "application/json", "User-Agent": "HRing-Integration-Health/1.0"}
     if provider.auth_scheme == "none":
         return {"Accept": "application/json", "User-Agent": "HRing-Integration-Health/1.0"}
     if not secret:
@@ -374,15 +409,36 @@ async def test_provider_connection(
         if provider.secret_ciphertext is not None:
             secret = ProviderSecretCipher(settings).decrypt(provider.secret_ciphertext)
         headers = _probe_headers(provider, secret)
-        url = _probe_url(provider)
+        url = _probe_url(provider, secret)
         async with httpx.AsyncClient(
             timeout=float(provider.timeout_seconds),
             follow_redirects=False,
         ) as client:
             response = await client.get(url, headers=headers)
         http_status = response.status_code
-        healthy = 200 <= response.status_code < 300
-        message = "Connection succeeded" if healthy else f"Provider returned HTTP {http_status}"
+        if provider.adapter == "zarinpal":
+            healthy = response.status_code < 500
+            message = (
+                "Zarinpal endpoint is reachable and merchant format is valid; "
+                "no payment was created"
+                if healthy
+                else f"Provider returned HTTP {http_status}"
+            )
+        elif provider.adapter == "kavenegar":
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            returned = body.get("return") if isinstance(body, dict) else None
+            healthy = (
+                200 <= response.status_code < 300
+                and isinstance(returned, dict)
+                and returned.get("status") == 200
+            )
+            message = "Connection succeeded" if healthy else f"Provider returned HTTP {http_status}"
+        else:
+            healthy = 200 <= response.status_code < 300
+            message = "Connection succeeded" if healthy else f"Provider returned HTTP {http_status}"
     except (IntegrationSecurityError, IntegrationValidationError) as exc:
         message = str(exc)
     except httpx.TimeoutException:
