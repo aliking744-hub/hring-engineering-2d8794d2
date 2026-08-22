@@ -1,23 +1,27 @@
 name: engineering-refresh-security-lockfile
 
 on:
-  push:
+  pull_request:
     branches:
-      - feature/zero-supabase-runtime
+      - engineering/foundation
     paths:
       - ".github/workflows/refresh-security-lockfile.yml"
+      - "package.json"
+      - "package-lock.json"
 
 permissions:
   contents: write
 
 jobs:
   refresh-lockfile:
-    if: github.ref == 'refs/heads/feature/zero-supabase-runtime'
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feature/zero-supabase-runtime'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - name: Checkout engineering branch
+      - name: Checkout exact engineering head branch
         uses: actions/checkout@v5
         with:
           ref: feature/zero-supabase-runtime
@@ -34,7 +38,7 @@ jobs:
       - name: Require clean production high/critical audit
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Commit lockfile only when changed and secure
+      - name: Commit only the regenerated lockfile
         run: |
           if git diff --quiet -- package-lock.json; then
             echo "package-lock.json already satisfies the production security gate"
