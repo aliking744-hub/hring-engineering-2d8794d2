@@ -15,6 +15,9 @@ class GatewaySettings(BaseSettings):
     environment: str = "development"
     internal_api_key: SecretStr = SecretStr("development-only-change-me")
 
+    hring_api_base_url: str | None = None
+    provider_registry_timeout_seconds: float = 5.0
+
     openai_api_key: SecretStr | None = None
     openai_base_url: str = "https://api.openai.com/v1"
 
