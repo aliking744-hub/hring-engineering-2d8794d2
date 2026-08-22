@@ -126,7 +126,11 @@ def smart_chunk(content: str) -> list[LegalChunk]:
         match = ARTICLE_NUMBER_PATTERN.match(text)
         if match:
             chunks.append(LegalChunk(content=text, article_number=match.group(1)))
-        elif not chunks and len(text) > 50:
+        elif not chunks:
+            # ARTICLE_PATTERN keeps any preamble before the first legal article as
+            # the first split item. Since it already passed the 20-character noise
+            # floor above, preserve it as a meaningful introduction rather than
+            # silently dropping legal context shorter than an arbitrary 50 chars.
             chunks.append(LegalChunk(content=text, article_number="مقدمه"))
 
     if chunks:
