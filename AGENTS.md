@@ -75,7 +75,7 @@ The current Supabase runtime is transitional technical debt. It must be removed 
 - HR Dashboard & Analytics
 - Legal Intelligence
 - Strategic Compass / Strategic Radar
-- Unicorn Lab / Strategic Intelligence
+- Strategic Intelligence (Strategic Compass / Strategic Radar; Unicorn Lab retired by product-owner decision)
 - Digital Products / Marketplace
 - Notifications & Support
 - Administration / Control Center
