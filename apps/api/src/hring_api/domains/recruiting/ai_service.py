@@ -7,6 +7,7 @@ import httpx
 from pydantic import ValidationError
 
 from hring_api.config import Settings
+from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
 from hring_api.domains.ai.gateway_client import AiGatewayError, generate_with_ai_gateway
 from hring_api.domains.recruiting.schemas import (
     AnalyzeCandidatesResponse,
@@ -121,14 +122,20 @@ async def _enrich_candidate(
         },
     ]
     try:
+        route = await resolve_runtime_feature_route(
+            feature_key="smart_headhunting.web_enrichment",
+            default_provider=settings.recruiting_enrichment_provider,
+            default_model=settings.recruiting_enrichment_model,
+        )
         result = await generate_with_ai_gateway(
             feature_key="smart_headhunting.web_enrichment",
             user_id=user_id,
             company_id=company_id,
-            provider=settings.recruiting_enrichment_provider,
-            model=settings.recruiting_enrichment_model,
+            provider=route.provider,
+            model=route.model,
             messages=messages,
             max_output_tokens=800,
+            metadata_json={"ai_route_source": route.source},
         )
         return result.content[:12_000]
     except AiGatewayError:
@@ -168,17 +175,23 @@ async def analyze_candidates(
     user_prompt = f"""الزامات شغلی:\n{_job_text(job)}\n\nکاندیداها:\n{json.dumps(prepared, ensure_ascii=False)}\n\nبرای هر کاندیدا فقط تحلیل پنج‌لایه و sourceIndex خودش را برگردان. اطلاعات هویتی و رزومه‌ای را در پاسخ تولید نکن. نتایج می‌توانند بر اساس matchScore مرتب شوند چون تطبیق با sourceIndex انجام می‌شود."""
 
     try:
+        route = await resolve_runtime_feature_route(
+            feature_key="smart_headhunting.candidate_analysis",
+            default_provider=settings.recruiting_ai_provider,
+            default_model=settings.recruiting_ai_model,
+        )
         result = await generate_with_ai_gateway(
             feature_key="smart_headhunting.candidate_analysis",
             user_id=user_id,
             company_id=company_id,
-            provider=settings.recruiting_ai_provider,
-            model=settings.recruiting_ai_model,
+            provider=route.provider,
+            model=route.model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
             max_output_tokens=12_000,
+            metadata_json={"ai_route_source": route.source},
         )
     except AiGatewayError as exc:
         raise RecruitingAiError("سرویس تحلیل هوش مصنوعی در دسترس نیست") from exc

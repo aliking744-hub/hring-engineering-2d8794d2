@@ -111,8 +111,14 @@ def normalize_usage(body: dict[str, Any]) -> dict[str, int]:
         _nested_int(usage, "reasoning_tokens"),
     )
     normalized = {
-        "input_tokens": _nested_int(usage, "prompt_tokens"),
-        "output_tokens": _nested_int(usage, "completion_tokens"),
+        "input_tokens": max(
+            _nested_int(usage, "prompt_tokens"),
+            _nested_int(usage, "input_tokens"),
+        ),
+        "output_tokens": max(
+            _nested_int(usage, "completion_tokens"),
+            _nested_int(usage, "output_tokens"),
+        ),
         "cached_input_tokens": _nested_int(usage, "prompt_tokens_details", "cached_tokens"),
         "reasoning_tokens": reasoning_tokens,
         "citation_tokens": _nested_int(usage, "citation_tokens"),
@@ -121,7 +127,22 @@ def normalize_usage(body: dict[str, Any]) -> dict[str, int]:
     return {key: value for key, value in normalized.items() if value > 0}
 
 
-def _extract_content(body: dict[str, Any]) -> str:
+def _extract_content(body: dict[str, Any], adapter: str) -> str:
+    if adapter == "anthropic":
+        blocks = body.get("content")
+        if not isinstance(blocks, list):
+            raise ProviderResponseError("Anthropic returned no content blocks")
+        text = "".join(
+            block["text"]
+            for block in blocks
+            if isinstance(block, dict)
+            and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+        )
+        if text:
+            return text
+        raise ProviderResponseError("Anthropic returned no text content")
+
     choices = body.get("choices")
     if not isinstance(choices, list) or not choices:
         raise ProviderResponseError("Provider returned no choices")
@@ -155,7 +176,39 @@ def _provider_headers(provider: ProviderConfig, request: GenerateRequest) -> dic
         raise ProviderUnavailableError("Provider authentication scheme is unsupported")
     if provider.adapter == "openai":
         headers["X-Client-Request-Id"] = str(request.request_id)
+    if provider.adapter == "anthropic":
+        headers["anthropic-version"] = "2023-06-01"
     return headers
+
+
+def _anthropic_payload(request: GenerateRequest, model: str) -> dict[str, object]:
+    if request.temperature is not None and request.temperature > 1:
+        raise ProviderUnavailableError("Anthropic temperature must be between 0 and 1")
+
+    system_parts: list[str] = []
+    messages: list[dict[str, str]] = []
+    for message in request.messages:
+        if message.role in {"system", "developer"}:
+            system_parts.append(message.content)
+        else:
+            messages.append({"role": message.role, "content": message.content})
+    if not messages:
+        raise ProviderUnavailableError("Anthropic requires at least one user or assistant message")
+    if request.response_format == "json_object":
+        system_parts.append(
+            "Return only one valid JSON object. Do not wrap the JSON in Markdown code fences."
+        )
+    payload: dict[str, object] = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": request.max_output_tokens or 4096,
+        "stream": False,
+    }
+    if system_parts:
+        payload["system"] = "\n\n".join(system_parts)
+    if request.temperature is not None:
+        payload["temperature"] = request.temperature
+    return payload
 
 
 async def _generate_once(
@@ -165,21 +218,24 @@ async def _generate_once(
     provider: ProviderConfig,
 ) -> GenerateResponse:
     model = provider.default_model or request.model
-    payload: dict[str, object] = {
-        "model": model,
-        "messages": [message.model_dump() for message in request.messages],
-        "stream": False,
-    }
-    if request.temperature is not None:
-        payload["temperature"] = request.temperature
-    if request.max_output_tokens is not None:
-        payload[provider.max_tokens_field] = request.max_output_tokens
-    if request.response_format == "json_object":
-        if provider.adapter == "perplexity":
-            raise ProviderUnavailableError(
-                "Perplexity structured output requires an explicit JSON schema"
-            )
-        payload["response_format"] = {"type": "json_object"}
+    if provider.adapter == "anthropic":
+        payload = _anthropic_payload(request, model)
+    else:
+        payload = {
+            "model": model,
+            "messages": [message.model_dump() for message in request.messages],
+            "stream": False,
+        }
+        if request.temperature is not None:
+            payload["temperature"] = request.temperature
+        if request.max_output_tokens is not None:
+            payload[provider.max_tokens_field] = request.max_output_tokens
+        if request.response_format == "json_object":
+            if provider.adapter == "perplexity":
+                raise ProviderUnavailableError(
+                    "Perplexity structured output requires an explicit JSON schema"
+                )
+            payload["response_format"] = {"type": "json_object"}
 
     timeout = httpx.Timeout(
         provider.timeout_seconds,
@@ -200,13 +256,13 @@ async def _generate_once(
     if not isinstance(raw, dict):
         raise ProviderResponseError("Provider returned malformed JSON")
     body = cast(dict[str, Any], raw)
-    provider_request_id = response.headers.get("x-request-id")
+    provider_request_id = response.headers.get("x-request-id") or response.headers.get("request-id")
     if not provider_request_id:
         body_id = body.get("id")
         provider_request_id = body_id if isinstance(body_id, str) else None
 
     return GenerateResponse(
-        content=_extract_content(body),
+        content=_extract_content(body, provider.adapter),
         provider=provider.name,
         model=model,
         usage=normalize_usage(body),

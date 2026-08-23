@@ -22,6 +22,7 @@ AI_ADAPTERS = frozenset(
     {
         "openai",
         "openai_compatible",
+        "anthropic",
         "gemini_openai",
         "perplexity",
         "ollama",
@@ -66,6 +67,7 @@ def _string_set(value: object) -> set[str]:
 def _canonical_alias(adapter: str) -> str | None:
     return {
         "openai": "openai",
+        "anthropic": "anthropic",
         "gemini_openai": "gemini",
         "perplexity": "perplexity",
         "ollama": "ollama",

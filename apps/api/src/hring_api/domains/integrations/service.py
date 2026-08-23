@@ -348,6 +348,8 @@ def _probe_url(provider: IntegrationProvider, secret: str | None) -> str:
         "vllm",
     }:
         return f"{provider.base_url.rstrip('/')}/models"
+    if provider.adapter == "anthropic":
+        return f"{provider.base_url.rstrip('/')}/v1/models"
     if provider.adapter == "resend":
         return f"{provider.base_url.rstrip('/')}/domains"
     return provider.base_url
@@ -370,11 +372,14 @@ def _probe_headers(provider: IntegrationProvider, secret: str | None) -> dict[st
     if name is None:
         raise IntegrationValidationError("Provider authentication scheme is unsupported")
     value = f"Bearer {secret}" if provider.auth_scheme == "bearer" else secret
-    return {
+    headers = {
         "Accept": "application/json",
         "User-Agent": "HRing-Integration-Health/1.0",
         name: value,
     }
+    if provider.adapter == "anthropic":
+        headers["anthropic-version"] = "2023-06-01"
+    return headers
 
 
 def _evaluate_local_ai_inventory(

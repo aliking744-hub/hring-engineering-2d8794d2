@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
+  ArrowRight,
+  BrainCircuit,
   Cloud,
   KeyRound,
   Loader2,
@@ -123,6 +125,7 @@ const PROVIDER_TYPES = [
 const ADAPTERS = [
   'openai_compatible',
   'openai',
+  'anthropic',
   'gemini_openai',
   'perplexity',
   'ollama',
@@ -171,6 +174,8 @@ const statusVariant = (status: ProviderStatus): 'default' | 'destructive' | 'sec
   if (status === 'disabled') return 'secondary';
   return 'outline';
 };
+
+type PresetKey = 'zarinpal' | 'kavenegar' | 'resend' | 'openai' | 'anthropic' | 'gemini' | 'ollama';
 
 const parseObject = (value: string, label: string): Record<string, unknown> => {
   const parsed: unknown = value.trim() ? JSON.parse(value) : {};
@@ -242,7 +247,7 @@ const IntegrationCenter = () => {
     setEditorOpen(true);
   };
 
-  const applyPreset = (adapter: 'zarinpal' | 'kavenegar' | 'resend' | 'openai' | 'gemini' | 'ollama') => {
+  const applyPreset = (adapter: PresetKey) => {
     const presets: Record<typeof adapter, Partial<EditorState>> = {
       zarinpal: {
         providerKey: 'zarinpal.primary',
@@ -282,13 +287,29 @@ const IntegrationCenter = () => {
       },
       openai: {
         providerKey: 'openai.primary',
-        displayName: 'OpenAI اصلی',
+        displayName: 'OpenAI (ChatGPT)',
         providerType: 'llm',
         adapter: 'openai',
         baseUrl: 'https://api.openai.com/v1',
+        defaultModel: '',
         authScheme: 'bearer',
         isInternal: false,
+        capabilities: 'chat',
         routingAliases: 'openai',
+        fallbackFor: '',
+        settings: '{}',
+      },
+      anthropic: {
+        providerKey: 'anthropic.primary',
+        displayName: 'Anthropic (Claude)',
+        providerType: 'llm',
+        adapter: 'anthropic',
+        baseUrl: 'https://api.anthropic.com',
+        defaultModel: '',
+        authScheme: 'x-api-key',
+        isInternal: false,
+        capabilities: 'chat',
+        routingAliases: 'anthropic, claude',
         fallbackFor: '',
         settings: '{}',
       },
@@ -298,8 +319,10 @@ const IntegrationCenter = () => {
         providerType: 'llm',
         adapter: 'gemini_openai',
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        defaultModel: '',
         authScheme: 'bearer',
         isInternal: false,
+        capabilities: 'chat',
         routingAliases: 'gemini',
         fallbackFor: '',
         settings: '{}',
@@ -310,14 +333,23 @@ const IntegrationCenter = () => {
         providerType: 'llm',
         adapter: 'ollama',
         baseUrl: 'http://ollama:11434/v1',
+        defaultModel: '',
         authScheme: 'none',
         isInternal: true,
+        capabilities: 'chat',
         routingAliases: 'ollama',
         fallbackFor: 'gemini, openai',
         settings: '{}',
       },
     };
     setEditor((current) => ({ ...current, ...presets[adapter] }));
+  };
+
+  const openPreset = (preset: PresetKey) => {
+    setEditingId(null);
+    setEditor(emptyEditor);
+    applyPreset(preset);
+    setEditorOpen(true);
   };
 
   const openEdit = (provider: IntegrationProvider) => {
@@ -521,16 +553,39 @@ const IntegrationCenter = () => {
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />
         <div className="container relative z-10 mx-auto max-w-7xl px-4 py-8">
+          <Button variant="outline" asChild className="mb-5"><Link to="/admin"><ArrowRight className="ml-2 h-4 w-4" />بازگشت به مرکز مدیریت</Link></Button>
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold"><PlugZap className="h-6 w-6 text-primary" />مرکز یکپارچه‌سازی‌ها</h1>
-              <p className="mt-1 text-sm text-muted-foreground">AI، مدل لوکال، جستجو، پرداخت، پیامک، ایمیل و وب‌هوک با Secret Store و تست سلامت.</p>
+              <h1 className="flex items-center gap-2 text-2xl font-bold"><PlugZap className="h-6 w-6 text-primary" />اتصال سرویس‌ها و APIها</h1>
+              <p className="mt-1 text-sm text-muted-foreground">ثبت امن کلیدها، آدرس سرویس‌ها و تست سلامت اتصال؛ از AI تا پرداخت، پیامک و ایمیل.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => void load()}><RefreshCw className="ml-2 h-4 w-4" />تازه‌سازی</Button>
               {canManage && <Button onClick={openNew}><Plus className="ml-2 h-4 w-4" />اتصال جدید</Button>}
             </div>
           </div>
+
+          <Card className="mb-5 border-primary/30 bg-primary/5">
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+              <div className="flex items-start gap-3">
+                <BrainCircuit className="mt-0.5 h-6 w-6 text-primary" />
+                <div><div className="font-medium">این صفحه فقط اتصال سرویس‌ها را مدیریت می‌کند</div><div className="mt-1 text-sm text-muted-foreground">برای دیدن و تغییر اینکه هر قابلیت HRing از کدام هوش و مدل استفاده می‌کند، وارد «مدیریت هوش قابلیت‌ها» شوید.</div></div>
+              </div>
+              <Button asChild><Link to="/admin/prompts">مدیریت هوش قابلیت‌ها</Link></Button>
+            </CardContent>
+          </Card>
+
+          {canManage && (
+            <Card className="mb-5">
+              <CardHeader><CardTitle className="text-base">اتصال سریع سرویس‌های هوش مصنوعی</CardTitle><CardDescription>سرویس را انتخاب کنید، نام مدل و API Key همان حساب را وارد کنید و سپس تست اتصال بگیرید.</CardDescription></CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => openPreset('openai')}>OpenAI (ChatGPT)</Button>
+                <Button variant="outline" onClick={() => openPreset('anthropic')}>Anthropic (Claude)</Button>
+                <Button variant="outline" onClick={() => openPreset('gemini')}>Google Gemini</Button>
+                <Button variant="outline" onClick={() => openPreset('ollama')}>Ollama لوکال</Button>
+              </CardContent>
+            </Card>
+          )}
 
           {!canManage && (
             <Card className="mb-5 border-amber-500/40 bg-amber-500/5">
@@ -551,7 +606,7 @@ const IntegrationCenter = () => {
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><CardTitle>Provider Registry</CardTitle><CardDescription>Secretها هرگز از API به مرورگر برگردانده نمی‌شوند؛ فقط چهار نویسه آخر برای تشخیص کلید نمایش داده می‌شود.</CardDescription></div>
+                <div><CardTitle>فهرست اتصال‌های ثبت‌شده</CardTitle><CardDescription>کلیدهای محرمانه هرگز به مرورگر برگردانده نمی‌شوند؛ فقط چهار نویسه آخر برای تشخیص کلید نمایش داده می‌شود.</CardDescription></div>
                 <Input className="max-w-sm" placeholder="جستجو در نام، نوع، مدل یا adapter..." value={search} onChange={(event) => setSearch(event.target.value)} />
               </div>
             </CardHeader>
@@ -597,7 +652,8 @@ const IntegrationCenter = () => {
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('zarinpal')}>زرین‌پال</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('kavenegar')}>کاوه‌نگار OTP</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('resend')}>Resend</Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('openai')}>OpenAI</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('openai')}>OpenAI (ChatGPT)</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('anthropic')}>Anthropic (Claude)</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('gemini')}>Gemini</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('ollama')}>Ollama لوکال</Button>
               </div>

@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import httpx
@@ -9,12 +10,17 @@ from sqlalchemy import select
 from hring_api.config import Settings
 from hring_api.db.session import SessionFactory
 from hring_api.domains.access.models import PlatformRoleAssignment
+from hring_api.domains.integrations.internal_routes import AI_ADAPTERS
 from hring_api.domains.integrations.models import IntegrationProvider
 from hring_api.domains.integrations.security import (
     IntegrationSecurityError,
     normalize_provider_base_url,
 )
-from hring_api.domains.integrations.service import _evaluate_local_ai_inventory
+from hring_api.domains.integrations.service import (
+    _evaluate_local_ai_inventory,
+    _probe_headers,
+    _probe_url,
+)
 from hring_api.main import app
 
 
@@ -271,3 +277,16 @@ def test_local_ai_inventory_requires_the_configured_model() -> None:
     )
     assert healthy is False
     assert "no models" in message.lower()
+
+
+def test_anthropic_probe_uses_models_endpoint_and_required_version_header() -> None:
+    assert "anthropic" in AI_ADAPTERS
+    provider = SimpleNamespace(
+        adapter="anthropic",
+        base_url="https://api.anthropic.com",
+        auth_scheme="x-api-key",
+    )
+    assert _probe_url(provider, "anthropic-secret") == "https://api.anthropic.com/v1/models"
+    headers = _probe_headers(provider, "anthropic-secret")
+    assert headers["X-API-Key"] == "anthropic-secret"
+    assert headers["anthropic-version"] == "2023-06-01"

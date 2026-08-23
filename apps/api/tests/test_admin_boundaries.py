@@ -164,6 +164,73 @@ def test_product_settings_reject_secrets_and_public_endpoint_filters_private_val
         assert "gemini_api_key" not in settings
 
 
+def test_product_settings_bulk_update_is_atomic() -> None:
+    with TestClient(app) as client:
+        content_admin = _register_with_platform_role(client, "content-cms", "content_admin")
+        header = _auth(content_admin)
+
+        saved = client.put(
+            "/api/v1/admin/product/settings/bulk",
+            headers=header,
+            json={
+                "settings": [
+                    {
+                        "key": "site_name",
+                        "value": "HRing CMS",
+                        "label": "Site name",
+                        "category": "branding",
+                        "value_type": "text",
+                        "is_public": True,
+                    },
+                    {
+                        "key": "color_primary",
+                        "value": "#2563eb",
+                        "label": "Primary color",
+                        "category": "theme",
+                        "value_type": "text",
+                        "is_public": True,
+                    },
+                ]
+            },
+        )
+        assert saved.status_code == 200, saved.text
+        assert {row["key"] for row in saved.json()} == {"site_name", "color_primary"}
+
+        unique_safe_key = f"cms_atomic_{uuid4().hex}"
+        rejected = client.put(
+            "/api/v1/admin/product/settings/bulk",
+            headers=header,
+            json={
+                "settings": [
+                    {
+                        "key": unique_safe_key,
+                        "value": "must roll back",
+                        "label": "Atomic marker",
+                        "category": "test",
+                        "value_type": "text",
+                        "is_public": True,
+                    },
+                    {
+                        "key": "openai_api_key",
+                        "value": "never-store-this",
+                        "label": "Forbidden secret",
+                        "category": "integrations",
+                        "value_type": "text",
+                        "is_public": False,
+                    },
+                ]
+            },
+        )
+        assert rejected.status_code == 409, rejected.text
+
+        public = client.get("/api/v1/public/settings")
+        assert public.status_code == 200, public.text
+        settings = public.json()["settings"]
+        assert settings["site_name"] == "HRing CMS"
+        assert settings["color_primary"] == "#2563eb"
+        assert unique_safe_key not in settings
+
+
 def test_platform_company_creation_provisions_an_isolated_ceo_account() -> None:
     with TestClient(app) as client:
         platform_admin = _register_with_platform_role(client, "tenant-platform", "platform_admin")

@@ -20,6 +20,7 @@ from hring_api.domains.admin.schemas import (
     AdminUserResponse,
     AdminUserStatusRequest,
     AuditLogResponse,
+    BulkUpsertSiteSettingsRequest,
     CreateManagedCompanyRequest,
     ManagedCompanyCreatedResponse,
     PlatformOverviewResponse,
@@ -264,6 +265,41 @@ async def product_settings(
     db: AsyncSession = Depends(get_db_session),
 ) -> list[SiteSettingResponse]:
     return [SiteSettingResponse.model_validate(row) for row in await list_site_settings(db)]
+
+
+@router.put(
+    "/admin/product/settings/bulk",
+    response_model=list[SiteSettingResponse],
+    tags=["product-admin"],
+)
+async def change_product_settings_bulk(
+    payload: BulkUpsertSiteSettingsRequest,
+    request: Request,
+    actor: PlatformPrincipal = Depends(require_platform_permission("product.settings.manage")),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[SiteSettingResponse]:
+    try:
+        rows = [
+            await save_site_setting(
+                db,
+                actor_user_id=actor.user_id,
+                key=item.key,
+                value=item.value,
+                label=item.label,
+                category=item.category,
+                value_type=item.value_type,
+                is_public=item.is_public,
+                ip_address=_client_ip(request),
+            )
+            for item in payload.settings
+        ]
+    except AdminError as exc:
+        await db.rollback()
+        raise _admin_error(exc) from exc
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    return [SiteSettingResponse.model_validate(row) for row in rows]
 
 
 @router.put(

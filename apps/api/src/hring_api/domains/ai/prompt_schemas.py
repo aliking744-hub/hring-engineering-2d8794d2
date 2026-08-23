@@ -163,7 +163,11 @@ class PromptResponse(BaseModel):
     description: str | None
     is_active: bool
     published_version: int | None
+    published_provider_alias: str | None
+    published_model: str | None
     draft_version: int | None
+    draft_provider_alias: str | None
+    draft_model: str | None
     version_count: int
     created_at: datetime
     updated_at: datetime

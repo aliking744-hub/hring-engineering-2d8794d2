@@ -107,6 +107,27 @@ class AiRateCard(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
+
+class AiFeatureRoute(Base):
+    __tablename__ = "ai_feature_routes"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    feature_key: Mapped[str] = mapped_column(
+        String(120), nullable=False, unique=True, index=True
+    )
+    provider_alias: Mapped[str] = mapped_column(String(120), nullable=False)
+    model: Mapped[str] = mapped_column(String(240), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class AiPrompt(Base):
     __tablename__ = "ai_prompts"
 
