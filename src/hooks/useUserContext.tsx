@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { apiRequest } from '@/lib/api';
 import { useAuth } from './useAuth';
 import type {
@@ -40,12 +40,17 @@ interface ApiUserContext {
 const UserContextContext = createContext<UserContextState | undefined>(undefined);
 
 export const UserContextProvider = ({ children }: { children: ReactNode }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, mfaRequired, mfaVerified } = useAuth();
   const [context, setContext] = useState<UserContext | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserContext = async () => {
+  const fetchUserContext = useCallback(async () => {
     if (!user) {
+      setContext(null);
+      setLoading(false);
+      return;
+    }
+    if (mfaRequired && !mfaVerified) {
       setContext(null);
       setLoading(false);
       return;
@@ -81,12 +86,12 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, mfaRequired, mfaVerified]);
 
   useEffect(() => {
     if (authLoading) return;
     void fetchUserContext();
-  }, [user, authLoading]);
+  }, [authLoading, fetchUserContext]);
 
   return (
     <UserContextContext.Provider value={{ context, loading, refetch: fetchUserContext }}>

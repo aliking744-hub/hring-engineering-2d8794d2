@@ -88,6 +88,37 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     tokens: TokenPairResponse
+    mfa_required: bool = False
+    mfa_enrollment_required: bool = False
+    mfa_verified: bool = False
+
+
+class MfaCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=64)
+
+
+class MfaDisableRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+
+
+class MfaEnrollmentResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class MfaStatusResponse(BaseModel):
+    required: bool
+    enrollment_required: bool
+    verification_required: bool
+    enabled: bool
+    verified: bool
+    recovery_codes_remaining: int
+    locked_until: datetime | None
+
+
+class MfaConfirmationResponse(BaseModel):
+    status: MfaStatusResponse
+    recovery_codes: list[str]
 
 
 class MembershipResponse(BaseModel):

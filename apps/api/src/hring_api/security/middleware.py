@@ -71,6 +71,18 @@ class SensitiveRouteRateLimitMiddleware(BaseHTTPMiddleware):
                 "email_verify",
                 settings.rate_limit_recovery_per_minute,
             ),
+            ("POST", f"{prefix}/auth/mfa/enroll"): (
+                "mfa_enroll",
+                settings.rate_limit_mfa_per_minute,
+            ),
+            ("POST", f"{prefix}/auth/mfa/confirm"): (
+                "mfa_confirm",
+                settings.rate_limit_mfa_per_minute,
+            ),
+            ("POST", f"{prefix}/auth/mfa/verify"): (
+                "mfa_verify",
+                settings.rate_limit_mfa_per_minute,
+            ),
             ("POST", f"{prefix}/compat/public-functions/hring-support"): (
                 "public_support",
                 settings.rate_limit_register_per_minute,

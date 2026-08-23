@@ -9,7 +9,8 @@ import {
   ArrowRight,
   Mail,
   Briefcase,
-  Building2
+  Building2,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,11 +160,11 @@ const Profile = () => {
         title: "تصویر به‌روزرسانی شد",
         description: "تصویر پروفایل شما با موفقیت آپلود شد",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
       toast({
         title: "خطا در آپلود",
-        description: error.message || "مشکلی در آپلود تصویر پیش آمد",
+        description: error instanceof Error ? error.message : "مشکلی در آپلود تصویر پیش آمد",
         variant: "destructive",
       });
     } finally {
@@ -197,11 +198,11 @@ const Profile = () => {
         title: "پروفایل به‌روزرسانی شد",
         description: "اطلاعات پروفایل شما با موفقیت ذخیره شد",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Update error:', error);
       toast({
         title: "خطا",
-        description: error.message || "مشکلی در ذخیره اطلاعات پیش آمد",
+        description: error instanceof Error ? error.message : "مشکلی در ذخیره اطلاعات پیش آمد",
         variant: "destructive",
       });
     } finally {
@@ -355,6 +356,15 @@ const Profile = () => {
                     )}
                   </Button>
                 </form>
+
+                <div className="border-t border-border/60 pt-5">
+                  <Button variant="outline" className="w-full gap-2" asChild>
+                    <Link to="/security">
+                      <ShieldCheck className="h-4 w-4" />
+                      امنیت حساب و ورود دومرحله‌ای
+                    </Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

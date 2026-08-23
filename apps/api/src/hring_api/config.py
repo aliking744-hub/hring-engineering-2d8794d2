@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     auth_security_token_pepper: SecretStr = SecretStr(
         "development-security-token-pepper-change-me"
     )
+    auth_mfa_encryption_key: SecretStr = SecretStr(
+        "development-mfa-encryption-key-change-me"
+    )
+    auth_mfa_issuer: str = "HRing"
+    auth_mfa_recovery_code_count: int = Field(default=10, ge=6, le=20)
+    auth_login_lockout_threshold: int = Field(default=5, ge=3, le=20)
+    auth_login_lockout_minutes: int = Field(default=15, ge=1, le=1_440)
+    auth_login_attempt_retention_days: int = Field(default=30, ge=1, le=365)
     auth_password_reset_ttl_minutes: int = 30
     auth_email_verify_ttl_hours: int = 24
 
@@ -76,6 +84,7 @@ class Settings(BaseSettings):
     rate_limit_register_per_minute: int = 6
     rate_limit_sms_request_per_minute: int = 5
     rate_limit_recovery_per_minute: int = 6
+    rate_limit_mfa_per_minute: int = 10
 
     @model_validator(mode="after")
     def reject_unsafe_production_configuration(self) -> "Settings":
@@ -88,6 +97,7 @@ class Settings(BaseSettings):
             "development-only-change-me",
             "development-sms-otp-pepper-change-me",
             "development-security-token-pepper-change-me",
+            "development-mfa-encryption-key-change-me",
         }
         secrets = {
             self.object_storage_secret_key.get_secret_value(),
@@ -95,9 +105,12 @@ class Settings(BaseSettings):
             self.auth_jwt_secret.get_secret_value(),
             self.sms_otp_pepper.get_secret_value(),
             self.auth_security_token_pepper.get_secret_value(),
+            self.auth_mfa_encryption_key.get_secret_value(),
         }
         if secrets & insecure_values:
             raise ValueError("Production secrets must be supplied securely")
+        if len(self.auth_mfa_encryption_key.get_secret_value()) < 32:
+            raise ValueError("AUTH_MFA_ENCRYPTION_KEY must contain at least 32 characters")
         if self.sms_provider.lower() == "development":
             raise ValueError("Development SMS provider is forbidden in production")
         if self.email_provider.lower() == "development":

@@ -21,6 +21,9 @@ export interface AuthEnvelope {
     access_expires_at: string;
     refresh_expires_at: string;
   };
+  mfa_required?: boolean;
+  mfa_enrollment_required?: boolean;
+  mfa_verified?: boolean;
 }
 
 export class ApiError extends Error {
@@ -127,7 +130,8 @@ export const apiRequest = async <T>(
       authRequired &&
       retryAuth &&
       error instanceof ApiError &&
-      error.status === 401
+      error.status === 401 &&
+      error.detail === 'Authentication required'
     ) {
       const refreshed = await refreshSession();
       if (refreshed) {

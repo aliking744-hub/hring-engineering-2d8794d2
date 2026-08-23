@@ -5,10 +5,12 @@ import {
   Activity,
   Building2,
   ChevronLeft,
+  LockKeyholeOpen,
   Loader2,
   Plus,
   RefreshCw,
   ShieldCheck,
+  ShieldOff,
   Users,
 } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
@@ -66,6 +68,9 @@ interface PlatformUser {
   email_verified_at: string | null;
   platform_roles: PlatformRole[];
   app_roles: string[];
+  failed_login_attempts: number;
+  locked_until: string | null;
+  mfa_enabled: boolean;
   created_at: string;
 }
 
@@ -199,6 +204,34 @@ const PlatformAdmin = () => {
     }
   };
 
+  const unlockUser = async (user: PlatformUser) => {
+    if (!isSuperAdmin || !window.confirm(`قفل ورود ${user.email} باز شود؟`)) return;
+    setBusyKey(`unlock:${user.id}`);
+    try {
+      await apiRequest<void>(`/admin/platform/users/${user.id}/unlock`, { method: 'POST' });
+      toast.success('قفل حساب باز شد');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'باز کردن قفل حساب انجام نشد');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const resetUserMfa = async (user: PlatformUser) => {
+    if (!isSuperAdmin || !window.confirm(`MFA حساب ${user.email} بازنشانی شود؟ همهٔ نشست‌های او بسته می‌شوند.`)) return;
+    setBusyKey(`mfa-reset:${user.id}`);
+    try {
+      await apiRequest<void>(`/admin/platform/users/${user.id}/mfa`, { method: 'DELETE' });
+      toast.success('MFA بازنشانی و نشست‌های کاربر بسته شد');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'بازنشانی MFA انجام نشد');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
   const updateCompany = async (company: PlatformCompany, values: Partial<PlatformCompany>) => {
     setBusyKey(`company:${company.id}`);
     try {
@@ -280,7 +313,7 @@ const PlatformAdmin = () => {
           <Tabs defaultValue="companies">
             <TabsList className="mb-5"><TabsTrigger value="companies">شرکت‌ها</TabsTrigger><TabsTrigger value="users">کاربران</TabsTrigger><TabsTrigger value="audit">Audit</TabsTrigger>{canManagePlatform && <TabsTrigger value="ai-economics">AI Economics</TabsTrigger>}</TabsList>
             <TabsContent value="companies"><Card><CardHeader><CardTitle>شرکت‌ها</CardTitle><CardDescription>پلن، وضعیت و ظرفیت قرارداد در سطح پلتفرم مدیریت می‌شود.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>شرکت</TableHead><TableHead>پلن</TableHead><TableHead>وضعیت</TableHead><TableHead>اعتبار</TableHead><TableHead>ظرفیت</TableHead></TableRow></TableHeader><TableBody>{companies.map((company) => <TableRow key={company.id}><TableCell><div className="font-medium">{company.name}</div><div className="text-xs text-muted-foreground" dir="ltr">{company.domain || '—'}</div></TableCell><TableCell><Select value={company.subscription_tier} disabled={!canManagePlatform || busyKey === `company:${company.id}`} onValueChange={(value) => void updateCompany(company, { subscription_tier: value as SubscriptionTier })}><SelectTrigger className="min-w-48"><SelectValue /></SelectTrigger><SelectContent>{COMPANY_TIERS.map((tier) => <SelectItem key={tier} value={tier}>{TIER_NAMES[tier]}</SelectItem>)}</SelectContent></Select></TableCell><TableCell><Select value={company.status} disabled={!canManagePlatform || busyKey === `company:${company.id}`} onValueChange={(value) => void updateCompany(company, { status: value as PlatformCompany['status'] })}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">فعال</SelectItem><SelectItem value="trial">آزمایشی</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent></Select></TableCell><TableCell>{company.used_credits.toLocaleString('fa-IR')} / {company.monthly_credits.toLocaleString('fa-IR')}</TableCell><TableCell>{company.max_members.toLocaleString('fa-IR')}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card></TabsContent>
-            <TabsContent value="users"><Card><CardHeader><CardTitle>کاربران پلتفرم</CardTitle><CardDescription>{isSuperAdmin ? 'سوپر ادمین می‌تواند نقش‌های سراسری را مدیریت کند.' : 'نقش‌های سراسری فقط توسط سوپر ادمین تغییر می‌کنند.'}</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>کاربر</TableHead><TableHead>وضعیت</TableHead><TableHead>نقش‌های سراسری</TableHead></TableRow></TableHeader><TableBody>{users.map((user) => <TableRow key={user.id}><TableCell><div className="font-medium">{user.full_name || user.email}</div><div className="text-xs text-muted-foreground" dir="ltr">{user.email}</div></TableCell><TableCell><div className="flex items-center gap-2"><Switch checked={user.is_active} disabled={!canManagePlatform || busyKey === `user-status:${user.id}`} onCheckedChange={(checked) => void updateUserStatus(user, checked)} /><Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'فعال' : 'غیرفعال'}</Badge></div></TableCell><TableCell><div className="flex flex-wrap gap-3">{PLATFORM_ROLES.map((role) => <label key={role} className="flex items-center gap-2 text-xs"><Switch checked={user.platform_roles.includes(role)} disabled={!isSuperAdmin || busyKey === `role:${user.id}:${role}`} onCheckedChange={(checked) => void togglePlatformRole(user, role, checked)} />{ROLE_LABELS[role]}</label>)}</div></TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card></TabsContent>
+            <TabsContent value="users"><Card><CardHeader><CardTitle>کاربران پلتفرم</CardTitle><CardDescription>{isSuperAdmin ? 'سوپر ادمین می‌تواند نقش‌ها و کنترل‌های امنیت حساب را مدیریت کند.' : 'نقش‌ها و کنترل‌های امنیتی فقط توسط سوپر ادمین تغییر می‌کنند.'}</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>کاربر</TableHead><TableHead>وضعیت</TableHead><TableHead>امنیت ورود</TableHead><TableHead>نقش‌های سراسری</TableHead></TableRow></TableHeader><TableBody>{users.map((user) => { const locked = Boolean(user.locked_until && new Date(user.locked_until) > new Date()); return <TableRow key={user.id}><TableCell><div className="font-medium">{user.full_name || user.email}</div><div className="text-xs text-muted-foreground" dir="ltr">{user.email}</div></TableCell><TableCell><div className="flex items-center gap-2"><Switch checked={user.is_active} disabled={!canManagePlatform || busyKey === `user-status:${user.id}`} onCheckedChange={(checked) => void updateUserStatus(user, checked)} /><Badge variant={user.is_active ? 'default' : 'destructive'}>{user.is_active ? 'فعال' : 'غیرفعال'}</Badge></div></TableCell><TableCell><div className="flex min-w-48 flex-wrap items-center gap-2"><Badge variant={user.mfa_enabled ? 'default' : 'secondary'}>MFA: {user.mfa_enabled ? 'فعال' : 'غیرفعال'}</Badge>{locked && <Badge variant="destructive">قفل تا {new Date(user.locked_until as string).toLocaleString('fa-IR')}</Badge>}{!locked && user.failed_login_attempts > 0 && <Badge variant="outline">{user.failed_login_attempts.toLocaleString('fa-IR')} تلاش ناموفق</Badge>}{isSuperAdmin && locked && <Button type="button" size="sm" variant="outline" disabled={busyKey === `unlock:${user.id}`} onClick={() => void unlockUser(user)}>{busyKey === `unlock:${user.id}` ? <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" /> : <LockKeyholeOpen className="ml-1 h-3.5 w-3.5" />}باز کردن قفل</Button>}{isSuperAdmin && user.mfa_enabled && <Button type="button" size="sm" variant="destructive" disabled={busyKey === `mfa-reset:${user.id}`} onClick={() => void resetUserMfa(user)}>{busyKey === `mfa-reset:${user.id}` ? <Loader2 className="ml-1 h-3.5 w-3.5 animate-spin" /> : <ShieldOff className="ml-1 h-3.5 w-3.5" />}بازنشانی MFA</Button>}</div></TableCell><TableCell><div className="flex flex-wrap gap-3">{PLATFORM_ROLES.map((role) => <label key={role} className="flex items-center gap-2 text-xs"><Switch checked={user.platform_roles.includes(role)} disabled={!isSuperAdmin || busyKey === `role:${user.id}:${role}`} onCheckedChange={(checked) => void togglePlatformRole(user, role, checked)} />{ROLE_LABELS[role]}</label>)}</div></TableCell></TableRow>; })}</TableBody></Table></div></CardContent></Card></TabsContent>
             <TabsContent value="audit"><Card><CardHeader><CardTitle>Audit Log</CardTitle><CardDescription>ردپای تغییرات مدیریتی و امنیتی.</CardDescription></CardHeader><CardContent className="space-y-2">{auditLogs.map((row) => <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div><div className="font-mono text-sm">{row.action}</div><div className="text-xs text-muted-foreground">{row.resource_type} · {row.resource_id || '—'}</div></div><div className="text-xs text-muted-foreground" dir="ltr">{new Date(row.created_at).toLocaleString('fa-IR')}</div></div>)}</CardContent></Card></TabsContent>
             {canManagePlatform && <TabsContent value="ai-economics"><AiEconomicsPanel /></TabsContent>}
           </Tabs>
