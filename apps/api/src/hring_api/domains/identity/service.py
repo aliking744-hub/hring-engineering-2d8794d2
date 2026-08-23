@@ -4,6 +4,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
+from hring_api.domains.identity.account_security_repository import get_user_by_email_for_update
+from hring_api.domains.identity.account_security_service import (
+    get_mfa_requirement,
+    is_account_locked,
+    record_login_outcome,
+    register_failed_login,
+    reset_failed_login_state,
+)
 from hring_api.domains.identity.models import User
 from hring_api.domains.identity.repository import (
     create_user,
@@ -51,6 +59,12 @@ class AuthTokens:
 class AuthResult:
     user: User
     tokens: AuthTokens
+    mfa_required: bool
+    mfa_enrollment_required: bool
+    mfa_verified: bool
+
+
+_DUMMY_PASSWORD_HASH = hash_password("hring-account-enumeration-dummy-password")
 
 
 def normalize_email(email: str) -> str:
@@ -95,14 +109,41 @@ async def login(
     user_agent: str | None,
     ip_address: str | None,
 ) -> AuthResult:
-    user = await get_user_by_email(session, normalize_email(email))
-    if (
-        user is None
-        or not user.is_active
-        or user.password_hash is None
-        or not verify_password(password, user.password_hash)
-    ):
+    normalized_email = normalize_email(email)
+    user = await get_user_by_email_for_update(session, normalized_email)
+    candidate_hash = (
+        user.password_hash
+        if user is not None and user.password_hash is not None
+        else _DUMMY_PASSWORD_HASH
+    )
+    password_valid = verify_password(password, candidate_hash)
+    locked = user is not None and is_account_locked(user)
+    if user is None or not user.is_active or user.password_hash is None or not password_valid or locked:
+        outcome = "locked" if locked else "invalid_credentials"
+        if user is not None and user.is_active and user.password_hash is not None and not locked:
+            if await register_failed_login(session, user=user, settings=settings):
+                outcome = "locked"
+        await record_login_outcome(
+            session,
+            user=user,
+            normalized_email=normalized_email,
+            outcome=outcome,
+            settings=settings,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
         raise InvalidCredentialsError("Invalid email or password")
+
+    reset_failed_login_state(user)
+    await record_login_outcome(
+        session,
+        user=user,
+        normalized_email=normalized_email,
+        outcome="success",
+        settings=settings,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
     return await create_authenticated_session(
         session,
@@ -147,6 +188,11 @@ async def refresh(
         settings=settings,
         now=now,
     )
+    requirement = await get_mfa_requirement(
+        session,
+        user_id=user.id,
+        session_id=user_session.id,
+    )
     return AuthResult(
         user=user,
         tokens=AuthTokens(
@@ -155,6 +201,9 @@ async def refresh(
             access_expires_at=access_expires_at,
             refresh_expires_at=refresh_expires_at,
         ),
+        mfa_required=requirement.required,
+        mfa_enrollment_required=requirement.enrollment_required,
+        mfa_verified=requirement.verified,
     )
 
 
@@ -189,6 +238,11 @@ async def create_authenticated_session(
         settings=settings,
         now=now,
     )
+    requirement = await get_mfa_requirement(
+        session,
+        user_id=user.id,
+        session_id=user_session.id,
+    )
     return AuthResult(
         user=user,
         tokens=AuthTokens(
@@ -197,4 +251,7 @@ async def create_authenticated_session(
             access_expires_at=access_expires_at,
             refresh_expires_at=refresh_expires_at,
         ),
+        mfa_required=requirement.required,
+        mfa_enrollment_required=requirement.enrollment_required,
+        mfa_verified=requirement.verified,
     )

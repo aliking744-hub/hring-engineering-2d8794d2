@@ -42,6 +42,7 @@ const CompanySettings = lazy(() => import("./pages/CompanySettings"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const Profile = lazy(() => import("./pages/Profile"));
+const AccountSecurity = lazy(() => import("./pages/AccountSecurity"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -241,6 +242,14 @@ const App = () => (
                     <Profile />
                   </ProtectedRoute>
                 } 
+              />
+              <Route
+                path="/security"
+                element={
+                  <ProtectedRoute>
+                    <AccountSecurity />
+                  </ProtectedRoute>
+                }
               />
               <Route 
                 path="/king744" 

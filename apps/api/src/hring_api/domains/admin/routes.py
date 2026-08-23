@@ -42,6 +42,7 @@ from hring_api.domains.admin.service import (
     update_managed_company,
 )
 from hring_api.domains.identity.models import User
+from hring_api.domains.identity.account_security_repository import get_mfa_factor
 from hring_api.domains.identity.repository import list_user_roles
 
 
@@ -64,6 +65,7 @@ def _admin_error(exc: AdminError) -> HTTPException:
 
 async def _user_response(session: AsyncSession, user: User) -> AdminUserResponse:
     profile = await get_profile_for_admin(session, user.id)
+    factor = await get_mfa_factor(session, user.id)
     return AdminUserResponse(
         id=user.id,
         email=user.email,
@@ -72,6 +74,9 @@ async def _user_response(session: AsyncSession, user: User) -> AdminUserResponse
         email_verified_at=user.email_verified_at,
         platform_roles=await list_platform_roles(session, user.id),
         app_roles=await list_user_roles(session, user.id),
+        failed_login_attempts=user.failed_login_attempts,
+        locked_until=user.locked_until,
+        mfa_enabled=factor is not None and factor.status == "enabled",
         created_at=user.created_at,
     )
 

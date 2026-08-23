@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
+from hring_api.domains.identity.account_security_service import get_mfa_requirement
 from hring_api.domains.identity.models import CompanyMember, User
 from hring_api.domains.identity.repository import (
     get_session_by_id,
@@ -35,7 +36,7 @@ class Principal:
         return self.user.id
 
 
-async def get_current_principal(
+async def get_current_authenticated_principal(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -72,6 +73,26 @@ async def get_current_principal(
         app_roles=await list_user_roles(db, user.id),
         memberships=await list_company_memberships(db, user.id),
     )
+
+
+async def get_current_principal(
+    principal: Principal = Depends(get_current_authenticated_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> Principal:
+    requirement = await get_mfa_requirement(
+        db,
+        user_id=principal.user_id,
+        session_id=principal.session_id,
+    )
+    if requirement.required and not requirement.verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "mfa_required",
+                "enrollment_required": requirement.enrollment_required,
+            },
+        )
+    return principal
 
 
 def require_app_role(*allowed_roles: str) -> PrincipalDependency:

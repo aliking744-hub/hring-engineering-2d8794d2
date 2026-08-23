@@ -25,6 +25,9 @@ class AdminUserResponse(BaseModel):
     email_verified_at: datetime | None
     platform_roles: list[str]
     app_roles: list[str]
+    failed_login_attempts: int
+    locked_until: datetime | None
+    mfa_enabled: bool
     created_at: datetime
 
 

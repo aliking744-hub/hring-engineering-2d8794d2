@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Building2,
   CheckCircle,
+  Copy,
   Eye,
   EyeOff,
   KeyRound,
@@ -13,6 +14,7 @@ import {
   Mail,
   MessageSquareText,
   Phone,
+  ShieldCheck,
   User,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -23,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import type { MfaEnrollment } from '@/hooks/useAuth';
 import { useLogos, useSiteName, useSiteSettings } from '@/hooks/useSiteSettings';
 import { apiRequest } from '@/lib/api';
 import { CompanyRole, ROLE_NAMES } from '@/types/multiTenant';
@@ -70,6 +73,12 @@ const Auth = () => {
     signUp,
     requestSmsLogin,
     verifySmsLogin,
+    mfaRequired,
+    mfaEnrollmentRequired,
+    mfaVerified,
+    beginMfaEnrollment,
+    confirmMfaEnrollment,
+    verifyMfa,
   } = useAuth();
 
   const [isLogin, setIsLogin] = useState(true);
@@ -84,7 +93,12 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(Boolean(inviteCode));
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaEnrollment, setMfaEnrollment] = useState<MfaEnrollment | null>(null);
+  const [mfaPreparing, setMfaPreparing] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const joinAttemptedRef = useRef(false);
+  const mfaEnrollmentAttemptedRef = useRef(false);
 
   const authLogo = logos.auth || logos.main || defaultLogo;
   const authTitle = getSetting('auth_title', `ورود به ${siteName}`);
@@ -143,7 +157,7 @@ const Auth = () => {
     };
   }, [inviteCode]);
 
-  const joinInvite = async () => {
+  const joinInvite = useCallback(async () => {
     if (!inviteCode || !inviteInfo?.is_valid) return;
     const joined = await apiRequest<JoinCompanyResponse>(
       `/company-invites/${encodeURIComponent(inviteCode)}/join`,
@@ -155,10 +169,12 @@ const Auth = () => {
         ? `شما قبلاً عضو ${joined.company_name} هستید`
         : `شما به ${joined.company_name} پیوستید`,
     });
-  };
+  }, [inviteCode, inviteInfo?.is_valid, toast]);
 
   useEffect(() => {
     if (!user) return;
+    if (mfaRequired && !mfaVerified) return;
+    if (recoveryCodes.length) return;
     if (!inviteCode) {
       navigate('/dashboard', { replace: true });
       return;
@@ -176,7 +192,62 @@ const Auth = () => {
         });
       })
       .finally(() => navigate('/dashboard', { replace: true }));
-  }, [user, inviteCode, inviteInfo?.is_valid]);
+  }, [
+    user,
+    mfaRequired,
+    mfaVerified,
+    recoveryCodes.length,
+    inviteCode,
+    inviteInfo?.is_valid,
+    joinInvite,
+    navigate,
+    toast,
+  ]);
+
+  useEffect(() => {
+    mfaEnrollmentAttemptedRef.current = false;
+    setMfaEnrollment(null);
+    setRecoveryCodes([]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (
+      !user
+      || !mfaRequired
+      || mfaVerified
+      || !mfaEnrollmentRequired
+      || mfaEnrollmentAttemptedRef.current
+    ) return;
+
+    let active = true;
+    const prepare = async () => {
+      mfaEnrollmentAttemptedRef.current = true;
+      setMfaPreparing(true);
+      const result = await beginMfaEnrollment();
+      if (!active) return;
+      if (result.error || !result.enrollment) {
+        toast({
+          title: 'راه‌اندازی ورود دومرحله‌ای انجام نشد',
+          description: result.error?.message || 'دوباره تلاش کن',
+          variant: 'destructive',
+        });
+      } else {
+        setMfaEnrollment(result.enrollment);
+      }
+      setMfaPreparing(false);
+    };
+    void prepare();
+    return () => {
+      active = false;
+    };
+  }, [
+    user,
+    mfaRequired,
+    mfaVerified,
+    mfaEnrollmentRequired,
+    beginMfaEnrollment,
+    toast,
+  ]);
 
   const finishAuthenticatedFlow = async () => {
     if (inviteInfo?.is_valid) await joinInvite();
@@ -202,6 +273,16 @@ const Auth = () => {
                 ? 'این ایمیل قبلاً ثبت شده است'
                 : message,
           variant: 'destructive',
+        });
+        return;
+      }
+
+      if (result.mfaRequired) {
+        toast({
+          title: result.mfaEnrollmentRequired
+            ? 'فعال‌سازی ورود دومرحله‌ای الزامی است'
+            : 'کد ورود دومرحله‌ای را وارد کن',
+          description: 'ورود فقط پس از تأیید مرحلهٔ دوم کامل می‌شود.',
         });
         return;
       }
@@ -260,11 +341,188 @@ const Auth = () => {
         });
         return;
       }
+      if (result.mfaRequired) {
+        toast({
+          title: result.mfaEnrollmentRequired
+            ? 'فعال‌سازی ورود دومرحله‌ای الزامی است'
+            : 'کد ورود دومرحله‌ای را وارد کن',
+          description: 'ورود فقط پس از تأیید مرحلهٔ دوم کامل می‌شود.',
+        });
+        return;
+      }
       toast({ title: 'ورود موفق', description: `به ${siteName} خوش آمدید` });
       await finishAuthenticatedFlow();
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleMfaSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (mfaCode.trim().length < 6) return;
+    setIsLoading(true);
+    try {
+      if (mfaEnrollmentRequired) {
+        const result = await confirmMfaEnrollment(mfaCode.trim());
+        if (result.error) {
+          toast({
+            title: 'کد تأیید نشد',
+            description: result.error.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+        setRecoveryCodes(result.recoveryCodes);
+        setMfaCode('');
+        toast({
+          title: 'ورود دومرحله‌ای فعال شد',
+          description: 'کدهای بازیابی را همین حالا در جای امن ذخیره کن.',
+        });
+        return;
+      }
+
+      const result = await verifyMfa(mfaCode.trim());
+      if (result.error) {
+        toast({
+          title: 'کد نامعتبر است',
+          description: 'کد برنامهٔ Authenticator یا یکی از کدهای بازیابی را بررسی کن.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'ورود امن کامل شد' });
+      await finishAuthenticatedFlow();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyText = async (value: string, successMessage: string) => {
+    await navigator.clipboard.writeText(value);
+    toast({ title: successMessage });
+  };
+
+  const showMfaPanel = Boolean(user && mfaRequired && !mfaVerified) || recoveryCodes.length > 0;
+
+  const renderMfaPanel = () => {
+    if (recoveryCodes.length) {
+      return (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="mb-2 flex items-center gap-2 font-semibold">
+              <ShieldCheck className="h-5 w-5 text-amber-600" />
+              کدهای بازیابی یک‌بارمصرف
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              این کدها دیگر نمایش داده نمی‌شوند. آن‌ها را خارج از HRing و در جای امن ذخیره کن.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2" dir="ltr">
+            {recoveryCodes.map((code) => (
+              <code key={code} className="rounded-lg border bg-muted px-2 py-2 text-center text-xs">
+                {code}
+              </code>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => void copyText(recoveryCodes.join('\n'), 'کدهای بازیابی کپی شدند')}
+          >
+            <Copy className="h-4 w-4" /> کپی همهٔ کدها
+          </Button>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => {
+              setRecoveryCodes([]);
+              void finishAuthenticatedFlow();
+            }}
+          >
+            کدها را ذخیره کردم؛ ادامه
+          </Button>
+        </div>
+      );
+    }
+
+    if (mfaEnrollmentRequired) {
+      return (
+        <div className="space-y-5">
+          <div className="text-center">
+            <ShieldCheck className="mx-auto mb-3 h-12 w-12 text-primary" />
+            <h2 className="text-xl font-bold">فعال‌سازی ورود دومرحله‌ای</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              حساب مدیریتی بدون MFA وارد پنل نمی‌شود. کلید زیر را در Google Authenticator،
+              Microsoft Authenticator یا برنامهٔ مشابه ثبت کن.
+            </p>
+          </div>
+          {mfaPreparing || !mfaEnrollment ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="ml-2 h-5 w-5 animate-spin" /> در حال ساخت کلید امن...
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border bg-muted/60 p-3">
+                <div className="mb-2 text-xs text-muted-foreground">کلید دستی Authenticator</div>
+                <div className="flex items-center gap-2" dir="ltr">
+                  <code className="min-w-0 flex-1 break-all text-sm">{mfaEnrollment.secret}</code>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => void copyText(mfaEnrollment.secret, 'کلید کپی شد')}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <form onSubmit={handleMfaSubmit} className="space-y-3">
+                <Input
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="کد ۶ رقمی برنامه"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  dir="ltr"
+                  className="text-center text-lg tracking-[0.35em]"
+                  required
+                />
+                <Button className="w-full" type="submit" disabled={isLoading || mfaCode.length !== 6}>
+                  {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                  تأیید و فعال‌سازی
+                </Button>
+              </form>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <form onSubmit={handleMfaSubmit} className="space-y-5">
+        <div className="text-center">
+          <ShieldCheck className="mx-auto mb-3 h-12 w-12 text-primary" />
+          <h2 className="text-xl font-bold">تأیید مرحلهٔ دوم</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            کد ۶ رقمی Authenticator یا یکی از کدهای بازیابی را وارد کن.
+          </p>
+        </div>
+        <Input
+          value={mfaCode}
+          onChange={(event) => setMfaCode(event.target.value.trim().slice(0, 64))}
+          placeholder="کد Authenticator یا بازیابی"
+          autoComplete="one-time-code"
+          dir="ltr"
+          className="text-center"
+          required
+        />
+        <Button className="w-full" type="submit" disabled={isLoading || mfaCode.trim().length < 6}>
+          {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+          تکمیل ورود امن
+        </Button>
+      </form>
+    );
   };
 
   const InviteBanner = () => {
@@ -324,7 +582,8 @@ const Auth = () => {
 
             <InviteBanner />
 
-            <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-muted/60 p-1">
+            {showMfaPanel ? renderMfaPanel() : <>
+              <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-muted/60 p-1">
               <Button
                 type="button"
                 variant={loginMethod === 'email' ? 'default' : 'ghost'}
@@ -344,7 +603,7 @@ const Auth = () => {
               >
                 <MessageSquareText className="h-4 w-4" /> پیامک
               </Button>
-            </div>
+              </div>
 
             {loginMethod === 'email' ? (
               <Tabs value={isLogin ? 'login' : 'signup'} onValueChange={(v) => setIsLogin(v === 'login')}>
@@ -463,7 +722,8 @@ const Auth = () => {
                   </Button>
                 )}
               </form>
-            )}
+              )}
+            </>}
 
             <div className="mt-6 border-t border-border/60 pt-5 text-center">
               <Button variant="ghost" asChild className="gap-2">

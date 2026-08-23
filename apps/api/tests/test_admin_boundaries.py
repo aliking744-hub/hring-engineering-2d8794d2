@@ -6,6 +6,7 @@ from sqlalchemy import delete
 
 from hring_api.db.session import SessionFactory
 from hring_api.domains.access.models import PlatformRoleAssignment
+from hring_api.domains.identity.mfa_security import generate_totp_code
 from hring_api.main import app
 
 
@@ -55,6 +56,14 @@ async def _keep_only_super_admin(user_id: UUID) -> None:
 def _register_with_platform_role(client: TestClient, prefix: str, role: str) -> dict:
     account = _register(client, prefix)
     asyncio.run(_grant_platform_role(UUID(account["user"]["id"]), role))
+    enrollment = client.post("/api/v1/auth/mfa/enroll", headers=_auth(account))
+    assert enrollment.status_code == 200, enrollment.text
+    confirmation = client.post(
+        "/api/v1/auth/mfa/confirm",
+        headers=_auth(account),
+        json={"code": generate_totp_code(enrollment.json()["secret"])},
+    )
+    assert confirmation.status_code == 200, confirmation.text
     return account
 
 

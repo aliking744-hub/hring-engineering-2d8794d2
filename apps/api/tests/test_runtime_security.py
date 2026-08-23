@@ -17,6 +17,7 @@ def _production_settings(**overrides: object) -> Settings:
         "auth_jwt_secret": "jwt-secret-that-is-not-a-default-and-is-long",
         "sms_otp_pepper": "sms-pepper-that-is-not-a-default",
         "auth_security_token_pepper": "security-pepper-that-is-not-a-default",
+        "auth_mfa_encryption_key": "mfa-encryption-key-that-is-not-a-default",
     }
     values.update(overrides)
     return Settings(**values)
@@ -35,6 +36,11 @@ def test_production_configuration_rejects_wildcard_trusted_hosts() -> None:
 def test_production_configuration_requires_https_public_url() -> None:
     with pytest.raises(ValidationError):
         _production_settings(public_app_url="http://hring.ir")
+
+
+def test_production_configuration_rejects_short_mfa_encryption_key() -> None:
+    with pytest.raises(ValidationError):
+        _production_settings(auth_mfa_encryption_key="too-short")
 
 
 def test_valid_production_security_configuration_is_accepted() -> None:

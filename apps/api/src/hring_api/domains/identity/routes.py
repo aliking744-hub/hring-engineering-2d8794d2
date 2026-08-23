@@ -66,6 +66,9 @@ def _auth_response(result: AuthResult) -> AuthResponse:
             access_expires_at=result.tokens.access_expires_at,
             refresh_expires_at=result.tokens.refresh_expires_at,
         ),
+        mfa_required=result.mfa_required,
+        mfa_enrollment_required=result.mfa_enrollment_required,
+        mfa_verified=result.mfa_verified,
     )
 
 
@@ -138,20 +141,22 @@ async def login_account(
     settings: Settings = Depends(get_settings),
 ) -> AuthResponse:
     try:
-        async with db.begin():
-            result = await login(
-                db,
-                email=str(payload.email),
-                password=payload.password,
-                settings=settings,
-                user_agent=request.headers.get("user-agent"),
-                ip_address=_client_ip(request),
-            )
+        result = await login(
+            db,
+            email=str(payload.email),
+            password=payload.password,
+            settings=settings,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=_client_ip(request),
+        )
     except InvalidCredentialsError as exc:
+        # Login failures intentionally commit lockout state and non-sensitive audit evidence.
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         ) from exc
+    await db.commit()
     _set_refresh_cookie(response, result, settings)
     return _auth_response(result)
 

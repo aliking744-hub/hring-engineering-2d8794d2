@@ -11,6 +11,7 @@ from hring_api.domains.companies.routes import router as companies_router
 from hring_api.domains.companies.settings_routes import router as company_settings_router
 from hring_api.domains.compat.routes import router as compat_router
 from hring_api.domains.identity.recovery_routes import router as identity_recovery_router
+from hring_api.domains.identity.account_security_routes import router as account_security_router
 from hring_api.domains.identity.routes import router as identity_router
 from hring_api.domains.integrations.internal_routes import router as internal_integrations_router
 from hring_api.domains.integrations.routes import router as integrations_router
@@ -22,6 +23,7 @@ api_router = APIRouter()
 api_router.include_router(health_router)
 api_router.include_router(identity_router)
 api_router.include_router(identity_recovery_router)
+api_router.include_router(account_security_router)
 api_router.include_router(companies_router)
 api_router.include_router(company_settings_router)
 api_router.include_router(access_router)

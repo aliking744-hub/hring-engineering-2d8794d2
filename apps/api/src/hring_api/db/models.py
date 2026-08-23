@@ -6,6 +6,7 @@ from hring_api.domains.ai import models as ai_models
 from hring_api.domains.billing import models as billing_models
 from hring_api.domains.compat import models as compat_models
 from hring_api.domains.identity import models as identity_models
+from hring_api.domains.identity import account_security_models as identity_account_security_models
 from hring_api.domains.identity import security_models as identity_security_models
 from hring_api.domains.identity import sms_models as identity_sms_models
 from hring_api.domains.integrations import models as integration_models
@@ -19,6 +20,7 @@ __all__ = [
     "billing_models",
     "compat_models",
     "identity_models",
+    "identity_account_security_models",
     "identity_security_models",
     "identity_sms_models",
     "integration_models",

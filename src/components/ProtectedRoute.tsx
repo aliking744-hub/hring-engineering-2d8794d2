@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
+  const { user, loading, mfaRequired, mfaVerified } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -20,6 +20,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  if (mfaRequired && !mfaVerified) {
+    return <Navigate to="/auth?mode=mfa" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
