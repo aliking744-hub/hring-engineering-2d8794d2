@@ -93,7 +93,7 @@ Domains include:
 - [ ] Legal Intelligence.
 - [ ] Strategic Compass.
 - [ ] Strategic Radar.
-- [ ] Unicorn Lab / Strategic Intelligence.
+- [x] Retire Unicorn Lab by product-owner decision; retain shared funding tracking under Strategic Radar.
 - [ ] Digital Products / Marketplace.
 - [ ] Notifications / Support.
 - [ ] Blog/site/content/settings/feedback.
