@@ -628,7 +628,9 @@ def test_ai_provider_failure_releases_reservation_and_retry_is_not_free(
 
     stored = asyncio.run(_credit_account_for_user(UUID(registered["user"]["id"])))
     events = asyncio.run(_ledger_events(stored.id))
-    assert [event.event_type for event in events][-2:] == ["reserve", "release"]
+    assert [
+        event.event_type for event in events if event.feature_key == "compat.generate-job-profile"
+    ] == ["reserve", "release"]
 
 
 def test_successful_ai_operation_consumes_once_and_reports_the_same_metered_cost(
@@ -680,7 +682,9 @@ def test_successful_ai_operation_consumes_once_and_reports_the_same_metered_cost
 
     stored = asyncio.run(_credit_account_for_user(UUID(registered["user"]["id"])))
     events = asyncio.run(_ledger_events(stored.id))
-    assert [event.event_type for event in events][-2:] == ["reserve", "consume"]
+    assert [
+        event.event_type for event in events if event.feature_key == "compat.generate-job-profile"
+    ] == ["reserve", "consume"]
 
 
 def test_verified_payment_reconciles_ledger_once_and_updates_legacy_projection(
