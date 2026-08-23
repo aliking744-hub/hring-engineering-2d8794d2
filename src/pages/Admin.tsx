@@ -46,11 +46,11 @@ const Admin = () => {
       badge: 'AI Routing',
     },
     canOpenProduct && {
-      title: 'Product & Content Admin',
-      description: 'ظاهر، متن‌ها، visibility، SEO و تنظیمات عمومی محصول. Secret و API Key در این بخش ذخیره نمی‌شود.',
+      title: 'CMS و تنظیمات سایت',
+      description: 'نام برند، لوگوها، رنگ‌ها، فونت‌ها، متن‌ها، نمایش بخش‌ها و SEO؛ بدون تغییر کد.',
       icon: Package,
       href: '/admin/product',
-      badge: 'Product',
+      badge: 'CMS',
     },
     canOpenCompany && {
       title: 'Company Admin',

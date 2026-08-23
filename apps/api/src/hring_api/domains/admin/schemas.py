@@ -111,6 +111,14 @@ class UpsertSiteSettingRequest(BaseModel):
     is_public: bool = False
 
 
+class BulkSiteSettingItem(UpsertSiteSettingRequest):
+    key: str = Field(min_length=1, max_length=160)
+
+
+class BulkUpsertSiteSettingsRequest(BaseModel):
+    settings: list[BulkSiteSettingItem] = Field(min_length=1, max_length=100)
+
+
 class PublicSettingsResponse(BaseModel):
     settings: dict[str, str | None]
 

@@ -130,3 +130,12 @@ def test_ai_feature_map_is_complete_admin_managed_and_runtime_effective() -> Non
             if row["resource_id"] == feature_key
         }
         assert {"ai.feature_route.update", "ai.feature_route.reset"}.issubset(actions)
+
+
+def test_unicorn_ai_catalog_is_removed_without_breaking_shared_funding_route() -> None:
+    feature_keys = {feature.feature_key for feature in AI_FEATURES}
+    assert not any("unicorn" in feature_key for feature_key in feature_keys)
+    assert not any("یونیکورن" in feature.category for feature in AI_FEATURES)
+
+    funding = next(feature for feature in AI_FEATURES if feature.feature_key == "compat.track-funding")
+    assert funding.category == "استراتژی"

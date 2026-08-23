@@ -37,7 +37,6 @@ const LegalSearchPage = lazy(() => import("./pages/LegalSearchPage"));
 const LegalAdvisor = lazy(() => import("./pages/LegalAdvisor"));
 const StrategicCompass = lazy(() => import("./pages/StrategicCompass"));
 const StrategicRadar = lazy(() => import("./pages/StrategicRadar"));
-const UnicornLab = lazy(() => import("./pages/UnicornLab"));
 const CompanyMembers = lazy(() => import("./pages/CompanyMembers"));
 const CompanySettings = lazy(() => import("./pages/CompanySettings"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
@@ -310,14 +309,6 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <StrategicRadar />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/unicorn-lab" 
-                element={
-                  <ProtectedRoute>
-                    <UnicornLab />
                   </ProtectedRoute>
                 } 
               />
