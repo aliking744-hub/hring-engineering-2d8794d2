@@ -11,6 +11,7 @@ from hring_api.domains.companies.service import (
     CompanyNotFoundError,
     CompanySuspendedError,
 )
+from hring_api.domains.billing.models import CreditAccount
 from hring_api.domains.identity.models import Company
 
 
@@ -63,6 +64,15 @@ async def update_company_settings(
         company.domain = normalized_domain
 
     if credit_pool_enabled is not None:
+        if credit_pool_enabled and not company.credit_pool_enabled:
+            account = await session.scalar(
+                select(CreditAccount).where(CreditAccount.company_id == company.id)
+            )
+            company.credit_pool = (
+                int(account.available_credits)
+                if account is not None
+                else max(0, int(company.monthly_credits) - int(company.used_credits))
+            )
         company.credit_pool_enabled = credit_pool_enabled
 
     await session.flush()

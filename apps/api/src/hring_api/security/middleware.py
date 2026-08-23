@@ -17,7 +17,8 @@ CallNext = Callable[[Request], Awaitable[Response]]
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: CallNext) -> Response:
-        request_id = request.headers.get("x-request-id") or str(uuid4())
+        request_id = (request.headers.get("x-request-id") or str(uuid4()))[:160]
+        request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -25,9 +26,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         cache_control = response.headers.get("Cache-Control", "")
         cache_directives = {
-            directive.strip().lower()
-            for directive in cache_control.split(",")
-            if directive.strip()
+            directive.strip().lower() for directive in cache_control.split(",") if directive.strip()
         }
         if "no-store" not in cache_directives:
             response.headers["Cache-Control"] = "no-store"

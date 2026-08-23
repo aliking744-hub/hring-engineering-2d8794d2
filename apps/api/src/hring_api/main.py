@@ -29,7 +29,7 @@ app.add_middleware(
     allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Idempotency-Key", "X-Request-ID"],
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SensitiveRouteRateLimitMiddleware, settings=settings)

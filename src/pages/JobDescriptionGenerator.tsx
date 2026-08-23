@@ -28,7 +28,7 @@ const JobDescriptionGenerator = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
   const { toast } = useToast();
-  const { credits, deductForOperation, hasEnoughCredits } = useCredits();
+  const { credits, hasEnoughCredits } = useCredits();
 
   const handleGenerate = async () => {
     if (!jobTitle || !industry || !seniorityLevel) {
@@ -51,12 +51,6 @@ const JobDescriptionGenerator = () => {
 
     setIsLoading(true);
     try {
-      const deducted = await deductForOperation('JOB_PROFILE');
-      if (!deducted) {
-        toast({ title: "خطا", description: "کسر اعتبار با مشکل مواجه شد", variant: "destructive" });
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("generate-job-profile", {
         body: { jobTitle, industry, seniorityLevel, companyName },
       });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Dynamic types preserve the legacy Supabase-compatible surface during cutover. */
 // Temporary source-compatible facade for legacy UI code.
 // Despite the exported variable name, this module has ZERO Supabase runtime dependency.
 // All data/functions/storage/auth calls terminate at the independent HRing API.
@@ -39,6 +40,23 @@ interface LegacyResult<T = any> {
 
 const PUBLIC_READ_TABLES = new Set(['posts', 'testimonials', 'digital_products']);
 const PUBLIC_STORAGE_BUCKETS = new Set(['avatars', 'products', 'blog-images', 'site-assets']);
+const METERED_COMPAT_FUNCTIONS = new Set([
+  'generate-job-profile',
+  'generate-interview-kit',
+  'generate-onboarding-plan',
+  'generate-job-ad',
+]);
+
+const newIdempotencyKey = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const notifyCreditsChanged = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('hring:credits-changed'));
+};
 
 const errorShape = (error: unknown) => ({
   name: error instanceof Error ? error.name : 'HRingApiError',
@@ -175,6 +193,7 @@ class QueryBuilder<T = any> implements PromiseLike<LegacyResult<T>> {
 }
 
 const invokeFunction = async (functionName: string, options?: { body?: unknown }): Promise<LegacyResult> => {
+  const isMetered = METERED_COMPAT_FUNCTIONS.has(functionName);
   try {
     const body = (options?.body || {}) as Record<string, any>;
 
@@ -224,10 +243,13 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
 
     const envelope = await apiRequest<CompatEnvelope>(`/compat/functions/${encodeURIComponent(functionName)}`, {
       method: 'POST',
+      headers: isMetered ? { 'X-Idempotency-Key': newIdempotencyKey() } : undefined,
       body: JSON.stringify({ body: options?.body ?? null }),
     });
+    if (isMetered) notifyCreditsChanged();
     return { data: envelope.data ?? null, error: null, count: envelope.count ?? null };
   } catch (error) {
+    if (isMetered) notifyCreditsChanged();
     return { data: null, error: errorShape(error) };
   }
 };
@@ -236,6 +258,7 @@ const rpc = async (name: string, args: JsonRecord = {}): Promise<LegacyResult> =
   try {
     const envelope = await apiRequest<CompatEnvelope>('/compat/rpc', {
       method: 'POST',
+      headers: name === 'deduct_credits' ? { 'X-Idempotency-Key': newIdempotencyKey() } : undefined,
       body: JSON.stringify({ name, args }),
     });
     return { data: envelope.data ?? null, error: null, count: envelope.count ?? null };

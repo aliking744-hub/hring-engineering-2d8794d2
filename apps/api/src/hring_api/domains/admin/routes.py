@@ -109,7 +109,9 @@ async def platform_overview(
     )
 
 
-@router.get("/admin/platform/users", response_model=list[AdminUserResponse], tags=["platform-admin"])
+@router.get(
+    "/admin/platform/users", response_model=list[AdminUserResponse], tags=["platform-admin"]
+)
 async def platform_users(
     search: str | None = Query(default=None, max_length=160),
     limit: int = Query(default=100, ge=1, le=500),
@@ -226,7 +228,9 @@ async def create_platform_company(
         raise _admin_error(exc) from exc
     await db.commit()
     if not isinstance(owner, User):
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Owner creation failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Owner creation failed"
+        )
     return ManagedCompanyCreatedResponse(
         company=AdminCompanyResponse.model_validate(company),
         owner=await _user_response(db, owner),
@@ -252,6 +256,7 @@ async def change_platform_company(
             company_id=company_id,
             values=payload.model_dump(exclude_unset=True),
             ip_address=_client_ip(request),
+            request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
         )
     except AdminError as exc:
         await db.rollback()

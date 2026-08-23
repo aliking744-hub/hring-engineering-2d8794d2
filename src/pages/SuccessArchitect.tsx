@@ -37,7 +37,7 @@ const SuccessArchitect = () => {
   const [isLoading, setIsLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const { credits, deductForOperation, hasEnoughCredits } = useCredits();
+  const { credits, hasEnoughCredits } = useCredits();
 
   const handleGenerate = async () => {
     if (!jobTitle || !seniority || !expectation) {
@@ -64,18 +64,6 @@ const SuccessArchitect = () => {
     setWelcomeEmail("");
 
     try {
-      // Deduct credits first
-      const deducted = await deductForOperation('ONBOARDING_PLAN');
-      if (!deducted) {
-        toast({
-          title: "خطا",
-          description: "کسر اعتبار با مشکل مواجه شد",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("generate-onboarding-plan", {
         body: {
           jobTitle,
@@ -87,7 +75,8 @@ const SuccessArchitect = () => {
 
       if (error) {
         console.error("Error:", error);
-        const status = (error as any)?.context?.status as number | undefined;
+        const apiError = error as { context?: { status?: number } };
+        const status = apiError.context?.status;
         
         if (status === 429) {
           toast({

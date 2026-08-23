@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,7 @@ from hring_api.domains.admin.repository import (
     get_user_for_admin,
     upsert_site_setting,
 )
+from hring_api.domains.billing.credit_service import replace_available_credits_for_plan
 from hring_api.domains.identity.models import Company, CompanyMember, Profile, User
 from hring_api.domains.identity.repository import create_user, get_user_by_email
 from hring_api.domains.identity.security import hash_password
@@ -86,6 +87,7 @@ async def create_managed_company(
         status=status,
         subscription_tier=subscription_tier,
         monthly_credits=monthly_credits,
+        credit_pool=monthly_credits,
         max_members=max_members,
         created_by=actor_user_id,
     )
@@ -129,6 +131,7 @@ async def update_managed_company(
     company_id: UUID,
     values: dict[str, object],
     ip_address: str | None,
+    request_id: str | None,
 ) -> Company:
     company = await get_company_for_admin(session, company_id)
     if company is None:
@@ -155,7 +158,22 @@ async def update_managed_company(
     if "subscription_tier" in values and isinstance(values["subscription_tier"], str):
         company.subscription_tier = values["subscription_tier"]
     if "monthly_credits" in values and isinstance(values["monthly_credits"], int):
-        company.monthly_credits = values["monthly_credits"]
+        target_credits = values["monthly_credits"]
+        if target_credits != company.monthly_credits:
+            await replace_available_credits_for_plan(
+                session,
+                owner_type="company",
+                owner_id=company.id,
+                target_credits=target_credits,
+                operation_key=f"platform-company-allocation:{company.id}:{uuid4()}",
+                actor_user_id=actor_user_id,
+                request_id=request_id,
+                grant_reason="Platform company credit allocation",
+                source="platform_company_update",
+            )
+            company.monthly_credits = target_credits
+            company.used_credits = 0
+            company.credit_pool = target_credits
     if "max_members" in values and isinstance(values["max_members"], int):
         company.max_members = values["max_members"]
 

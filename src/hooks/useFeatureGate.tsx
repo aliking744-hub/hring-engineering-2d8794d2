@@ -4,15 +4,16 @@ import { useFeaturePermissions } from '@/hooks/useFeaturePermissions';
 import { useCredits } from '@/hooks/useCredits';
 
 /**
- * Hook for checking feature access and handling credit deduction.
+ * Hook for checking feature access and performing a credit preflight.
  * Use this when you need programmatic access control (not just UI gating).
  */
 export const useFeatureGate = () => {
   const { checkAccess, getCreditCost, hasFeature, canEdit } = useFeaturePermissions();
-  const { credits, deductCredits } = useCredits();
+  const { credits, preflightCredits } = useCredits();
 
   /**
-   * Check if user can use a feature and optionally deduct credits.
+   * Check if user can use a feature and optionally preflight credits.
+   * Actual reservation and consumption always happen in the backend operation.
    * Returns true if access was granted, false otherwise.
    */
   const useFeature = useCallback(async (featureKey: string, deductOnUse = true): Promise<boolean> => {
@@ -31,7 +32,7 @@ export const useFeatureGate = () => {
         return false;
       }
 
-      const success = await deductCredits(cost);
+      const success = await preflightCredits(cost, featureKey);
       if (!success) {
         toast.error('خطا در کسر اعتبار');
         return false;
@@ -39,7 +40,7 @@ export const useFeatureGate = () => {
     }
 
     return true;
-  }, [checkAccess, getCreditCost, credits, deductCredits]);
+  }, [checkAccess, getCreditCost, credits, preflightCredits]);
 
   /**
    * Check access without deducting credits.

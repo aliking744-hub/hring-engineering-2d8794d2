@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -8,6 +9,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.admin.models import SiteSetting
+from hring_api.domains.billing.credit_service import (
+    InsufficientCreditsError,
+    consume_reservation,
+    get_credit_balance,
+    reserve_credits,
+)
 from hring_api.domains.compat.access import (
     CompatAccessForbiddenError,
     can_read_record,
@@ -84,9 +91,7 @@ def _matches_filter(row: dict[str, Any], item: QueryFilter) -> bool:
 
 
 def _apply_filters(rows: list[dict[str, Any]], request: CompatQueryRequest) -> list[dict[str, Any]]:
-    filtered = [
-        row for row in rows if all(_matches_filter(row, item) for item in request.filters)
-    ]
+    filtered = [row for row in rows if all(_matches_filter(row, item) for item in request.filters)]
     if request.order is not None:
         column = request.order.column
 
@@ -138,7 +143,9 @@ def _profile_payload(profile: Profile) -> dict[str, Any]:
         "monthly_credits": profile.monthly_credits,
         "used_credits": profile.used_credits,
         "is_active": profile.is_active,
-        "last_credit_reset": profile.last_credit_reset.isoformat() if profile.last_credit_reset else None,
+        "last_credit_reset": profile.last_credit_reset.isoformat()
+        if profile.last_credit_reset
+        else None,
         "created_at": profile.created_at.isoformat(),
     }
 
@@ -338,7 +345,9 @@ def _record_payload(record: CompatRecord) -> dict[str, Any]:
     return row
 
 
-def _ensure_owner_managed_insert(values: dict[str, Any], *, table: str, principal: Principal, is_admin: bool) -> None:
+def _ensure_owner_managed_insert(
+    values: dict[str, Any], *, table: str, principal: Principal, is_admin: bool
+) -> None:
     field = OWNER_MANAGED_COMPASS_FIELDS.get(table)
     if field is None or is_admin:
         return
@@ -347,7 +356,9 @@ def _ensure_owner_managed_insert(values: dict[str, Any], *, table: str, principa
         values[field] = str(principal.user_id)
         return
     if str(raw) != str(principal.user_id):
-        raise CompatForbiddenError("Owner-managed Strategic Compass records cannot be assigned to another user")
+        raise CompatForbiddenError(
+            "Owner-managed Strategic Compass records cannot be assigned to another user"
+        )
 
 
 async def execute_query(
@@ -539,18 +550,8 @@ async def execute_query(
 
 
 async def get_user_credits(db: AsyncSession, *, principal: Principal) -> int:
-    profile = await db.get(Profile, principal.user_id)
-    if profile is None:
-        return 0
-    company_ids = active_company_ids(principal)
-    if company_ids:
-        from hring_api.domains.identity.models import Company
-
-        for company_id in company_ids:
-            company = await db.get(Company, company_id)
-            if company is not None and company.credit_pool_enabled:
-                return max(0, int(company.credit_pool or 0))
-    return max(0, profile.monthly_credits - profile.used_credits)
+    balance = await get_credit_balance(db, principal=principal)
+    return int(balance.account.available_credits)
 
 
 async def deduct_user_credits(
@@ -558,33 +559,32 @@ async def deduct_user_credits(
     *,
     principal: Principal,
     amount: int,
+    idempotency_key: str | None = None,
+    feature_key: str | None = None,
+    request_id: str | None = None,
 ) -> bool:
     if amount <= 0:
         raise CompatError("amount must be positive")
-    from hring_api.domains.identity.models import Company
-
-    company_ids = active_company_ids(principal)
-    for company_id in company_ids:
-        result = await db.execute(
-            select(Company).where(Company.id == company_id).with_for_update()
+    raw_key = (idempotency_key or "").strip()
+    if not raw_key:
+        raise CompatError("Credit deduction idempotency key is required")
+    operation_key = f"compat-rpc:{sha256(raw_key.encode()).hexdigest()}"
+    try:
+        reserved = await reserve_credits(
+            db,
+            principal=principal,
+            amount=amount,
+            idempotency_key=operation_key,
+            feature_key=feature_key or "compat.rpc.deduct_credits",
+            description="Legacy credit deduction compatibility call",
+            request_id=request_id,
         )
-        company = result.scalar_one_or_none()
-        if company is not None and company.credit_pool_enabled:
-            available = int(company.credit_pool or 0)
-            if available < amount:
-                await db.rollback()
-                return False
-            company.credit_pool = available - amount
-            await db.commit()
-            return True
-
-    result = await db.execute(
-        select(Profile).where(Profile.id == principal.user_id).with_for_update()
-    )
-    profile = result.scalar_one_or_none()
-    if profile is None or profile.monthly_credits - profile.used_credits < amount:
-        await db.rollback()
+    except InsufficientCreditsError:
         return False
-    profile.used_credits += amount
-    await db.commit()
+    await consume_reservation(
+        db,
+        principal=principal,
+        reservation_id=reserved.reservation.id,
+        request_id=request_id,
+    )
     return True

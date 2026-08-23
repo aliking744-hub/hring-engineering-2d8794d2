@@ -44,7 +44,7 @@ const InterviewAssistant = () => {
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [openAnswerKeys, setOpenAnswerKeys] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  const { credits, deductForOperation, hasEnoughCredits } = useCredits();
+  const { credits, hasEnoughCredits } = useCredits();
   const resultRef = useRef<HTMLDivElement>(null);
 
   const getSectionIcon = (icon: string) => {
@@ -86,18 +86,6 @@ const InterviewAssistant = () => {
     setQuestions([]);
 
     try {
-      // Deduct credits first
-      const deducted = await deductForOperation('INTERVIEW_KIT');
-      if (!deducted) {
-        toast({
-          title: "خطا",
-          description: "کسر اعتبار با مشکل مواجه شد",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("generate-interview-kit", {
         body: {
           jobTitle,
@@ -119,11 +107,11 @@ const InterviewAssistant = () => {
           resultRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 100);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating interview kit:", error);
       toast({
         title: "خطا",
-        description: error.message || "خطا در تولید راهنمای مصاحبه",
+        description: error instanceof Error ? error.message : "خطا در تولید راهنمای مصاحبه",
         variant: "destructive",
       });
     } finally {

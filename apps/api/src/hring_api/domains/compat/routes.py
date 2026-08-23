@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,6 +66,13 @@ from hring_api.domains.compat.storage_policy import (
     is_storage_admin,
     validate_storage_upload,
 )
+from hring_api.domains.billing.credit_service import (
+    CreditConflictError,
+    CreditError,
+    CreditForbiddenError,
+    CreditNotFoundError,
+    InsufficientCreditsError,
+)
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 
 
@@ -73,6 +80,16 @@ router = APIRouter(prefix="/compat", tags=["compatibility"])
 
 
 def _compat_http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, InsufficientCreditsError):
+        return HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc))
+    if isinstance(exc, CreditForbiddenError):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    if isinstance(exc, CreditNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, CreditConflictError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, CreditError):
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     if isinstance(
         exc,
         (
@@ -153,6 +170,7 @@ async def query_public_compat_store(
 @router.post("/rpc", response_model=CompatQueryResponse)
 async def execute_compat_rpc(
     payload: CompatRpcRequest,
+    request: Request,
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
 ) -> CompatQueryResponse:
@@ -163,12 +181,21 @@ async def execute_compat_rpc(
             raw_amount = payload.args.get("amount")
             if isinstance(raw_amount, bool) or not isinstance(raw_amount, int):
                 raise CompatError("amount must be an integer")
-            data = await deduct_user_credits(db, principal=principal, amount=raw_amount)
+            raw_feature_key = payload.args.get("feature_key")
+            feature_key = raw_feature_key if isinstance(raw_feature_key, str) else None
+            data = await deduct_user_credits(
+                db,
+                principal=principal,
+                amount=raw_amount,
+                idempotency_key=request.headers.get("x-idempotency-key"),
+                feature_key=feature_key,
+                request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+            )
         else:
             raise CompatFunctionUnavailableError(
                 f"RPC {payload.name} requires a dedicated HRing service"
             )
-    except (CompatError, CompatFunctionUnavailableError) as exc:
+    except (CompatError, CompatFunctionUnavailableError, CreditError) as exc:
         raise _compat_http_error(exc) from exc
     return CompatQueryResponse(data=data, count=1)
 
@@ -248,6 +275,7 @@ async def download_product_file(
 async def execute_compat_function(
     name: str,
     payload: CompatFunctionRequest,
+    request: Request,
     principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
     db: AsyncSession = Depends(get_db_session),
@@ -258,20 +286,22 @@ async def execute_compat_function(
             detail=f"{name} must use a dedicated security-sensitive HRing API",
         )
     if name == "submit-feedback":
-        request = CompatQueryRequest(
+        query_request = CompatQueryRequest(
             table="site_feedback",
             operation="insert",
             values=payload.body if isinstance(payload.body, dict) else {"feedback": payload.body},
             single=True,
         )
         try:
-            data = await execute_query(db, request=request, principal=principal)
+            data = await execute_query(db, request=query_request, principal=principal)
         except CompatError as exc:
             raise _compat_http_error(exc) from exc
         return CompatQueryResponse(data={"success": True, "record": data}, count=1)
     if name == "download-product":
         if not isinstance(payload.body, dict) or not isinstance(payload.body.get("productId"), str):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="productId is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="productId is required"
+            )
         try:
             url = await create_product_download_url(
                 db,
@@ -336,8 +366,11 @@ async def execute_compat_function(
             body=payload.body,
             principal=principal,
             settings=settings,
+            session=db,
+            request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+            idempotency_key=request.headers.get("x-idempotency-key"),
         )
-    except CompatFunctionError as exc:
+    except (CompatFunctionError, CreditError) as exc:
         raise _compat_http_error(exc) from exc
     return CompatQueryResponse(data=data, count=1)
 
@@ -456,7 +489,9 @@ async def read_public_compat_object(
             path=object_path,
         )
     except StorageCompatError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Object not found"
+        ) from exc
     return StreamingResponse(stream, media_type=content_type)
 
 
