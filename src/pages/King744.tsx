@@ -11,7 +11,6 @@ import { ArrowRight, Settings, Users, FileText, Diamond, Database, Shield, Loade
 import { useAuth } from '@/hooks/useAuth';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { toast } from 'sonner';
-import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
 import UsersCreditsManager from '@/components/admin/UsersCreditsManager';
 import BlogManager from '@/components/admin/BlogManager';
 import ProductManager from '@/components/admin/ProductManager';
@@ -359,7 +358,17 @@ const King744 = () => {
             </div>
 
             <TabsContent value="settings" className="space-y-6">
-              <SiteSettingsManager />
+              <Card>
+                <CardHeader>
+                  <CardTitle>CMS و تنظیمات سایت</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm leading-7 text-muted-foreground">
+                    مدیریت نام برند، لوگو، رنگ‌ها، فونت‌ها، متن‌ها، نمایش بخش‌ها و SEO به پنل مستقل CMS منتقل شده است.
+                  </p>
+                  <Button onClick={() => navigate('/admin/product')}>بازکردن CMS سایت</Button>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="users" className="space-y-6">

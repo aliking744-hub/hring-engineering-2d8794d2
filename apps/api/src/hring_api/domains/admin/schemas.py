@@ -118,6 +118,14 @@ class BulkSiteSettingItem(UpsertSiteSettingRequest):
 class BulkUpsertSiteSettingsRequest(BaseModel):
     settings: list[BulkSiteSettingItem] = Field(min_length=1, max_length=100)
 
+    @field_validator("settings")
+    @classmethod
+    def validate_unique_keys(cls, value: list[BulkSiteSettingItem]) -> list[BulkSiteSettingItem]:
+        normalized = [item.key.strip().lower() for item in value]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("Duplicate site setting keys are not allowed")
+        return value
+
 
 class PublicSettingsResponse(BaseModel):
     settings: dict[str, str | None]

@@ -297,6 +297,8 @@ async def change_product_settings_bulk(
         await db.rollback()
         raise _admin_error(exc) from exc
     await db.commit()
+    for row in rows:
+        await db.refresh(row)
     return [SiteSettingResponse.model_validate(row) for row in rows]
 
 
