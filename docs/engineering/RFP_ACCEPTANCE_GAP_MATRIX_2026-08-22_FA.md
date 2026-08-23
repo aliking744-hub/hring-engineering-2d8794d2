@@ -1,160 +1,96 @@
-# HRing — ماتریس شکاف RFP و وضعیت فعلی Staging
+# HRing — ماتریس شکاف RFP و وضعیت واقعی Staging
 
-**تاریخ ممیزی:** 2026-08-22  
-**منبع وضعیت اجرا:** staging روی commit `1532fc25e908067f5186b955151d68683da4ff61`؛ `main` پس از رفع CI روی commit `d20bf3322166261fc8d6b5f38cde3a2ca5945951`  
+**تاریخ ممیزی:** 2026-08-23  
+**منبع حقیقت کد:** `main@fb994cd32af7f581228601d0c0c66237182cf83b`  
+**وضعیت Staging:** هم‌تراز با `main`، تمام سرویس‌های اصلی Healthy، API Health موفق، Alembic روی `20260823_0011 (head)`  
 **مبنای الزامات:** `HRing_Independent_Reengineering_RFP_FA_v1.0` و اسناد معماری مخزن  
-**مرز ایمنی:** این سند صرفاً ممیزی است. هیچ تغییر یا استقراری روی Production مجاز نیست.
+**مرز ایمنی:** Production خارج از محدوده است و هیچ مسیر استقرار خودکار Production در این مخزن فعال نیست.
 
 ## نتیجه مدیریتی
 
-HRing در staging یک زیربنای مستقل واقعی شامل React/Vite، FastAPI، PostgreSQL، Redis، MinIO، Alembic و AI Gateway دارد؛ اما هنوز «تحویل کامل RFP» نیست. بزرگ‌ترین فاصله‌ها عبارت‌اند از: پنل مدیریتی جامع، Provider/Secret Management، مدل AI لوکال، Prompt Registry، Worker/Scheduler، CMS کامل، مهاجرت و تطبیق داده، بکاپ/Restore، مانیتورینگ، API Key/Webhook Management و تست‌های پذیرش.
+HRing اکنون یک پلتفرم مستقل واقعی روی Staging دارد: React/Vite، FastAPI، PostgreSQL/pgvector، Redis، MinIO، Alembic، AI Gateway، احراز هویت مستقل و کنترل دسترسی سمت سرور. Integration Center، Prompt Registry، نقشهٔ مسیریابی ۲۵ قابلیت AI، اتصال‌های OpenAI/Anthropic و CMS پایه نیز به `main` رسیده‌اند.
 
-قاعده قطعی محصول:
+با این حال، «فاز هسته» هنوز بسته نیست. چهار مانع اصلی آن عبارت‌اند از:
 
-> هر سرویس یا مدل قابل‌تغییر باید از پنل Super Admin، بدون تغییر کد، قابل تعریف، تست، فعال‌سازی، اولویت‌بندی، جایگزینی، Rotate و Revoke باشد.
+1. MFA برای حساب‌های دارای دسترسی مدیریتی پیاده‌سازی نشده است.
+2. قفل حساب و بازکردن قفل مدیریتی پس از تلاش‌های ناموفق ورود کامل نیست؛ Rate Limit مبتنی بر Redis وجود دارد اما جای Lockout حساب را نمی‌گیرد.
+3. اعتبار هنوز عمدتاً با شمارنده‌های `monthly_credits/used_credits/credit_pool` مدیریت می‌شود و Ledger افزایشی `reserve/consume/release/refund/expire` وجود ندارد.
+4. تست‌های Tenant/RBAC خوب شروع شده‌اند، اما هنوز ماتریس جامع endpoint × role × tenant و UAT واقعی پنل ثبت نشده است.
 
 ## راهنمای وضعیت
 
-- ✅ **کامل/دارای مدرک:** پیاده‌سازی و معیار پذیرش ثبت‌شده.
-- 🟡 **ناقص:** بخشی از Backend/UI وجود دارد، اما معیار پذیرش کامل یا UAT ندارد.
-- 🟠 **ناقص شدید:** مسیر پایه یا UI قدیمی وجود دارد، ولی قابلیت مدیریتی/عملیاتی مورد توافق فراهم نیست.
-- 🔴 **غایب:** در کد و استقرار فعلی مدرک قابل اتکایی دیده نشد.
-- ⚪ **قراردادی/نیازمند تصمیم:** الزام فرایندی که باید جداگانه تثبیت شود.
+- ✅ **کامل برای دروازه فعلی:** پیاده‌سازی و مدرک تست/استقرار موجود است.
+- 🟡 **ناقص:** مسیر اصلی وجود دارد، اما بخشی از معیار پذیرش یا UAT باقی است.
+- 🟠 **ناقص شدید:** پایه وجود دارد، اما کنترل بنیادی RFP غایب است.
+- 🔴 **غایب:** مدرک قابل اتکایی در کد/استقرار فعلی دیده نشد.
+- ⚪ **فرایندی/قراردادی:** باید پیش از Production تثبیت شود.
 
 ## ماتریس ۳۰ معیار پذیرش
 
 | کد | حوزه | وضعیت | شواهد فعلی | شکاف تا پذیرش |
-|---|---|---|---|---|
-| A01 | نصب مستقل | 🟡 | `compose.yaml` و staging مستقل فعال است | نصب روی سرور تمیز فقط با مستندات، ثبت زمان و مدرک تکرارپذیری انجام نشده |
-| A02 | حذف Lovable/Supabase Runtime | 🟡 | `@supabase/supabase-js` از dependency فعال حذف، lockfile از cache خصوصی Lovable پاک و PR #21 با CI سبز merge شده است | اسکن نهایی سورس/build/network و پاکسازی متن‌های قدیمی README لازم است |
-| A03 | دیتابیس، Migration و CI | 🟡 | PostgreSQL/pgvector و Alembic وجود دارد؛ frontend quality gates پس از PR #21 سبز است | اجرای schema/migration از صفر و backend/container gates کامل در CI هنوز مدرک نهایی ندارد |
-| A04 | Auth و MFA | 🟡 | ثبت‌نام، ورود، refresh، reset، session revoke و logout-all در Backend دیده می‌شود | MFA اجباری مدیران و E2E کامل Auth تحویل نشده |
-| A05 | Tenant Isolation | 🟡 | عضویت شرکت و کنترل‌های server-side برای چند مسیر وجود دارد | پوشش همه منابع، تست IDOR و اثبات عدم دسترسی متقاطع کامل نیست |
-| A06 | RBAC | 🟡 | Platform permissions و کنترل نقش‌های شرکتی وجود دارد | ماتریس کامل endpointها، نقش‌های Finance/Content/Support و تست جامع مجوزها ناقص است |
-| A07 | CMS واقعی | 🟠 | تنظیمات عمومی و تعدادی کامپوننت قدیمی CMS وجود دارد | CRUD کامل صفحات، FAQ، بلاگ، نظرات، آمار، رسانه، SEO، ترتیب و انتشار از پنل جدید متصل نیست |
-| A08 | Pricing واحد | 🟡 | `BillingPlan` دیتابیس‌محور و endpoint مدیریتی وجود دارد | UI مدیریتی کامل، نسخه/تاریخ اثر و اثبات یکسانی Landing/Upgrade/Payment کامل نیست |
-| A09 | Credit Ledger | 🟠 | اعتبار شرکت و داده‌های Billing پایه وجود دارد | Ledger افزایشی reserve/consume/release/refund/expire، جلوگیری از مصرف رایگان و تست اتمیک کامل اثبات نشده |
-| A10 | Payment | 🟡 | Adapter زرین‌پال و init/verify در Backend وجود دارد | Provider در staging غیرفعال و Merchant ID تنظیم نشده؛ پنل تنظیم، sandbox E2E، reconciliation و گزارش مالی غایب است |
-| A11 | Store | 🟡 | MinIO و مسیر entitlement/download امضاشده گزارش شده | UAT خرید تا دانلود، نسخه محصول، شمارنده واقعی و مدیریت کامل فروشگاه از پنل لازم است |
-| A12 | HR AI | 🟠 | تعدادی route مستقل و compatibility bridge برای قابلیت‌ها وجود دارد | ذخیره خروجی، تاریخچه، دانلود، Job قابل پیگیری، مدل/Prompt ثبت‌شده و اعتبار صحیح برای همه ماژول‌ها کامل نیست |
-| A13 | Onboarding واقعی | 🔴 | صفحه و مسیر قدیمی وجود دارد | تبدیل Demo به workflow واقعی با task/owner/status/reminder/history و UAT اثبات نشده |
-| A14 | Legal RAG | 🟡 | ورود PDF/DOCX/TXT/RTF/HTML/URL، محدودیت حجم و SSRF گزارش شده | embedding داخلی، hybrid search، citation، version/reindex/delete و golden set کامل نیست |
-| A15 | AI داخلی و Offline | 🔴 | AI Gateway داخلی شبکه وجود دارد | runtime مدل Ollama/vLLM و اجرای بدون اینترنت/Gemini/Gateway خارجی وجود ندارد |
-| A16 | Provider Management | 🔴 | Providerها فقط با Environment تنظیم می‌شوند | تعریف Provider/API/Endpoint/Secret/Model، health، fallback، rotate/revoke و quota از پنل غایب است |
-| A17 | Prompt Registry | 🔴 | مدرک Prompt Registry عملیاتی دیده نشد | Draft/Test/Publish/Rollback، schema خروجی، version compare و ثبت نسخه در خروجی باید ساخته شود |
-| A18 | Storage Security | 🟡 | MinIO private، signed access و بخشی از validation وجود دارد | ClamAV/quarantine، lifecycle، orphan cleanup، retention و backup/restore فایل کامل نیست |
-| A19 | Data/File Migration | 🔴 | دیتابیس مستقل staging ساخته شده | انتقال ۳۷ جدول، کاربران، فایل‌ها، تاریخچه‌ها و reconciliation/checksum/rollback انجام نشده |
-| A20 | Backup/Restore | 🔴 | Volumeهای persistent وجود دارند | backup خارج از سرور، نگهداری ۳۰روزه، رمزگذاری، drill واقعی و ثبت RPO/RTO غایب است |
-| A21 | Monitoring/Alerts | 🔴 | healthcheck سرویس‌ها وجود دارد | Prometheus/Grafana/Loki، alert، payment anomaly، AI/queue metrics و runbook غایب است |
-| A22 | Security Acceptance | 🟡 | CORS، Trusted Hosts، headers، rate limit و production secret guards وجود دارد | گزارش OWASP/API Security، tenant/file tests، secret/dependency scan و retest بدون High/Critical کامل نیست |
-| A23 | Performance | 🔴 | healthcheck و تعدادی تست مهندسی وجود دارد | load test صد کاربر/۵ AI Job، p95 و گزارش bottleneck تحویل نشده |
-| A24 | UI/RTL/Responsive | 🟡 | مسیرها، RTL و صفحات اصلی وجود دارند | UAT مرورگر/موبایل، accessibility، visual regression و states همه صفحات کامل نیست |
-| A25 | Docs/Training | 🟡 | معماری، handoff و READMEهای پایه وجود دارد | راهنمای کامل نصب/ادمین/محصول/API/backup/runbook و آموزش ضبط‌شده وجود ندارد |
-| A26 | Ownership | 🟡 | مخزن و staging تحت کنترل کارفرماست | inventory کامل حساب‌ها/secretها، روش rotate، restore، deploy و bootstrap admin باید مستند و آزموده شود |
-| A27 | No Demo Data | 🔴 | چند دامنه هنوز از UI/داده قدیمی عبور می‌کنند | audit کل محصول برای حذف یا برچسب‌گذاری آمار، نظر، خروجی و workflow ساختگی انجام نشده |
-| A28 | Audit | 🟡 | Audit برای بخشی از عملیات Platform/Billing وجود دارد | پوشش تمام اعمال حساس، جست‌وجوی پیشرفته، export و retention ناقص است |
-| A29 | API Keys/Webhooks | 🔴 | یک secret داخلی Gateway و URL webhook تنظیمی وجود دارد | API key مشتری با scope/quota/expiry/IP، rotate/revoke، HMAC webhook و delivery log غایب است |
-| A30 | Warranty/Defect Process | ⚪ | پروژه اکنون داخلی ادامه پیدا می‌کند | معیار release acceptance، defect window و مسئول رفع نقص باید پیش از Production تثبیت شود |
+|---|---|---:|---|---|
+| A01 | نصب مستقل | 🟡 | Compose مستقل و Staging عملیاتی است | نصب مجدد روی سرور تمیز فقط با Runbook و ثبت زمان هنوز انجام نشده |
+| A02 | حذف Lovable/Supabase Runtime | 🟡 | Safety tests و build مستقل پاس شده و cache خصوصی Lovable حذف شده است | compatibility code و آثار تاریخی باید پس از Reconciliation نهایی جمع شوند؛ اسکن نهایی network/image باقی است |
+| A03 | دیتابیس، Migration و CI | ✅ | سه Quality Gate سبز، migration round-trip در CI و Staging روی Alembic head است | بازبینی مجدد فقط هنگام migration بعدی |
+| A04 | Auth و MFA | 🟡 | Register/Login/Refresh/Logout، چرخش refresh، reset/change password، email verification، session list/revoke/logout-all تست شده‌اند | MFA/TOTP مدیران و Account Lockout/Unlock غایب است |
+| A05 | Tenant Isolation | 🟡 | ایجاد شرکت و CEO مستقل، منع دسترسی متقاطع و invite/capacity tests وجود دارد | پوشش تمام منابع tenant-owned و ماتریس IDOR سراسری ناقص است |
+| A06 | RBAC | 🟡 | Platform/Product/Company boundaries و permission override سمت سرور تست شده‌اند | پوشش جامع همه endpointها و نقش‌های Finance/Support/Operations ناقص است |
+| A07 | CMS واقعی | 🟡 | CMS پایه برای برند، لوگو/favicon، رنگ، فونت، متن، visibility و SEO روی PostgreSQL/MinIO فعال است | Pages/FAQ/Blog/Testimonials/Stats/Media، Draft/Preview/Publish و UAT کامل باقی است |
+| A08 | Pricing واحد | 🟡 | `BillingPlan` دیتابیس‌محور و endpoint عمومی وجود دارد | Plan Version، تاریخ اثر و اثبات همسانی Landing/Upgrade/Payment کامل نیست |
+| A09 | Credit Ledger | 🟠 | قفل ردیف هنگام کسر اعتبار وجود دارد | Ledger افزایشی، reservation lifecycle، idempotency، refund/expire و double-spend tests غایب است |
+| A10 | Payment | 🟡 | Adapter زرین‌پال و verify اتمیک پایه وجود دارد | Provider روی Staging غیرفعال، sandbox E2E، reconciliation و گزارش مالی ناقص است |
+| A11 | Store | 🟡 | MinIO و entitlement/signed download پایه وجود دارد | UAT خرید تا دانلود، نسخه محصول و شمارنده واقعی کامل نیست |
+| A12 | HR AI | 🟠 | routeهای مستقل، Recruiting persistence و AI routing مرکزی وجود دارد | Job/history/download/credit lifecycle برای همه ماژول‌ها کامل نیست |
+| A13 | Onboarding واقعی | 🔴 | UI قدیمی وجود دارد | workflow واقعی task/owner/status/reminder/history تحویل نشده |
+| A14 | Legal RAG | 🟡 | ورود چندفرمتی و SSRF/size protection وجود دارد | embedding داخلی، citation، reindex/version و golden set ناقص است |
+| A15 | AI داخلی و Offline | 🟡 | runtimeهای opt-in Ollama/vLLM و provider داخلی تعریف شده‌اند | مدل فعال، benchmark فارسی، ظرفیت و آزمون قطع اینترنت انجام نشده |
+| A16 | Provider Management | 🟡 | Integration Center مستقل، secret encryption، health/test و OpenAI/Anthropic پشتیبانی می‌شوند | rotate/revoke کامل، quota و UAT Providerهای واقعی باقی است |
+| A17 | Prompt Registry | 🟡 | Draft/Test/Publish/Rollback، versioning و UI مستقل وجود دارد | adoption تمام قابلیت‌ها، golden regression batch و UAT عملیاتی ناقص است |
+| A18 | Storage Security | 🟡 | MinIO خصوصی، signed access و validation پایه وجود دارد | ClamAV/quarantine، lifecycle، orphan cleanup و restore فایل ناقص است |
+| A19 | Data/File Migration | 🔴 | دیتابیس مستقل Staging ساخته شده است | انتقال واقعی داده/فایل Production، checksum، reconciliation و rollback انجام نشده |
+| A20 | Backup/Restore | 🟠 | قبل از استقرار اخیر pg_dump و rollback tag ساخته شد | backup خودکار/offsite/رمزگذاری‌شده، retention و restore drill غایب است |
+| A21 | Monitoring/Alerts | 🔴 | healthcheck سرویس‌ها وجود دارد | Prometheus/Grafana/Loki، alert و runbook غایب است |
+| A22 | Security Acceptance | 🟡 | CORS/Trusted Hosts/headers/Redis rate limit/secret guards و تست‌های پایه وجود دارد | گزارش OWASP/API Security و retest بدون High/Critical کامل نیست |
+| A23 | Performance | 🔴 | build و smoke tests موجود است | load test صد کاربر/۵ AI Job و p95 report وجود ندارد |
+| A24 | UI/RTL/Responsive | 🟡 | RTL و مسیرهای اصلی فعال‌اند | مرورگر/موبایل/accessibility/visual regression و state coverage کامل نیست |
+| A25 | Docs/Training | 🟡 | معماری، handoff، run notes و این ماتریس وجود دارد | راهنمای کامل نصب/ادمین/API/backup/incident و آموزش نهایی ناقص است |
+| A26 | Ownership | 🟡 | مخزن، Staging و حساب‌های اصلی تحت کنترل کارفرماست | inventory نهایی حساب/secret و drill مستقل rotate/restore/deploy باقی است |
+| A27 | No Demo Data | 🟠 | Unicorn Lab حذف و بخشی از fallbackهای ساختگی حذف شده است | ممیزی کل UI برای demo/sample/hardcode و حذف یا برچسب‌گذاری کامل نیست |
+| A28 | Audit | 🟡 | عملیات حساس Platform/Product و بخشی از Billing لاگ می‌شوند | auth/security/credit/provider/file events، export و retention کامل نیست |
+| A29 | API Keys/Webhooks | 🔴 | secret داخلی Gateway و webhook تنظیمی محدود وجود دارد | API key مشتری، scope/quota/expiry/IP، HMAC webhook و delivery log غایب است |
+| A30 | Warranty/Defect Process | ⚪ | توسعه داخلی ادامه دارد | release acceptance، defect window و مسئول رفع نقص باید پیش از Production ثبت شود |
 
-## شکاف‌های تأییدشده در پنل فعلی
+## دروازهٔ فعلی: بستن فاز هسته
 
-### Platform Admin موجود
+فاز هسته فقط با چهار خروجی زیر بسته می‌شود:
 
-- نمای کلی کاربران و شرکت‌ها
-- مدیریت وضعیت کاربر و نقش‌های سراسری
-- ساخت/ویرایش شرکت
-- Audit محدود
-- AI economics
+- [ ] MFA/TOTP برای نقش‌های مدیریتی، recovery امن و تست E2E
+- [ ] Lockout سمت سرور، ثبت تلاش ورود و Admin Unlock
+- [ ] Credit Ledger افزایشی با reserve/consume/release/refund/expire و idempotency
+- [ ] ماتریس تست Auth/Tenant/RBAC/Credit و UAT ثبت‌شده روی Staging
 
-### Product Admin موجود
+## ترتیب PRهای بعدی
 
-- فقط تنظیمات عمومی `key/value` برای متن، visibility، SEO و رفتار محصول
-- Backend عمداً Secret و API Key را در این پنل رد می‌کند
+1. **Account Security:** MFA، lockout/unlock، audit و تست‌ها
+2. **Credit Ledger:** مدل/مهاجرت/service، سازگاری با شمارنده فعلی، تست اتمیک و rollback
+3. **Authorization Gate:** پوشش endpoint × role × tenant و رفع شکاف‌های IDOR/RBAC
+4. **Core UAT:** اجرای سناریوهای واقعی روی Staging و ثبت Pass/Fail
 
-### بخش‌های مدیریتی جاافتاده
+هر PR باید مستقل، قابل rollback و بدون تغییر Production باشد.
 
-- CMS کامل: بلاگ، FAQ، نظرات، آمار، صفحات و رسانه
-- پلن/اعتبار/تراکنش/مغایرت
-- Providerها، مدل‌ها و Secretها
-- Prompt Registry
-- پیامک، ایمیل، پرداخت، OCR، Search و Crawler
-- فایل‌ها و Quarantine
-- صف‌ها، Jobها، Retry و Dead Letter
-- API Key و Webhook
-- Feature Flags
-- سلامت سرویس‌ها، بکاپ و هشدارها
+## تصمیم‌های دامنه
 
-## شکاف‌های تأییدشده در استقرار فعلی
+- Unicorn Lab طبق تصمیم مالک محصول از دامنه حذف شده است.
+- قابلیت مشترک `track-funding` زیر Strategic Radar باقی می‌ماند.
+- ظاهر و ماژول‌های جدید پس از تثبیت هسته روی همین معماری افزوده می‌شوند.
+- Production تا تکمیل Migration، Operations، Backup/Restore و پذیرش صریح مالک محصول دست‌نخورده می‌ماند.
 
-1. `compose.yaml` شامل `postgres`، `redis`، `minio`، `ai`، `api` و `web` است؛ اما `worker`، `scheduler`، runtime مدل لوکال، Prometheus، Grafana و Loki ندارد.
-2. OpenAI، Gemini و Perplexity فقط از Environment به AI Gateway داده می‌شوند.
-3. `SMS_PROVIDER` و `EMAIL_PROVIDER` در نمونه تنظیمات غیرفعال‌اند.
-4. `RECRUITING_SOURCING_WEBHOOK_URL` خالی است.
-5. Backend زرین‌پال را می‌شناسد، اما متغیرهای Payment در `.env.standalone.example` کامل ارائه نشده و staging غیرفعال است.
-6. PR #21 پس از پاکسازی ۳۱ URL خصوصی Lovable با CI سبز merge شد؛ staging هنوز باید به commit جدید `main` همگام و دوباره بررسی شود.
+## شواهد این ممیزی
 
-## ترتیب اجرایی مصوب پیشنهادی
-
-
-
-### گام ۱ — تثبیت Baseline
-
-- [x] رفع CI مربوط به PR #21
-- [x] سبزشدن Build/Test
-- [x] Merge به `main`
-- [ ] بازگرداندن staging به commit ادغام‌شده‌ی `main`
-- [x] بدون هیچ تغییر Production
-
-### گام ۲ — Integration Center
-
-- Secret Store امن
-- Provider Registry
-- Connection Test و Health
-- Primary/Fallback routing
-- AI/Payment/SMS/Email/Web Search/Crawler/OCR/Webhook adapters
-- Audit کامل تغییرات
-
-### گام ۳ — Prompt Registry و AI لوکال
-
-- Draft/Test/Publish/Rollback
-- اتصال Ollama/vLLM
-- انتخاب مدل برای هر قابلیت
-- ثبت Provider/Model/Prompt/Usage روی هر خروجی
-
-### گام ۴ — تکمیل پنل‌ها
-
-- Super Admin جامع
-- Product/Content Admin
-- Finance Admin
-- Support/Operations Admin
-- Company Admin کامل
-
-### گام‌های بعدی
-
-- CMS و Billing/Credit
-- Worker/Queue و Job history
-- Backup/Restore و Monitoring
-- مهاجرت/Reconciliation
-- UAT ماژول‌به‌ماژول و تکمیل A01 تا A30
-
-## تصمیم بعدی
-
-رفع CI و Merge PR #21 انجام شد. اقدام بعدی همگام‌سازی و Smoke Test staging روی `main` است؛ سپس توسعه Integration Center باید در یک PR مستقل آغاز شود.
-
-## شواهد بررسی‌شده
-
-- `AGENTS.md`
-- `docs/architecture/INDEPENDENT_PLATFORM.md`
-- `docs/engineering/INDEPENDENCE_BACKLOG.md`
-- `compose.yaml`
-- `.env.standalone.example`
-- `package.json`
-- `src/App.tsx`
-- `src/pages/Admin.tsx`
-- `src/pages/PlatformAdmin.tsx`
-- `src/pages/ProductAdmin.tsx`
-- `src/integrations/supabase/client.ts`
-- `apps/api/src/hring_api/api/v1/router.py`
-- `apps/api/src/hring_api/config.py`
-- دامنه‌های Admin، Identity، Companies، Billing، AI و Recruiting
-- وضعیت PR #21 و workflowهای commit فعلی staging
+- `main@fb994cd` و PR #28
+- سه GitHub Quality Gate سبز روی `1d8a2fc`
+- Staging healthy و API health موفق
+- Alembic `20260823_0011 (head)`
+- تست‌های Auth، Recovery، Company، Admin، Runtime Security، AI Metering
+- مدل‌ها و سرویس‌های Identity، Access، Billing، Admin و Compatibility
+- `AGENTS.md`، `EXECUTION_ORDER.md` و `INDEPENDENCE_BACKLOG.md`
