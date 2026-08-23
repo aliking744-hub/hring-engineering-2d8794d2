@@ -17,7 +17,7 @@ This map is a working decomposition of the existing product. It does not imply t
 | Legal Intelligence | LegalSearchPage, LegalAdvisor, legal components | document search, legal chat, defense/complaint tools | High |
 | Strategic Compass | StrategicCompass and components | intents, bets, behaviors, journals, achievements | Medium |
 | Strategic Radar | StrategicRadar and components | web research and strategic analyses | Medium |
-| Unicorn Lab | UnicornLab and components | screening, analysis, web radar | Medium |
+| Strategic Intelligence scope | Strategic Compass and Strategic Radar | Unicorn Lab retired; shared funding tracking remains under Strategic Radar | Medium |
 | Digital Products | Shop, ProductCatalog | catalog, purchase/download access | Medium |
 | Notifications & Support | NotificationsDropdown, SupportChatWidget | notifications, support logs, chat | Medium |
 | Administration / Control Center | Admin and admin components | users, companies, credits, permissions, content, logs | High |
