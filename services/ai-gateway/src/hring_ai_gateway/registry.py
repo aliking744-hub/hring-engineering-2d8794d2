@@ -32,11 +32,19 @@ def _optional_string(value: object) -> str | None:
 
 
 def _default_endpoint(adapter: str) -> str:
-    return "/v1/sonar" if adapter == "perplexity" else "/chat/completions"
+    if adapter == "perplexity":
+        return "/v1/sonar"
+    if adapter == "anthropic":
+        return "/v1/messages"
+    return "/chat/completions"
 
 
 def _default_max_tokens_field(adapter: str) -> str:
-    return "max_tokens" if adapter in {"perplexity", "ollama", "vllm"} else "max_completion_tokens"
+    return (
+        "max_tokens"
+        if adapter in {"anthropic", "perplexity", "ollama", "vllm"}
+        else "max_completion_tokens"
+    )
 
 
 def parse_registry_provider(value: object) -> ProviderConfig | None:

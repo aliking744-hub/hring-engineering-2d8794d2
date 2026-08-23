@@ -32,18 +32,18 @@ const Admin = () => {
       badge: 'Platform',
     },
     canOpenIntegrations && {
-      title: 'Integration Center',
-      description: 'مدیریت امن AI، مدل لوکال، درگاه، پیامک، ایمیل، وب‌هوک و تست سلامت اتصال‌ها.',
+      title: 'اتصال سرویس‌ها و APIها',
+      description: 'ثبت امن API Key و تست سلامت سرویس‌های AI، مدل لوکال، پرداخت، پیامک، ایمیل و وب‌هوک.',
       icon: PlugZap,
       href: '/admin/integrations',
       badge: 'Secrets & APIs',
     },
     canOpenPrompts && {
-      title: 'Prompt Registry',
-      description: 'ساخت، تست، انتشار، مقایسه و Rollback پرامپت‌ها با انتخاب Provider و مدل برای هر قابلیت.',
+      title: 'مدیریت هوش قابلیت‌ها',
+      description: 'مشاهده و تغییر هوش و مدل هر بخش HRing، همراه با نسخه‌بندی، تست و بازگشت متن دستورها.',
       icon: FileCode2,
       href: '/admin/prompts',
-      badge: 'AI Prompts',
+      badge: 'AI Routing',
     },
     canOpenProduct && {
       title: 'Product & Content Admin',
@@ -91,7 +91,7 @@ const Admin = () => {
             <Button variant="ghost" size="icon" asChild><Link to="/dashboard"><ChevronLeft className="h-5 w-5" /></Link></Button>
             <div>
               <h1 className="text-3xl font-bold">مرکز مدیریت HRing</h1>
-              <p className="mt-1 text-sm text-muted-foreground">سه Control Plane جدا با مرز دسترسی مستقل.</p>
+              <p className="mt-1 text-sm text-muted-foreground">بخش‌های مدیریتی مستقل با مرز دسترسی روشن.</p>
             </div>
           </div>
 

@@ -129,6 +129,9 @@ def test_prompt_registry_draft_test_publish_compare_and_rollback(monkeypatch) ->
         assert first["version"] == 1
         assert first["status"] == "draft"
         assert first["test_status"] == "untested"
+        assert prompt["published_provider_alias"] is None
+        assert prompt["draft_provider_alias"] == "gemini"
+        assert prompt["draft_model"] == "gemini-2.5-flash"
 
         tested = client.post(
             f"/api/v1/admin/platform/ai/prompts/{prompt_id}/versions/{first['id']}/test",
@@ -163,7 +166,18 @@ def test_prompt_registry_draft_test_publish_compare_and_rollback(monkeypatch) ->
         )
         assert published.status_code == 200, published.text
         assert published.json()["published_version"] == 1
+        assert published.json()["published_provider_alias"] == "gemini"
+        assert published.json()["published_model"] == "gemini-2.5-flash"
         assert published.json()["draft_version"] is None
+
+        listed = client.get(
+            "/api/v1/admin/platform/ai/prompts",
+            headers=platform_headers,
+        )
+        assert listed.status_code == 200, listed.text
+        summary = next(item for item in listed.json() if item["id"] == prompt_id)
+        assert summary["published_provider_alias"] == "gemini"
+        assert summary["published_model"] == "gemini-2.5-flash"
 
         draft = client.post(
             f"/api/v1/admin/platform/ai/prompts/{prompt_id}/drafts",

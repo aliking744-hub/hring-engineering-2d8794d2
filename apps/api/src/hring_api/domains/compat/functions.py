@@ -5,41 +5,13 @@ from typing import Any
 from uuid import UUID
 
 from hring_api.config import Settings
+from hring_api.domains.ai.feature_catalog import COMPAT_AI_FUNCTIONS
+from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
 from hring_api.domains.ai.gateway_client import AiGatewayError, generate_with_ai_gateway
 from hring_api.domains.identity.dependencies import Principal
 
 
-AI_FUNCTIONS = frozenset(
-    {
-        "analyze-competitor",
-        "analyze-competitor-swot",
-        "analyze-global-trends",
-        "analyze-market-position",
-        "analyze-tech-edge",
-        "analyze-unicorn",
-        "analyze-unicorn-engine",
-        "analyze-value-chain",
-        "defense-builder",
-        "fetch-company-intel",
-        "generate-interview-guide",
-        "generate-interview-kit",
-        "generate-job-ad",
-        "generate-job-profile",
-        "generate-learning-path",
-        "generate-mental-prism",
-        "generate-onboarding-plan",
-        "generate-smart-ad",
-        "generate-strategic-recommendations",
-        "hring-support",
-        "labor-complaint-assistant",
-        "legal-advisor-chat",
-        "search-competitor-news",
-        "search-legal-docs",
-        "track-funding",
-        "unicorn-ai-chat",
-        "unicorn-web-radar",
-    }
-)
+AI_FUNCTIONS = COMPAT_AI_FUNCTIONS
 
 BLOCKED_SENSITIVE_FUNCTIONS = frozenset(
     {
@@ -118,18 +90,25 @@ async def invoke_ai_function(
         f"Request JSON: {serialized}\n\n"
         "Return the structured result expected by this HRing capability as JSON."
     )
+    feature_key = f"compat.{name}"
+    route = await resolve_runtime_feature_route(
+        feature_key=feature_key,
+        default_provider=settings.recruiting_ai_provider,
+        default_model=settings.recruiting_ai_model,
+    )
     try:
         result = await generate_with_ai_gateway(
-            feature_key=f"compat.{name}",
+            feature_key=feature_key,
             user_id=principal.user_id if principal is not None else None,
             company_id=_company_id(principal),
-            provider=settings.recruiting_ai_provider,
-            model=settings.recruiting_ai_model,
+            provider=route.provider,
+            model=route.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             max_output_tokens=12_000,
+            metadata_json={"ai_route_source": route.source},
         )
     except AiGatewayError as exc:
         raise CompatFunctionError("HRing AI service is unavailable") from exc
