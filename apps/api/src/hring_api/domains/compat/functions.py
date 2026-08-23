@@ -139,7 +139,7 @@ async def invoke_ai_function(
     if cost <= 0:
         return await generate()
     assert session is not None
-    raw_key = (idempotency_key or request_id or "").strip()
+    raw_key = (idempotency_key or "").strip()
     if not raw_key:
         raise CompatFunctionError("AI request idempotency key is required")
     operation_key = f"compat:{sha256(f'{name}:{raw_key}'.encode()).hexdigest()}"

@@ -34,7 +34,7 @@ export const useFeatureGate = () => {
 
       const success = await preflightCredits(cost, featureKey);
       if (!success) {
-        toast.error('خطا در کسر اعتبار');
+        toast.error('اعتبار کافی نیست یا بررسی موجودی انجام نشد');
         return false;
       }
     }

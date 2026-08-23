@@ -97,7 +97,7 @@ export const useCredits = () => {
 
   // Transitional name: this performs an authoritative server preflight only.
   // Metered operations reserve and consume credits inside the backend transaction.
-  const preflightCredits = async (amount: number, featureKey?: string): Promise<boolean> => {
+  const preflightCredits = useCallback(async (amount: number, featureKey?: string): Promise<boolean> => {
     try {
       const result = await apiRequest<CreditPreflight>('/billing/credits/preflight', {
         method: 'POST',
@@ -109,7 +109,7 @@ export const useCredits = () => {
       console.error(`Credit preflight failed${featureKey ? ` for ${featureKey}` : ''}:`, error);
       return false;
     }
-  };
+  }, []);
 
   const hasEnoughCredits = (operation: CreditOperation): boolean => {
     return credits >= CREDIT_COSTS[operation];
