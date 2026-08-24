@@ -1,0 +1,26 @@
+[Unit]
+Description=Create and verify an HRing PostgreSQL and MinIO backup
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/hring
+Environment=ENV_FILE=/opt/hring/.env.standalone
+Environment=COMPOSE_FILE=/opt/hring/compose.yaml
+Environment=BACKUP_ROOT=/var/backups/hring
+Environment=RETENTION_DAYS=14
+ExecStart=/opt/hring/scripts/operations/backup.sh
+ExecStartPost=/bin/sh -ec 'latest="$(find /var/backups/hring -mindepth 1 -maxdepth 1 -type d -name "20*T*Z" | sort | tail -n 1)"; test -n "$latest"; /opt/hring/scripts/operations/verify-backup.sh "$latest"'
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/hring /run /tmp
+
+[Install]
+WantedBy=multi-user.target

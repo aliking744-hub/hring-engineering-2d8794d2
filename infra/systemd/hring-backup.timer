@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the HRing backup every day
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+RandomizedDelaySec=20m
+Persistent=true
+Unit=hring-backup.service
+
+[Install]
+WantedBy=timers.target
