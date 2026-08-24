@@ -20,7 +20,6 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
-app.add_middleware(MetricsMiddleware, service="hring-ai-gateway")
 
 
 def require_internal_key(
@@ -82,3 +81,10 @@ async def generate(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI provider returned an invalid response",
         ) from exc
+
+
+app.add_middleware(
+    MetricsMiddleware,
+    service="hring-ai-gateway",
+    routes=tuple(app.routes),
+)

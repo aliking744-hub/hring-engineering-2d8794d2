@@ -1,4 +1,4 @@
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable
 from time import perf_counter
 
 from fastapi import Request, Response
@@ -6,7 +6,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, Counter, Gauge, His
 from prometheus_client.exposition import generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import BaseRoute, Match
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Scope
 
 
 CallNext = Callable[[Request], Awaitable[Response]]
@@ -30,16 +30,17 @@ HTTP_REQUESTS_IN_PROGRESS = Gauge(
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, *, service: str) -> None:
+    def __init__(self, app: ASGIApp, *, service: str, routes: tuple[BaseRoute, ...]) -> None:
         super().__init__(app)
         self.service = service
+        self.routes = routes
 
     async def dispatch(self, request: Request, call_next: CallNext) -> Response:
         if request.url.path == "/metrics":
             return await call_next(request)
 
         method = request.method.upper()
-        route_label = self._route_label(request)
+        route_label = self._route_label(request.scope)
         started_at = perf_counter()
         status_code = 500
         HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).inc()
@@ -61,15 +62,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             ).observe(max(0.0, perf_counter() - started_at))
             HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).dec()
 
-    @staticmethod
-    def _route_label(request: Request) -> str:
-        routes = getattr(request.app, "routes", ())
-        if not isinstance(routes, Iterable):
-            return "unmatched"
-        for candidate in routes:
-            if not isinstance(candidate, BaseRoute):
-                continue
-            match, _ = candidate.matches(request.scope)
+    def _route_label(self, scope: Scope) -> str:
+        for candidate in self.routes:
+            match, _ = candidate.matches(scope)
             if match is Match.FULL:
                 route = getattr(candidate, "path", None)
                 if isinstance(route, str):

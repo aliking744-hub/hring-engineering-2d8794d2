@@ -20,6 +20,7 @@ app = FastAPI(
     redoc_url="/redoc" if settings.environment != "production" else None,
     openapi_url="/openapi.json" if settings.environment != "production" else None,
 )
+app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 app.add_middleware(
     TrustedHostMiddleware,
@@ -34,9 +35,7 @@ app.add_middleware(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SensitiveRouteRateLimitMiddleware, settings=settings)
-app.add_middleware(MetricsMiddleware, service="hring-api")
-
-app.include_router(api_router, prefix=settings.api_v1_prefix)
+app.add_middleware(MetricsMiddleware, service="hring-api", routes=tuple(app.routes))
 
 
 @app.get("/metrics", include_in_schema=False)
