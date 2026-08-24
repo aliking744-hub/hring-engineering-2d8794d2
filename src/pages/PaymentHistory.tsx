@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { 
   Receipt, 
-  Download, 
   CheckCircle2, 
   XCircle, 
   Clock, 
@@ -26,14 +25,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import AuroraBackground from '@/components/AuroraBackground';
 
 interface PaymentTransaction {
   id: string;
-  amount: number;
+  amount_toman: number;
   plan_type: string;
   status: string;
   ref_id: string | null;
@@ -55,6 +53,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; vari
   verified: { label: 'موفق', icon: <CheckCircle2 className="h-4 w-4" />, variant: 'default' },
   pending: { label: 'در انتظار', icon: <Clock className="h-4 w-4" />, variant: 'secondary' },
   failed: { label: 'ناموفق', icon: <XCircle className="h-4 w-4" />, variant: 'destructive' },
+  cancelled: { label: 'لغوشده', icon: <XCircle className="h-4 w-4" />, variant: 'outline' },
 };
 
 const formatPrice = (price: number) => {
@@ -75,39 +74,31 @@ const formatDate = (dateString: string) => {
 export default function PaymentHistory() {
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (user) {
-      fetchTransactions();
-    }
-  }, [user]);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('payment_transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTransactions(data || []);
-    } catch (error: any) {
+      const data = await apiRequest<PaymentTransaction[]>('/billing/payments');
+      setTransactions(data);
+    } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
         title: 'خطا در دریافت تاریخچه',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'تاریخچه پرداخت دریافت نشد',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    void fetchTransactions();
+  }, [fetchTransactions]);
 
   const totalPaid = transactions
     .filter(t => t.status === 'verified')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + t.amount_toman, 0);
 
   const successfulPayments = transactions.filter(t => t.status === 'verified').length;
 
@@ -268,7 +259,7 @@ export default function PaymentHistory() {
                                   {PLAN_NAMES[transaction.plan_type] || transaction.plan_type}
                                 </TableCell>
                                 <TableCell>
-                                  {formatPrice(transaction.amount)} تومان
+                                  {formatPrice(transaction.amount_toman)} تومان
                                 </TableCell>
                                 <TableCell>
                                   <Badge variant={statusConfig.variant} className="gap-1">
