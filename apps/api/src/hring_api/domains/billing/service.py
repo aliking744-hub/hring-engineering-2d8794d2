@@ -70,6 +70,21 @@ async def list_billing_plans(
     return list(result.scalars().all())
 
 
+async def list_payment_transactions(
+    db: AsyncSession,
+    *,
+    principal: Principal,
+    limit: int = 200,
+) -> list[PaymentTransaction]:
+    result = await db.execute(
+        select(PaymentTransaction)
+        .where(PaymentTransaction.user_id == principal.user_id)
+        .order_by(PaymentTransaction.created_at.desc(), PaymentTransaction.id.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
 async def initialize_payment(
     db: AsyncSession,
     *,
