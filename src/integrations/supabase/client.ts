@@ -268,7 +268,7 @@ const rpc = async (name: string, args: JsonRecord = {}): Promise<LegacyResult> =
 };
 
 const storageBucket = (bucket: string) => ({
-  upload: async (path: string, file: Blob | File, options?: { contentType?: string; upsert?: boolean }): Promise<LegacyResult> => {
+  upload: async (path: string, file: Blob | File, options?: { cacheControl?: string; contentType?: string; upsert?: boolean }): Promise<LegacyResult> => {
     try {
       const form = new FormData();
       const filename = path.split('/').pop() || 'upload.bin';
@@ -293,7 +293,7 @@ const storageBucket = (bucket: string) => ({
       return { data: null, error: errorShape(error) };
     }
   },
-  list: async (prefix = '', options?: { limit?: number }): Promise<LegacyResult> => {
+  list: async (prefix = '', options?: { limit?: number; sortBy?: { column: string; order?: 'asc' | 'desc' } }): Promise<LegacyResult> => {
     try {
       const data = await apiRequest<{ data: any[] }>(`/compat/storage/${encodeURIComponent(bucket)}/list`, {
         method: 'POST',
@@ -351,7 +351,7 @@ const auth = {
       return { data: { user: null, session: null }, error: errorShape(error) };
     }
   },
-  signUp: async ({ email, password, options }: { email: string; password: string; options?: { data?: JsonRecord } }) => {
+  signUp: async ({ email, password, options }: { email: string; password: string; options?: { data?: JsonRecord; emailRedirectTo?: string } }) => {
     try {
       const envelope = await authRequest<AuthEnvelope>('/auth/register', {
         method: 'POST',
@@ -380,8 +380,8 @@ const auth = {
 
 class PollingChannel {
   private timer: number | null = null;
-  private handlers: Array<() => void> = [];
-  on(_type: string, _filter: unknown, callback: () => void) {
+  private handlers: Array<(...args: any[]) => void> = [];
+  on(_type: string, _filter: unknown, callback: (...args: any[]) => void) {
     this.handlers.push(callback);
     return this;
   }

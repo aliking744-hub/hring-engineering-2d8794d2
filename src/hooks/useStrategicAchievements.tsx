@@ -82,36 +82,8 @@ export const useStrategicAchievements = () => {
           schema: "public",
           table: "strategic_achievements",
         },
-        (payload) => {
-          console.log("New achievement:", payload);
-          const newItem = payload.new as {
-            id: string;
-            name: string;
-            owner_name: string;
-            department_id: string;
-            department_name: string;
-            strategic_importance: number;
-            completed_at: string;
-          };
-
-          const newTask: Task = {
-            id: newItem.id,
-            name: newItem.name,
-            ownerName: newItem.owner_name,
-            departmentId: newItem.department_id,
-            departmentName: newItem.department_name,
-            strategicImportance: newItem.strategic_importance,
-            completedAt: new Date(newItem.completed_at),
-          };
-
-          // Mark as new for animation
-          setNewTaskIds((prev) => [...prev, newTask.id]);
-          setTasks((prev) => [newTask, ...prev]);
-
-          // Remove from new list after animation completes
-          setTimeout(() => {
-            setNewTaskIds((prev) => prev.filter((id) => id !== newTask.id));
-          }, 2000);
+        () => {
+          void fetchAchievements();
         }
       )
       .subscribe();
