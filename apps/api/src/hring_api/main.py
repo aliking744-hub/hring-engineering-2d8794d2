@@ -21,6 +21,7 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.environment != "production" else None,
 )
 
+app.add_middleware(MetricsMiddleware, service="hring-api")
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=[*settings.trusted_hosts, "api"],
@@ -34,7 +35,6 @@ app.add_middleware(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SensitiveRouteRateLimitMiddleware, settings=settings)
-app.add_middleware(MetricsMiddleware, service="hring-api")
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
