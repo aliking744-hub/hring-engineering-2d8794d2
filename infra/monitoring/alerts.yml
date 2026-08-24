@@ -51,13 +51,25 @@ groups:
           description: "The p95 latency for {{ $labels.service }} has exceeded two seconds."
 
       - alert: HRingProcessMemoryHigh
-        expr: process_resident_memory_bytes{job=~"hring-api|hring-ai-gateway"} > 805306368
+        expr: process_resident_memory_bytes{job=~"hring-api|hring-ai-gateway|hring-worker"} > 805306368
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "HRing process memory is high"
           description: "{{ $labels.job }} is using more than 768 MiB resident memory."
+
+      - alert: HRingWorkerHeartbeatStale
+        expr: |
+          hring_worker_ready == 0
+          or
+          time() - hring_worker_last_heartbeat_timestamp_seconds > 120
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HRing worker heartbeat is stale"
+          description: "The background worker is not ready or has stopped sending heartbeats."
 
       - alert: HRingPrometheusConfigReloadFailed
         expr: prometheus_config_last_reload_successful == 0
