@@ -7,8 +7,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 require_command docker
+require_command find
 require_command flock
 require_command sha256sum
+require_command tar
 require_file "${ENV_FILE}"
 require_file "${COMPOSE_FILE}"
 umask 077
@@ -57,8 +59,6 @@ compose run -d --no-deps --name "${minio_container}" --entrypoint /bin/sh minio-
   mkdir -p /tmp/hring-export/hring-private
   mc alias set hring http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
   mc mirror --overwrite hring/hring-private /tmp/hring-export/hring-private >/dev/null
-  find /tmp/hring-export/hring-private -type f | wc -l | tr -d " " >/tmp/minio-object-count.txt
-  tar -C /tmp/hring-export -czf /tmp/minio.tar.gz hring-private
 ' >/dev/null
 
 minio_exit="$(docker wait "${minio_container}")"
@@ -66,11 +66,11 @@ if [[ "${minio_exit}" != "0" ]]; then
   docker logs "${minio_container}" >&2 || true
   fail "MinIO export failed"
 fi
-docker cp "${minio_container}:/tmp/minio.tar.gz" "${partial_dir}/minio.tar.gz" >/dev/null
-docker cp "${minio_container}:/tmp/minio-object-count.txt" "${partial_dir}/minio-object-count.txt" >/dev/null
-minio_object_count="$(tr -d '[:space:]' <"${partial_dir}/minio-object-count.txt")"
-rm -f -- "${partial_dir}/minio-object-count.txt"
+docker cp "${minio_container}:/tmp/hring-export/hring-private" "${partial_dir}/" >/dev/null
+minio_object_count="$(find "${partial_dir}/hring-private" -type f | wc -l | tr -d '[:space:]')"
 [[ "${minio_object_count}" =~ ^[0-9]+$ ]] || fail "Invalid MinIO object count"
+tar -C "${partial_dir}" -czf "${partial_dir}/minio.tar.gz" hring-private
+find "${partial_dir}/hring-private" -depth -delete
 
 git_commit="$(git -C "${REPOSITORY_ROOT}" rev-parse HEAD 2>/dev/null || printf 'unknown')"
 {
