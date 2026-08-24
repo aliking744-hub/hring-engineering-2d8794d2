@@ -41,7 +41,6 @@ interface PaymentTransaction {
 
 const PLAN_NAMES: Record<string, string> = {
   individual_free: 'رایگان',
-  individual_expert: 'کارشناس',
   individual_pro: 'حرفه‌ای',
   individual_plus: 'پلاس',
   corporate_expert: 'شرکتی - کارشناس',

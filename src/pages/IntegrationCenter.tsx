@@ -111,34 +111,25 @@ interface EditorState {
 
 const PROVIDER_TYPES = [
   ['llm', 'مدل زبانی'],
-  ['embedding', 'Embedding'],
-  ['image', 'تولید تصویر'],
-  ['search', 'جستجو'],
-  ['crawler', 'خزش/منبع‌یابی'],
-  ['ocr', 'OCR'],
   ['email', 'ایمیل'],
   ['sms', 'پیامک'],
   ['payment', 'پرداخت'],
-  ['webhook', 'وب‌هوک'],
 ] as const;
 
-const ADAPTERS = [
-  'openai_compatible',
-  'openai',
-  'anthropic',
-  'gemini_openai',
-  'perplexity',
-  'ollama',
-  'vllm',
-  'resend',
-  'smtp',
-  'kavenegar',
-  'farazsms',
-  'melipayamak',
-  'zarinpal',
-  'generic_http',
-  'webhook',
-];
+const RUNTIME_ADAPTERS_BY_TYPE: Record<string, readonly string[]> = {
+  llm: [
+    'openai_compatible',
+    'openai',
+    'anthropic',
+    'gemini_openai',
+    'perplexity',
+    'ollama',
+    'vllm',
+  ],
+  email: ['resend'],
+  sms: ['kavenegar'],
+  payment: ['zarinpal'],
+};
 
 const emptyEditor: EditorState = {
   providerKey: '',
@@ -175,7 +166,7 @@ const statusVariant = (status: ProviderStatus): 'default' | 'destructive' | 'sec
   return 'outline';
 };
 
-type PresetKey = 'zarinpal' | 'kavenegar' | 'resend' | 'openai' | 'anthropic' | 'gemini' | 'ollama';
+type PresetKey = 'zarinpal' | 'kavenegar' | 'resend' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'custom';
 
 const parseObject = (value: string, label: string): Record<string, unknown> => {
   const parsed: unknown = value.trim() ? JSON.parse(value) : {};
@@ -208,6 +199,7 @@ const IntegrationCenter = () => {
   const hasLegacyAdmin = context?.appRoles.includes('admin') || false;
   const canRead = roles.some((role) => ['super_admin', 'platform_admin', 'support_admin'].includes(role)) || hasLegacyAdmin;
   const canManage = roles.includes('super_admin');
+  const supportedAdapters = RUNTIME_ADAPTERS_BY_TYPE[editor.providerType] || [];
 
   const load = useCallback(async () => {
     if (!canRead) {
@@ -240,6 +232,37 @@ const IntegrationCenter = () => {
       provider.default_model || '',
     ].some((value) => value.toLowerCase().includes(query)));
   }, [providers, search]);
+
+  const runtimeReadiness = useMemo(() => {
+    const specs = [
+      { type: 'llm', label: 'هوش مصنوعی' },
+      { type: 'payment', label: 'پرداخت' },
+      { type: 'sms', label: 'پیامک OTP' },
+      { type: 'email', label: 'ایمیل تراکنشی' },
+    ];
+    return specs.map((spec) => {
+      const candidates = providers.filter(
+        (provider) =>
+          provider.provider_type === spec.type &&
+          (RUNTIME_ADAPTERS_BY_TYPE[spec.type] || []).includes(provider.adapter),
+      );
+      const configured = candidates[0];
+      const active = candidates.find((provider) => provider.is_active);
+      const ready = candidates.some(
+        (provider) =>
+          provider.is_active &&
+          provider.status === 'healthy' &&
+          ((provider.is_internal && provider.auth_scheme === 'none') || provider.secret_configured),
+      );
+      let state = 'ثبت نشده';
+      if (ready) state = 'آماده';
+      else if (configured && !active) state = 'غیرفعال';
+      else if (active && !active.secret_configured && !active.is_internal) state = 'نیازمند کلید';
+      else if (active?.status === 'untested') state = 'نیازمند تست';
+      else if (active?.status === 'unhealthy') state = 'خطای اتصال';
+      return { ...spec, ready, state };
+    });
+  }, [providers]);
 
   const openNew = () => {
     setEditingId(null);
@@ -341,6 +364,20 @@ const IntegrationCenter = () => {
         fallbackFor: 'gemini, openai',
         settings: '{}',
       },
+      custom: {
+        providerKey: 'custom.primary',
+        displayName: 'سرویس سازگار با OpenAI',
+        providerType: 'llm',
+        adapter: 'openai_compatible',
+        baseUrl: '',
+        defaultModel: '',
+        authScheme: 'bearer',
+        isInternal: false,
+        capabilities: 'chat',
+        routingAliases: 'custom',
+        fallbackFor: '',
+        settings: '{}',
+      },
     };
     setEditor((current) => ({ ...current, ...presets[adapter] }));
   };
@@ -387,7 +424,11 @@ const IntegrationCenter = () => {
       toast.error('نام نمایشی و Adapter الزامی است');
       return;
     }
-    if (['llm', 'embedding', 'image'].includes(editor.providerType) && !editor.defaultModel.trim()) {
+    if (!supportedAdapters.includes(editor.adapter)) {
+      toast.error('این Adapter هنوز به مسیر اجرایی نوع انتخاب‌شده متصل نیست');
+      return;
+    }
+    if (editor.providerType === 'llm' && !editor.defaultModel.trim()) {
       toast.error('برای اتصال هوش مصنوعی، نام مدل پیش‌فرض را وارد کنید');
       return;
     }
@@ -569,9 +610,21 @@ const IntegrationCenter = () => {
             <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
               <div className="flex items-start gap-3">
                 <BrainCircuit className="mt-0.5 h-6 w-6 text-primary" />
-                <div><div className="font-medium">این صفحه فقط اتصال سرویس‌ها را مدیریت می‌کند</div><div className="mt-1 text-sm text-muted-foreground">برای دیدن و تغییر اینکه هر قابلیت HRing از کدام هوش و مدل استفاده می‌کند، وارد «مدیریت هوش قابلیت‌ها» شوید.</div></div>
+                <div><div className="font-medium">این صفحه فقط اتصال سرویس‌ها را مدیریت می‌کند</div><div className="mt-1 text-sm text-muted-foreground">فقط Adapterهای متصل به runtime قابل ثبت‌اند. برای تغییر هوش هر قابلیت، وارد «مدیریت هوش قابلیت‌ها» شوید.</div></div>
               </div>
               <Button asChild><Link to="/admin/prompts">مدیریت هوش قابلیت‌ها</Link></Button>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-5">
+            <CardHeader><CardTitle className="text-base">آمادگی سرویس‌های اجرایی</CardTitle><CardDescription>سرویس فقط پس از ثبت کلید و تست موفق وارد مسیر واقعی HRing می‌شود.</CardDescription></CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {runtimeReadiness.map((item) => (
+                <div key={item.type} className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="text-sm font-medium">{item.label}</span>
+                  <Badge variant={item.ready ? 'default' : item.state === 'خطای اتصال' ? 'destructive' : 'secondary'}>{item.state}</Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
@@ -583,6 +636,7 @@ const IntegrationCenter = () => {
                 <Button variant="outline" onClick={() => openPreset('anthropic')}>Anthropic (Claude)</Button>
                 <Button variant="outline" onClick={() => openPreset('gemini')}>Google Gemini</Button>
                 <Button variant="outline" onClick={() => openPreset('ollama')}>Ollama لوکال</Button>
+                <Button variant="outline" onClick={() => openPreset('custom')}>سرویس سازگار با OpenAI</Button>
               </CardContent>
             </Card>
           )}
@@ -600,7 +654,7 @@ const IntegrationCenter = () => {
             <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">کل اتصال‌ها</div><div className="mt-1 text-2xl font-bold">{providers.length.toLocaleString('fa-IR')}</div></CardContent></Card>
             <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">سالم</div><div className="mt-1 text-2xl font-bold text-emerald-600">{providers.filter((item) => item.status === 'healthy').length.toLocaleString('fa-IR')}</div></CardContent></Card>
             <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">نیازمند بررسی</div><div className="mt-1 text-2xl font-bold text-destructive">{providers.filter((item) => item.status === 'unhealthy').length.toLocaleString('fa-IR')}</div></CardContent></Card>
-            <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">مدل/AI</div><div className="mt-1 text-2xl font-bold">{providers.filter((item) => ['llm', 'embedding', 'image'].includes(item.provider_type)).length.toLocaleString('fa-IR')}</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-sm text-muted-foreground">مدل/AI</div><div className="mt-1 text-2xl font-bold">{providers.filter((item) => item.provider_type === 'llm').length.toLocaleString('fa-IR')}</div></CardContent></Card>
           </div>
 
           <Card>
@@ -656,6 +710,7 @@ const IntegrationCenter = () => {
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('anthropic')}>Anthropic (Claude)</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('gemini')}>Gemini</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('ollama')}>Ollama لوکال</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('custom')}>سرویس سازگار با OpenAI</Button>
               </div>
             )}
             <div className="grid gap-4 md:grid-cols-2">
@@ -663,8 +718,8 @@ const IntegrationCenter = () => {
               <div className="grid gap-2"><Label>نام نمایشی</Label><Input value={editor.displayName} onChange={(event) => setEditor((current) => ({ ...current, displayName: event.target.value }))} placeholder="OpenAI اصلی" /></div>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="grid gap-2"><Label>نوع</Label><Select value={editor.providerType} onValueChange={(value) => setEditor((current) => ({ ...current, providerType: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PROVIDER_TYPES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid gap-2"><Label>Adapter</Label><Input dir="ltr" list="integration-adapters" value={editor.adapter} onChange={(event) => setEditor((current) => ({ ...current, adapter: event.target.value.toLowerCase() }))} /><datalist id="integration-adapters">{ADAPTERS.map((adapter) => <option key={adapter} value={adapter} />)}</datalist></div>
+              <div className="grid gap-2"><Label>نوع</Label><Select value={editor.providerType} onValueChange={(value) => { const adapters = RUNTIME_ADAPTERS_BY_TYPE[value] || []; setEditor((current) => ({ ...current, providerType: value, adapter: adapters[0] || '' })); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PROVIDER_TYPES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+              <div className="grid gap-2"><Label>Adapter</Label><Select value={editor.adapter} onValueChange={(value) => setEditor((current) => ({ ...current, adapter: value }))}><SelectTrigger dir="ltr"><SelectValue /></SelectTrigger><SelectContent>{supportedAdapters.map((adapter) => <SelectItem key={adapter} value={adapter}>{adapter}</SelectItem>)}</SelectContent></Select></div>
               <div className="grid gap-2"><Label>روش احراز</Label><Select value={editor.authScheme} onValueChange={(value) => setEditor((current) => ({ ...current, authScheme: value }))}><SelectTrigger dir="ltr"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">none</SelectItem><SelectItem value="bearer">Bearer</SelectItem><SelectItem value="x-api-key">X-API-Key</SelectItem><SelectItem value="api-key">Api-Key</SelectItem><SelectItem value="x-goog-api-key">X-Goog-Api-Key</SelectItem></SelectContent></Select></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -678,7 +733,7 @@ const IntegrationCenter = () => {
               <div className="grid gap-2"><Label>تعداد Retry</Label><Input type="number" min={0} max={10} value={editor.maxRetries} onChange={(event) => setEditor((current) => ({ ...current, maxRetries: Number(event.target.value) }))} /></div>
             </div>
             <div className="grid gap-2"><Label>قابلیت‌ها (با کاما جدا کنید)</Label><Input dir="ltr" value={editor.capabilities} onChange={(event) => setEditor((current) => ({ ...current, capabilities: event.target.value }))} placeholder="chat, embedding, vision" /></div>
-            {['llm', 'embedding', 'image'].includes(editor.providerType) && (
+            {editor.providerType === 'llm' && (
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2"><Label>نام‌های مسیریابی Primary</Label><Input dir="ltr" value={editor.routingAliases} onChange={(event) => setEditor((current) => ({ ...current, routingAliases: event.target.value }))} placeholder="gemini, default" /><p className="text-xs text-muted-foreground">قابلیت‌هایی که مستقیماً این Provider را صدا می‌زنند.</p></div>
                 <div className="grid gap-2"><Label>Fallback برای</Label><Input dir="ltr" value={editor.fallbackFor} onChange={(event) => setEditor((current) => ({ ...current, fallbackFor: event.target.value }))} placeholder="gemini, openai" /><p className="text-xs text-muted-foreground">در صورت خطای Provider اصلی، این اتصال با مدل خودش استفاده می‌شود.</p></div>

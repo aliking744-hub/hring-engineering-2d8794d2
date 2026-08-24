@@ -193,3 +193,41 @@ test('dashboards do not present invented operational metrics or retired modules'
 
   assert.equal(/planMaxCredits|allocatedCredits|creditPercentage/.test(dashboard), false);
 });
+
+test('active subscription contract excludes the retired individual expert tier', async () => {
+  const contractSources = await Promise.all([
+    read('apps/api/src/hring_api/domains/identity/enums.py'),
+    read('src/types/multiTenant.ts'),
+    read('src/integrations/supabase/types.ts'),
+    read('src/components/admin/FeatureFlagsManager.tsx'),
+    read('src/components/admin/FeaturePermissionsManager.tsx'),
+    read('src/components/admin/CorporateUserManager.tsx'),
+    read('src/pages/PaymentHistory.tsx'),
+  ]);
+  const migration = await read(
+    'apps/api/alembic/versions/20260824_0014_release_contract_cleanup.py',
+  );
+
+  for (const source of contractSources) {
+    assert.equal(/individual_expert/.test(source), false);
+  }
+  assert.match(migration, /UPDATE profiles/);
+  assert.match(migration, /individual_expert/);
+  assert.match(migration, /individual_pro/);
+});
+
+test('integration center only activates adapters backed by runtime consumers', async () => {
+  const center = await read('src/pages/IntegrationCenter.tsx');
+  const service = await read(
+    'apps/api/src/hring_api/domains/integrations/service.py',
+  );
+
+  assert.match(center, /RUNTIME_ADAPTERS_BY_TYPE/);
+  assert.match(center, /آمادگی سرویس‌های اجرایی/);
+  assert.match(center, /سرویس فقط پس از ثبت کلید و تست موفق/);
+  assert.equal(/farazsms|melipayamak|smtp|generic_http/.test(center), false);
+
+  assert.match(service, /RUNTIME_ADAPTERS_BY_TYPE/);
+  assert.match(service, /_validate_runtime_adapter/);
+  assert.match(service, /not runtime-backed/);
+});

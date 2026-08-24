@@ -4,7 +4,6 @@ export type CompanyStatus = 'active' | 'suspended' | 'trial';
 
 export type SubscriptionTier =
   | 'individual_free'
-  | 'individual_expert'
   | 'individual_pro'
   | 'individual_plus'
   | 'corporate_expert'
@@ -130,7 +129,6 @@ export interface FeatureAccess {
 
 export const TIER_NAMES: Record<SubscriptionTier, string> = {
   individual_free: 'رایگان',
-  individual_expert: 'کارشناس',
   individual_pro: 'حرفه‌ای',
   individual_plus: 'پلاس',
   corporate_expert: 'شرکتی - کارشناس',

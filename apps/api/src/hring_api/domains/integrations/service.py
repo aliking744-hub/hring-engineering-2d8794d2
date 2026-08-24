@@ -46,6 +46,32 @@ class IntegrationValidationError(IntegrationError):
     pass
 
 
+RUNTIME_ADAPTERS_BY_TYPE: dict[str, frozenset[str]] = {
+    "llm": frozenset(
+        {
+            "openai",
+            "openai_compatible",
+            "anthropic",
+            "gemini_openai",
+            "perplexity",
+            "ollama",
+            "vllm",
+        }
+    ),
+    "email": frozenset({"resend"}),
+    "sms": frozenset({"kavenegar"}),
+    "payment": frozenset({"zarinpal"}),
+}
+
+
+def _validate_runtime_adapter(provider_type: str, adapter: str) -> None:
+    supported = RUNTIME_ADAPTERS_BY_TYPE.get(provider_type, frozenset())
+    if adapter not in supported:
+        raise IntegrationValidationError(
+            f"Adapter '{adapter}' is not runtime-backed for provider type '{provider_type}'"
+        )
+
+
 @dataclass(frozen=True)
 class ConnectionTestResult:
     provider_id: UUID
@@ -117,6 +143,7 @@ async def create_provider(
     ip_address: str | None,
     settings: Settings,
 ) -> IntegrationProvider:
+    _validate_runtime_adapter(payload.provider_type, payload.adapter)
     if await get_integration_provider_by_key(session, payload.provider_key) is not None:
         raise IntegrationConflictError("Provider key already exists")
 
@@ -185,6 +212,9 @@ async def update_provider(
         raise IntegrationNotFoundError("Integration provider not found")
 
     changes = payload.model_dump(exclude_unset=True)
+    target_provider_type = str(changes.get("provider_type", provider.provider_type))
+    target_adapter = str(changes.get("adapter", provider.adapter))
+    _validate_runtime_adapter(target_provider_type, target_adapter)
     is_internal = bool(changes.get("is_internal", provider.is_internal))
     requested_base_url = changes.get("base_url", provider.base_url)
     base_url = _safe_base_url(
@@ -435,6 +465,7 @@ async def test_provider_connection(
     message = "Provider connection test failed"
     started = time.perf_counter()
     try:
+        _validate_runtime_adapter(provider.provider_type, provider.adapter)
         if not provider.is_active:
             raise IntegrationValidationError("Provider is disabled")
         if provider.base_url is None:

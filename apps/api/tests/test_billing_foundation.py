@@ -53,6 +53,7 @@ def test_billing_plans_are_seeded_and_publicly_readable() -> None:
     plans = response.json()
     plan_types = {item["plan_type"] for item in plans}
     assert "individual_pro" in plan_types
+    assert "individual_expert" not in plan_types
     assert "corporate_expert" in plan_types
     for plan in plans:
         assert plan["price_toman"] >= 0
