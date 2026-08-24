@@ -5,7 +5,6 @@ from fastapi import Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, Counter, Gauge, Histogram
 from prometheus_client.exposition import generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import BaseRoute, Route
 from starlette.types import ASGIApp, Scope
 
 
@@ -30,17 +29,15 @@ HTTP_REQUESTS_IN_PROGRESS = Gauge(
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, *, service: str, routes: tuple[BaseRoute, ...]) -> None:
+    def __init__(self, app: ASGIApp, *, service: str) -> None:
         super().__init__(app)
         self.service = service
-        self.routes = routes
 
     async def dispatch(self, request: Request, call_next: CallNext) -> Response:
         if request.url.path == "/metrics":
             return await call_next(request)
 
         method = request.method.upper()
-        route_label = self._route_label(request.scope)
         started_at = perf_counter()
         status_code = 500
         HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).inc()
@@ -49,6 +46,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             status_code = response.status_code
             return response
         finally:
+            route_label = self._route_label(request.scope)
             HTTP_REQUESTS.labels(
                 service=self.service,
                 method=method,
@@ -62,13 +60,20 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             ).observe(max(0.0, perf_counter() - started_at))
             HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).dec()
 
-    def _route_label(self, scope: Scope) -> str:
-        path = scope.get("path")
-        if not isinstance(path, str):
-            return "unmatched"
-        for candidate in self.routes:
-            if isinstance(candidate, Route) and candidate.path_regex.fullmatch(path):
-                return candidate.path
+    @staticmethod
+    def _route_label(scope: Scope) -> str:
+        fastapi_scope = scope.get("fastapi")
+        if isinstance(fastapi_scope, dict):
+            route_context = fastapi_scope.get("effective_route_context")
+            route = getattr(route_context, "path_format", None)
+            if isinstance(route, str):
+                return route
+
+        route_object = scope.get("route")
+        for attribute in ("path_format", "path"):
+            route = getattr(route_object, attribute, None)
+            if isinstance(route, str):
+                return route
         return "unmatched"
 
 

@@ -35,7 +35,7 @@ app.add_middleware(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SensitiveRouteRateLimitMiddleware, settings=settings)
-app.add_middleware(MetricsMiddleware, service="hring-api", routes=tuple(app.routes))
+app.add_middleware(MetricsMiddleware, service="hring-api")
 
 
 @app.get("/metrics", include_in_schema=False)

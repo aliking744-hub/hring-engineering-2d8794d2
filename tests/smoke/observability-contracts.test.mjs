@@ -40,9 +40,9 @@ test('metrics stay off the public API prefix and avoid unbounded URL labels', as
   assert.match(apiMain, /@app\.get\("\/metrics"/);
   assert.match(apiMain, /allowed_hosts=\[\*settings\.trusted_hosts, "api"\]/);
   assert.match(aiMain, /@app\.get\("\/metrics"/);
-  assert.match(apiMetrics, /candidate\.path_regex\.fullmatch\(path\)/);
-  assert.match(apiMetrics, /return candidate\.path/);
-  assert.match(apiMain, /routes=tuple\(app\.routes\)/);
+  assert.match(apiMetrics, /effective_route_context/);
+  assert.match(apiMetrics, /path_format/);
+  assert.match(apiMetrics, /scope\.get\("route"\)/);
   assert.doesNotMatch(apiMetrics, /request\.url\.(?:query|path).*labels/);
   assert.doesNotMatch(nginx, /location[^\n]*\/metrics/);
 });

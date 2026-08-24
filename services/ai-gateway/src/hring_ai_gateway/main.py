@@ -86,5 +86,4 @@ async def generate(
 app.add_middleware(
     MetricsMiddleware,
     service="hring-ai-gateway",
-    routes=tuple(app.routes),
 )
