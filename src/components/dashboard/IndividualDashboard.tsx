@@ -1,29 +1,17 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Briefcase, Users, Calendar, TrendingUp, Megaphone,
-  FileDown, Gem, Target, Radar, Sparkles
+  Briefcase, Users, Megaphone,
+  FileDown, Gem, Target, Radar
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useUserContext } from '@/hooks/useUserContext';
 import { useCredits } from '@/hooks/useCredits';
+import { useCampaigns } from '@/hooks/useCampaigns';
 import { TIER_NAMES } from '@/types/multiTenant';
 import LegalAdvisorWidget from '@/components/LegalAdvisorWidget';
-
-const stats = [
-  { label: "موقعیت‌های فعال", value: "۱۲", change: "+۲", icon: Briefcase },
-  { label: "متقاضیان جدید", value: "۴۸", change: "+۱۵", icon: Users },
-  { label: "مصاحبه این هفته", value: "۸", change: "+۳", icon: Calendar },
-  { label: "استخدام این ماه", value: "۳", change: "+۱", icon: TrendingUp },
-];
-
-const todayInterviews = [
-  { name: "سارا احمدی", position: "طراح UI/UX", time: "۱۰:۳۰" },
-  { name: "محمد رضایی", position: "توسعه‌دهنده فرانت‌اند", time: "۱۴:۰۰" },
-  { name: "زهرا کریمی", position: "مدیر محصول", time: "۱۶:۳۰" },
-];
 
 const PRINT_STYLES = `
   @media print {
@@ -48,8 +36,19 @@ const IndividualDashboard = () => {
   const navigate = useNavigate();
   const { context } = useUserContext();
   const { credits, loading: creditsLoading } = useCredits();
-  
-  const hiringHealth = 95;
+  const { campaigns, loading: campaignsLoading } = useCampaigns();
+
+  const totalCandidates = campaigns.reduce((sum, campaign) => sum + (campaign.candidatesCount || 0), 0);
+  const weightedMatchTotal = campaigns.reduce(
+    (sum, campaign) => sum + (campaign.avgMatchScore || 0) * (campaign.candidatesCount || 0),
+    0,
+  );
+  const hiringHealth = totalCandidates > 0 ? Math.round(weightedMatchTotal / totalCandidates) : 0;
+  const stats = [
+    { label: "کمپین‌های ثبت‌شده", value: campaignsLoading ? "…" : campaigns.length.toLocaleString('fa-IR'), icon: Briefcase },
+    { label: "کل کاندیداها", value: campaignsLoading ? "…" : totalCandidates.toLocaleString('fa-IR'), icon: Users },
+    { label: "کمپین‌های خودکار", value: campaignsLoading ? "…" : campaigns.filter((campaign) => campaign.auto_headhunting).length.toLocaleString('fa-IR'), icon: Radar },
+  ];
   const currentDate = new Date().toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const handleExportPDF = () => {
@@ -195,13 +194,13 @@ const IndividualDashboard = () => {
         </div>
 
         {/* Health */}
-        <div className="sec-title">سلامت فرآیند استخدام</div>
+        <div className="sec-title">میانگین تطابق کاندیداها</div>
         <div className="health-row">
           <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#1e3a5f', minWidth: '56px' }}>٪{hiringHealth}</span>
           <div className="hbar-wrap">
             <div className="hbar-fill" style={{ width: `${hiringHealth}%` }} />
           </div>
-          <span style={{ fontSize: '12px', color: '#16a34a' }}>عالی</span>
+          <span style={{ fontSize: '12px', color: '#555' }}>{totalCandidates > 0 ? 'بر اساس داده‌های ثبت‌شده' : 'بدون داده'}</span>
         </div>
 
         {/* Stats */}
@@ -211,31 +210,15 @@ const IndividualDashboard = () => {
             <div key={stat.label} className="stat-box">
               <span className="stat-val">{stat.value}</span>
               <span className="stat-lbl">{stat.label}</span>
-              <span className="stat-chg">{stat.change} نسبت به هفته قبل</span>
             </div>
           ))}
         </div>
 
         {/* Interviews */}
-        <div className="sec-title">مصاحبه‌های امروز</div>
-        <table className="iv-table">
-          <thead>
-            <tr>
-              <th>نام متقاضی</th>
-              <th>موقعیت شغلی</th>
-              <th>ساعت</th>
-            </tr>
-          </thead>
-          <tbody>
-            {todayInterviews.map((iv, i) => (
-              <tr key={i}>
-                <td>{iv.name}</td>
-                <td>{iv.position}</td>
-                <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#1e3a5f' }}>{iv.time}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="sec-title">مصاحبه‌ها</div>
+        <p style={{ fontSize: '12px', color: '#555', border: '1px solid #ddd', borderRadius: '8px', padding: '12px' }}>
+          تقویم مصاحبه هنوز به داده عملیاتی متصل نشده است؛ هیچ مصاحبه نمونه‌ای در این گزارش درج نشده.
+        </p>
 
         <div className="pf">این گزارش توسط پلتفرم hring تولید شده است — hring.ir</div>
       </div>
@@ -263,7 +246,7 @@ const IndividualDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Hiring Health */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -271,7 +254,7 @@ const IndividualDashboard = () => {
           transition={{ delay: 0.3 }}
           className="glass-card p-5 flex flex-col items-center justify-center"
         >
-          <p className="text-muted-foreground text-sm mb-3">سلامت استخدام</p>
+          <p className="text-muted-foreground text-sm mb-3">میانگین تطابق</p>
           <div className="relative w-20 h-20">
             <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
               <path
@@ -299,7 +282,7 @@ const IndividualDashboard = () => {
               <span className="text-lg font-bold text-foreground">٪{hiringHealth}</span>
             </div>
           </div>
-          <p className="text-sm text-green-500 mt-2">عالی</p>
+          <p className="text-sm text-muted-foreground mt-2">{totalCandidates > 0 ? "بر اساس کاندیداهای ثبت‌شده" : "بدون داده"}</p>
         </motion.div>
 
         {stats.map((stat, index) => (
@@ -319,7 +302,6 @@ const IndividualDashboard = () => {
                 <stat.icon className="w-5 h-5 text-primary" />
               </div>
             </div>
-            <p className="text-sm text-green-500 mt-2">{stat.change} نسبت به هفته قبل</p>
           </motion.div>
         ))}
       </div>
@@ -373,14 +355,6 @@ const IndividualDashboard = () => {
               <Radar className="w-4 h-4 ml-2" />
               رادار استراتژیک
             </Button>
-            <Button 
-              variant="outline" 
-              className="border-violet-500/50 bg-violet-950/30 h-12 hover:bg-violet-900/50 text-violet-300"
-              onClick={() => navigate('/unicorn-lab')}
-            >
-              <Sparkles className="w-4 h-4 ml-2" />
-              آزمایشگاه یونیکورن
-            </Button>
           </div>
         </motion.div>
 
@@ -390,18 +364,13 @@ const IndividualDashboard = () => {
           transition={{ delay: 0.8 }}
           className="glass-card p-6"
         >
-          <h2 className="text-lg font-semibold text-foreground mb-4">مصاحبه‌های امروز</h2>
-          <div className="space-y-3">
-            {todayInterviews.map((interview, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                <div>
-                  <p className="font-medium text-foreground">{interview.name}</p>
-                  <p className="text-sm text-muted-foreground">{interview.position}</p>
-                </div>
-                <span className="text-sm font-medium text-primary">{interview.time}</span>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-lg font-semibold text-foreground mb-3">مصاحبه‌ها</h2>
+          <p className="mb-4 text-sm leading-6 text-muted-foreground">
+            تقویم مصاحبه هنوز به داده عملیاتی متصل نشده است؛ برای ساخت راهنمای یک مصاحبه از دستیار مصاحبه استفاده کنید.
+          </p>
+          <Button variant="outline" onClick={() => navigate('/interview-assistant')}>
+            ورود به دستیار مصاحبه
+          </Button>
         </motion.div>
       </div>
 

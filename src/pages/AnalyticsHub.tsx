@@ -62,8 +62,8 @@ const sidebarItems = [
   { icon: BarChart3, label: "مرکز تحلیل", path: "/analytics", external: false },
   { icon: Boxes, label: "ابزارهای مدیریتی", path: "/hr-dashboard", external: false },
   { icon: Briefcase, label: "موقعیت‌های شغلی", path: "/job-description", external: false },
-  { icon: Megaphone, label: "آگهی‌ها", path: "/smart-ad", external: false },
-  { icon: Users, label: "مصاحبه‌ها", path: "/interviews", external: false },
+  { icon: Megaphone, label: "آگهی‌ها", path: "/smart-ad-generator", external: false },
+  { icon: Users, label: "مصاحبه‌ها", path: "/interview-assistant", external: false },
   { icon: Boxes, label: "ماژولها", path: "/modules", external: false },
   { icon: UserPlus, label: "آنبوردینگ", path: "/onboarding", external: false },
   { icon: FileText, label: "مستندات", path: "/dashboard#modules", external: false },
@@ -338,7 +338,7 @@ const AnalyticsHub = () => {
                 <BarChart3 className="w-7 h-7 text-primary" />
                 مرکز تحلیل
               </h1>
-              <p className="text-muted-foreground">تحلیل جامع داده‌های منابع انسانی</p>
+              <p className="text-muted-foreground">پیش‌نمایش تحلیلی با داده‌های نمونه</p>
             </div>
             
             <div className="flex items-center gap-3">
@@ -355,6 +355,18 @@ const AnalyticsHub = () => {
               </Button>
             </div>
           </header>
+
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-amber-200">داده‌های نمایشی</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                نمودارهای این صفحه فعلاً از داده نمونه ساخته می‌شوند و گزارش عملیاتی سازمان شما نیستند.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => navigate('/hr-dashboard')}>
+              تحلیل فایل واقعی
+            </Button>
+          </div>
 
           {/* Filter Bar */}
           <motion.div

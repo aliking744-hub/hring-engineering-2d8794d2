@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Users, Building2, TrendingUp, Calendar, Briefcase, 
-  Target, BarChart3, UserPlus, Gem, Settings, Coins, Radar, Sparkles
+  Users, Building2, Briefcase, 
+  Target, BarChart3, UserPlus, Gem, Settings, Coins, Radar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,11 +16,14 @@ const CorporateDashboard = () => {
   const { context } = useUserContext();
   const { company, members, isCEO } = useCompany();
 
+  const remainingCredits = company?.credit_pool_enabled
+    ? company.credit_pool
+    : Math.max(0, (company?.monthly_credits ?? 0) - (company?.used_credits ?? 0));
   const corporateStats = [
-    { label: "اعضای فعال", value: members.length.toString(), icon: Users, color: "text-blue-400" },
-    { label: "پروژه‌های استراتژیک", value: "۸", icon: Target, color: "text-green-400" },
-    { label: "جلسات هفته", value: "۱۲", icon: Calendar, color: "text-yellow-400" },
-    { label: "رشد ماهانه", value: "٪۲۳", icon: TrendingUp, color: "text-primary" },
+    { label: "اعضای فعال", value: members.length.toLocaleString('fa-IR'), icon: Users, color: "text-blue-400" },
+    { label: "سقف اعضا", value: company ? company.max_members.toLocaleString('fa-IR') : "—", icon: UserPlus, color: "text-green-400" },
+    { label: "اعتبار ماهانه", value: company ? company.monthly_credits.toLocaleString('fa-IR') : "—", icon: Coins, color: "text-yellow-400" },
+    { label: "اعتبار باقی‌مانده", value: company ? remainingCredits.toLocaleString('fa-IR') : "—", icon: Gem, color: "text-primary" },
   ];
 
   return (
@@ -158,14 +161,6 @@ const CorporateDashboard = () => {
               <Radar className="w-4 h-4 ml-2" />
               رادار استراتژیک
             </Button>
-            <Button 
-              variant="outline" 
-              className="border-violet-500/50 bg-violet-950/30 h-12 hover:bg-violet-900/50 text-violet-300"
-              onClick={() => navigate('/unicorn-lab')}
-            >
-              <Sparkles className="w-4 h-4 ml-2" />
-              آزمایشگاه یونیکورن
-            </Button>
           </div>
         </motion.div>
 
@@ -223,20 +218,15 @@ const CorporateDashboard = () => {
         transition={{ delay: 0.7 }}
         className="glass-card p-6"
       >
-        <h2 className="text-lg font-semibold text-foreground mb-4">نمای استراتژیک</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-            <p className="text-sm text-muted-foreground">نیت‌های فعال</p>
-            <p className="text-2xl font-bold text-green-400 mt-1">۵</p>
-          </div>
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-            <p className="text-sm text-muted-foreground">رفتارهای ثبت‌شده</p>
-            <p className="text-2xl font-bold text-blue-400 mt-1">۲۸</p>
-          </div>
-          <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-            <p className="text-sm text-muted-foreground">امتیاز همراستایی</p>
-            <p className="text-2xl font-bold text-yellow-400 mt-1">٪۸۷</p>
-          </div>
+        <h2 className="text-lg font-semibold text-foreground mb-3">نمای استراتژیک</h2>
+        <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm leading-6 text-muted-foreground">
+            شاخص‌های استراتژیک پس از ثبت داده در قطب‌نما نمایش داده می‌شوند؛ این داشبورد عدد نمونه نشان نمی‌دهد.
+          </p>
+          <Button variant="outline" onClick={() => navigate('/strategic-compass')}>
+            <Target className="ml-2 h-4 w-4" />
+            ورود به قطب‌نما
+          </Button>
         </div>
       </motion.div>
 

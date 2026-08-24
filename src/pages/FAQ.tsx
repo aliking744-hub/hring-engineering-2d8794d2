@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
@@ -17,152 +17,25 @@ import {
   Users,
   Briefcase,
   CreditCard,
-  Shield,
   HelpCircle,
   ArrowLeft,
   Check,
-  X,
-  Sparkles,
-  Building2,
   User,
   Zap,
 } from "lucide-react";
 import AuroraBackground from "@/components/AuroraBackground";
 import Navbar from "@/components/Navbar";
-import { useSiteName } from "@/hooks/useSiteSettings";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import PricingSection from "@/components/landing/PricingSection";
+import { DIAMOND_COSTS } from "@/hooks/useCredits";
 
 const FAQ = () => {
-  const siteName = useSiteName();
+  const { siteName, getSetting } = useSiteSettings();
+  const canonicalBase = getSetting("seo_canonical_base_url", "https://hring.ir").replace(/\/+$/, "");
+  const faqUrl = canonicalBase + "/faq";
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "plans";
   const [activeTab, setActiveTab] = useState(initialTab);
-
-  const individualPlans = [
-    {
-      name: "رایگان",
-      tier: "individual_free",
-      price: "۰",
-      credits: "۵۰",
-      creditsNote: "یکبار",
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "محاسبه هزینه استخدام", included: true },
-        { name: "هدهانتینگ هوشمند", included: false },
-        { name: "آنبوردینگ", included: false },
-        { name: "قطب‌نمای استراتژیک", included: false },
-        { name: "داشبورد HR", included: false },
-        { name: "ذخیره ابری", included: false },
-      ],
-      color: "border-muted",
-    },
-    {
-      name: "کارشناس",
-      tier: "individual_expert",
-      price: "۲۹۰,۰۰۰",
-      credits: "۶۰۰",
-      creditsNote: "ماهانه",
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "محاسبه هزینه استخدام", included: true },
-        { name: "هدهانتینگ هوشمند", included: false },
-        { name: "آنبوردینگ", included: false },
-        { name: "قطب‌نمای استراتژیک", included: false },
-        { name: "داشبورد HR", included: false },
-        { name: "ذخیره ابری", included: false },
-      ],
-      color: "border-blue-500/50",
-    },
-    {
-      name: "حرفه‌ای",
-      tier: "individual_pro",
-      price: "۴۹۰,۰۰۰",
-      credits: "۶۰۰",
-      creditsNote: "ماهانه",
-      popular: true,
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "محاسبه هزینه استخدام", included: true },
-        { name: "هدهانتینگ هوشمند", included: true },
-        { name: "آنبوردینگ", included: false },
-        { name: "قطب‌نمای استراتژیک", included: false },
-        { name: "داشبورد HR", included: true },
-        { name: "ذخیره ابری", included: false },
-      ],
-      color: "border-primary",
-    },
-    {
-      name: "پلاس",
-      tier: "individual_plus",
-      price: "۹۹۰,۰۰۰",
-      credits: "۲,۵۰۰",
-      creditsNote: "ماهانه",
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "محاسبه هزینه استخدام", included: true },
-        { name: "هدهانتینگ هوشمند", included: true },
-        { name: "آنبوردینگ", included: "demo" },
-        { name: "قطب‌نمای استراتژیک", included: "demo" },
-        { name: "داشبورد HR", included: true },
-        { name: "ذخیره ابری", included: true },
-      ],
-      color: "border-amber-500/50",
-    },
-  ];
-
-  const corporatePlans = [
-    {
-      name: "کارشناس شرکتی",
-      tier: "corporate_expert",
-      price: "۱,۴۹۰,۰۰۰",
-      credits: "۵۰۰",
-      creditsNote: "ماهانه",
-      seats: "۵ کاربر",
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "هدهانتینگ هوشمند", included: true },
-        { name: "آنبوردینگ", included: true },
-        { name: "قطب‌نمای استراتژیک", included: false },
-        { name: "داشبورد HR کامل", included: false },
-        { name: "مدیریت تیم", included: true },
-      ],
-      color: "border-blue-500/50",
-    },
-    {
-      name: "پشتیبان تصمیم",
-      tier: "corporate_decision_support",
-      price: "۲,۹۹۰,۰۰۰",
-      credits: "۲,۰۰۰",
-      creditsNote: "ماهانه",
-      seats: "۱۰ کاربر",
-      popular: true,
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "هدهانتینگ هوشمند", included: true },
-        { name: "آنبوردینگ", included: true },
-        { name: "قطب‌نمای استراتژیک", included: true },
-        { name: "داشبورد HR کامل", included: false },
-        { name: "مدیریت تیم", included: true },
-      ],
-      color: "border-primary",
-    },
-    {
-      name: "تصمیم‌ساز",
-      tier: "corporate_decision_making",
-      price: "۵,۹۹۰,۰۰۰",
-      credits: "۵,۰۰۰",
-      creditsNote: "ماهانه",
-      seats: "۵۰ کاربر",
-      features: [
-        { name: "ماژول‌های هوش مصنوعی", included: true },
-        { name: "هدهانتینگ هوشمند", included: true },
-        { name: "آنبوردینگ", included: true },
-        { name: "قطب‌نمای استراتژیک", included: true },
-        { name: "داشبورد HR کامل", included: true },
-        { name: "مدیریت تیم", included: true },
-      ],
-      color: "border-amber-500/50",
-    },
-  ];
 
   const roles = [
     {
@@ -213,7 +86,7 @@ const FAQ = () => {
         },
         {
           q: "اعتبار چگونه محاسبه می‌شود؟",
-          a: "هر ابزار هوش مصنوعی هزینه اعتبار مشخصی دارد. برای مثال، آگهی‌نویس ۵ اعتبار و تحلیل استراتژیک ۴۰ اعتبار مصرف می‌کند. اعتبار ماهانه تجدید می‌شود.",
+          a: `هر ابزار هوش مصنوعی هزینه اعتبار مشخصی دارد. برای مثال، آگهی‌نویس ${DIAMOND_COSTS.SMART_AD_TEXT} اعتبار و تحلیل استراتژیک ${DIAMOND_COSTS.STRATEGIC_ANALYSIS} اعتبار مصرف می‌کند. اعتبار ماهانه تجدید می‌شود.`,
         },
         {
           q: "اگر اعتبارم تمام شود چه اتفاقی می‌افتد؟",
@@ -258,9 +131,9 @@ const FAQ = () => {
       <Helmet>
         <title>سوالات متداول | {siteName}</title>
         <meta name="description" content={`راهنمای کامل پلن‌ها، قیمت‌گذاری و دسترسی‌های ${siteName}. پاسخ به سوالات متداول درباره اشتراک‌ها و امکانات.`} />
-        <link rel="canonical" href="https://hring-app.lovable.app/faq" />
+        <link rel="canonical" href={faqUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://hring-app.lovable.app/faq" />
+        <meta property="og:url" content={faqUrl} />
         <meta property="og:title" content={`سوالات متداول | ${siteName}`} />
         <meta property="og:description" content={`راهنمای پلن‌ها، نقش‌ها و امکانات ${siteName} در یک نگاه.`} />
         <script type="application/ld+json">
@@ -322,124 +195,8 @@ const FAQ = () => {
             </TabsList>
 
             {/* Plans Tab */}
-            <TabsContent value="plans" className="space-y-8">
-              {/* Individual Plans */}
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <User className="w-6 h-6 text-primary" />
-                  <h2 className="text-2xl font-bold">پلن‌های فردی</h2>
-                </div>
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {individualPlans.map((plan, index) => (
-                    <motion.div
-                      key={plan.tier}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card className={`h-full relative ${plan.color} ${plan.popular ? "ring-2 ring-primary" : ""}`}>
-                        {plan.popular && (
-                          <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-                            <Sparkles className="w-3 h-3 ml-1" />
-                            محبوب
-                          </Badge>
-                        )}
-                        <CardHeader className="text-center pb-2">
-                          <CardTitle>{plan.name}</CardTitle>
-                          <div className="mt-2">
-                            <span className="text-3xl font-bold">{plan.price}</span>
-                            <span className="text-muted-foreground text-sm mr-1">تومان</span>
-                          </div>
-                          <Badge variant="secondary" className="mt-2">
-                            {plan.credits} اعتبار ({plan.creditsNote})
-                          </Badge>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {plan.features.map((feature) => (
-                              <li key={feature.name} className="flex items-center gap-2 text-sm">
-                                {feature.included === true ? (
-                                  <Check className="w-4 h-4 text-green-500 shrink-0" />
-                                ) : feature.included === "demo" ? (
-                                  <Badge variant="outline" className="text-xs">دمو</Badge>
-                                ) : (
-                                  <X className="w-4 h-4 text-muted-foreground shrink-0" />
-                                )}
-                                <span className={feature.included ? "" : "text-muted-foreground"}>
-                                  {feature.name}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Corporate Plans */}
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <Building2 className="w-6 h-6 text-primary" />
-                  <h2 className="text-2xl font-bold">پلن‌های شرکتی</h2>
-                </div>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {corporatePlans.map((plan, index) => (
-                    <motion.div
-                      key={plan.tier}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card className={`h-full relative ${plan.color} ${plan.popular ? "ring-2 ring-primary" : ""}`}>
-                        {plan.popular && (
-                          <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-                            <Sparkles className="w-3 h-3 ml-1" />
-                            محبوب
-                          </Badge>
-                        )}
-                        <CardHeader className="text-center pb-2">
-                          <CardTitle>{plan.name}</CardTitle>
-                          <CardDescription>{plan.seats}</CardDescription>
-                          <div className="mt-2">
-                            <span className="text-3xl font-bold">{plan.price}</span>
-                            <span className="text-muted-foreground text-sm mr-1">تومان</span>
-                          </div>
-                          <Badge variant="secondary" className="mt-2">
-                            {plan.credits} اعتبار ({plan.creditsNote})
-                          </Badge>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2">
-                            {plan.features.map((feature) => (
-                              <li key={feature.name} className="flex items-center gap-2 text-sm">
-                                {feature.included ? (
-                                  <Check className="w-4 h-4 text-green-500 shrink-0" />
-                                ) : (
-                                  <X className="w-4 h-4 text-muted-foreground shrink-0" />
-                                )}
-                                <span className={feature.included ? "" : "text-muted-foreground"}>
-                                  {feature.name}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="text-center pt-4">
-                <Button asChild size="lg">
-                  <Link to="/upgrade">
-                    <Crown className="w-5 h-5 ml-2" />
-                    مشاهده صفحه ارتقا
-                  </Link>
-                </Button>
-              </div>
+            <TabsContent value="plans">
+              <PricingSection />
             </TabsContent>
 
             {/* Roles Tab */}
@@ -493,15 +250,15 @@ const FAQ = () => {
                 <CardContent>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[
-                      { name: "آگهی‌نویس هوشمند", cost: 5, category: "text_generation" },
-                      { name: "دستیار مصاحبه", cost: 5, category: "text_generation" },
-                      { name: "مهندسی مشاغل", cost: 5, category: "text_generation" },
-                      { name: "معمار موفقیت ۹۰ روزه", cost: 5, category: "text_generation" },
-                      { name: "تولید تصویر آگهی", cost: 20, category: "image_generation" },
-                      { name: "داشبورد HR", cost: 20, category: "analytics" },
-                      { name: "مرکز تحلیل", cost: 20, category: "analytics" },
-                      { name: "هدهانتینگ هوشمند", cost: 30, category: "deep_search" },
-                      { name: "قطب‌نمای استراتژیک", cost: 40, category: "complex_analysis" },
+                      { name: "آگهی‌نویس هوشمند", cost: DIAMOND_COSTS.SMART_AD_TEXT, category: "text_generation" },
+                      { name: "دستیار مصاحبه", cost: DIAMOND_COSTS.INTERVIEW_KIT, category: "text_generation" },
+                      { name: "مهندسی مشاغل", cost: DIAMOND_COSTS.JOB_PROFILE, category: "text_generation" },
+                      { name: "معمار موفقیت ۹۰ روزه", cost: DIAMOND_COSTS.ONBOARDING_PLAN, category: "text_generation" },
+                      { name: "تولید تصویر آگهی", cost: DIAMOND_COSTS.SMART_AD_IMAGE, category: "image_generation" },
+                      { name: "داشبورد HR", cost: DIAMOND_COSTS.HR_DASHBOARD, category: "analytics" },
+                      { name: "مرکز تحلیل", cost: DIAMOND_COSTS.ANALYTICS_HUB, category: "analytics" },
+                      { name: "هدهانتینگ هوشمند", cost: DIAMOND_COSTS.HEADHUNTING, category: "deep_search" },
+                      { name: "قطب‌نمای استراتژیک", cost: DIAMOND_COSTS.STRATEGIC_ANALYSIS, category: "complex_analysis" },
                       { name: "محاسبه هزینه استخدام", cost: 0, category: "free_tools" },
                     ].map((feature) => (
                       <div

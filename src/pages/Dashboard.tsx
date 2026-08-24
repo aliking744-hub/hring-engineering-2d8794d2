@@ -14,7 +14,6 @@ import {
   // Tier 4 - Vision Deck
   Compass, Scale, TrendingUp
 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuroraBackground from "@/components/AuroraBackground";
@@ -90,6 +89,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
+  const canonicalBase = getSetting('seo_canonical_base_url', 'https://hring.ir').replace(/\/+$/, '');
+  const dashboardUrl = canonicalBase + '/dashboard';
   const showUpgradeCta = useSectionVisible('dashboard_upgrade_cta');
   const isVisibleSetting = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
   const visibleTiers = TIERS
@@ -97,25 +98,9 @@ const Dashboard = () => {
     .map(t => ({ ...t, modules: t.modules.filter(m => isVisibleSetting(`dash_mod_${m.id}`)) }))
     .filter(t => t.modules.length > 0);
 
-  const creditLabel = getSetting('dashboard_credit_label', 'اعتبار شرکت');
+  const creditLabel = getSetting('dashboard_credit_label', context?.userType === 'company' ? 'اعتبار شرکت' : 'اعتبار موجود');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
   const searchPlaceholder = getSetting('dashboard_search_placeholder', 'جستجو...');
-
-  const getMaxCredits = () => {
-    const tier = context?.subscriptionTier || context?.companyTier;
-    switch (tier) {
-      case 'individual_free': return 50;
-      case 'individual_pro': return 600;
-      case 'individual_plus': return 2500;
-      case 'corporate_expert': return 500;
-      case 'corporate_decision_support': return 2000;
-      case 'corporate_decision_making': return 5000;
-      default: return 50;
-    }
-  };
-
-  const maxCredits = getMaxCredits();
-  const creditPercentage = maxCredits > 0 ? Math.min((credits / maxCredits) * 100, 100) : 0;
 
   const handleLogout = async () => {
     await signOut();
@@ -171,9 +156,8 @@ const Dashboard = () => {
           </Link>
         </div>
         <div className="text-xl font-bold text-primary mb-2">
-          {credits.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">/ {maxCredits.toLocaleString()}</span>
+          {credits.toLocaleString()}
         </div>
-        <Progress value={creditPercentage} className="h-1.5" />
       </div>
 
       {/* 4-Tier Accordion Nav */}
@@ -299,7 +283,7 @@ const Dashboard = () => {
         <title>داشبورد | {siteName} - پنل مدیریت منابع انسانی</title>
         <meta name="description" content={`پنل کاربری ${siteName} برای مدیریت منابع انسانی، استخدام، آنبوردینگ، تحلیل پرسنل و دسترسی به ابزارهای هوش مصنوعی.`} />
         <meta name="robots" content="noindex, nofollow" />
-        <link rel="canonical" href="https://hring-app.lovable.app/dashboard" />
+        <link rel="canonical" href={dashboardUrl} />
       </Helmet>
       <div className="relative min-h-screen flex" dir="rtl">
         <AuroraBackground />

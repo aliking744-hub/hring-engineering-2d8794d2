@@ -126,3 +126,70 @@ test('auto-headhunt persists candidates with allowed pending status', async () =
   assert.match(headhunt, /status:\s*['\"]pending['\"]/);
   assert.equal(/status:\s*['\"]analyzed['\"]/.test(headhunt), false);
 });
+
+test('dashboard and tool navigation only target registered product routes', async () => {
+  const tools = await read('src/pages/ToolsGrid.tsx');
+  const analytics = await read('src/pages/AnalyticsHub.tsx');
+  const individual = await read('src/components/dashboard/IndividualDashboard.tsx');
+  const corporate = await read('src/components/dashboard/CorporateDashboard.tsx');
+  const featureGate = await read('src/components/FeatureGate.tsx');
+  const navigationSources = [tools, analytics, individual, corporate];
+
+  for (const page of navigationSources) {
+    assert.equal(/["']\/smart-ad["']/.test(page), false);
+    assert.equal(/["']\/interviews["']/.test(page), false);
+    assert.equal(/\/unicorn-lab/.test(page), false);
+  }
+  assert.match(tools, /\/smart-ad-generator/);
+  assert.match(tools, /\/interview-assistant/);
+  assert.match(featureGate, /navigate\(['"]\/upgrade['"]\)/);
+  assert.equal(/navigate\(['"]\/shop['"]\)/.test(featureGate), false);
+});
+
+test('public and dashboard metadata use the configurable canonical origin', async () => {
+  const pages = await Promise.all([
+    read('src/pages/FAQ.tsx'),
+    read('src/pages/Blog.tsx'),
+    read('src/pages/BlogPost.tsx'),
+    read('src/pages/Dashboard.tsx'),
+  ]);
+
+  for (const page of pages) {
+    assert.match(page, /seo_canonical_base_url/);
+    assert.equal(/hring-app\.lovable\.app/.test(page), false);
+  }
+});
+
+test('FAQ reuses the live pricing and credit catalogs', async () => {
+  const faq = await read('src/pages/FAQ.tsx');
+
+  assert.match(faq, /<PricingSection \/>/);
+  assert.match(faq, /DIAMOND_COSTS/);
+  assert.equal(/individual_expert/.test(faq), false);
+});
+
+test('sample and estimated analytics are visibly labelled', async () => {
+  const analytics = await read('src/pages/AnalyticsHub.tsx');
+  const radar = await read('src/components/strategic-radar/RadarDashboard.tsx');
+
+  assert.match(analytics, /داده‌های نمایشی/);
+  assert.match(analytics, /گزارش عملیاتی سازمان شما نیستند/);
+  assert.match(radar, /برآورد سناریویی/);
+  assert.equal(/>\s*LIVE\s*</.test(radar), false);
+});
+
+test('dashboards do not present invented operational metrics or retired modules', async () => {
+  const individual = await read('src/components/dashboard/IndividualDashboard.tsx');
+  const corporate = await read('src/components/dashboard/CorporateDashboard.tsx');
+  const dashboard = await read('src/pages/Dashboard.tsx');
+
+  assert.match(individual, /useCampaigns/);
+  assert.match(individual, /candidatesCount/);
+  assert.equal(/سارا احمدی|const hiringHealth = 95|\/unicorn-lab/.test(individual), false);
+
+  assert.match(corporate, /members\.length/);
+  assert.match(corporate, /این داشبورد عدد نمونه نشان نمی‌دهد/);
+  assert.equal(/پروژه‌های فعال|جلسات این هفته|\/unicorn-lab/.test(corporate), false);
+
+  assert.equal(/planMaxCredits|allocatedCredits|creditPercentage/.test(dashboard), false);
+});

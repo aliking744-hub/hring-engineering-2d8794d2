@@ -82,7 +82,7 @@ const FeatureGate = ({
             </Button>
             <Button 
               className="glow-button text-foreground"
-              onClick={() => navigate('/shop')}
+              onClick={() => navigate('/upgrade')}
             >
               <Crown className="w-4 h-4 ml-2" />
               مشاهده پلن‌ها
