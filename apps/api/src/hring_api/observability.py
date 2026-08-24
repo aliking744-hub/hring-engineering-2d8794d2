@@ -1,10 +1,11 @@
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from time import perf_counter
 
 from fastapi import Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, Counter, Gauge, Histogram
 from prometheus_client.exposition import generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.routing import BaseRoute, Match
 from starlette.types import ASGIApp
 
 
@@ -38,6 +39,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         method = request.method.upper()
+        route_label = self._route_label(request)
         started_at = perf_counter()
         status_code = 500
         HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).inc()
@@ -46,9 +48,6 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             status_code = response.status_code
             return response
         finally:
-            route_object = request.scope.get("route")
-            route = getattr(route_object, "path", None)
-            route_label = route if isinstance(route, str) else "unmatched"
             HTTP_REQUESTS.labels(
                 service=self.service,
                 method=method,
@@ -61,6 +60,21 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 route=route_label,
             ).observe(max(0.0, perf_counter() - started_at))
             HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).dec()
+
+    @staticmethod
+    def _route_label(request: Request) -> str:
+        routes = getattr(request.app, "routes", ())
+        if not isinstance(routes, Iterable):
+            return "unmatched"
+        for candidate in routes:
+            if not isinstance(candidate, BaseRoute):
+                continue
+            match, _ = candidate.matches(request.scope)
+            if match is Match.FULL:
+                route = getattr(candidate, "path", None)
+                if isinstance(route, str):
+                    return route
+        return "unmatched"
 
 
 def metrics_response() -> Response:
