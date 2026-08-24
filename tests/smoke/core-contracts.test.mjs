@@ -54,6 +54,22 @@ test('product admin uses backend product settings and does not import Supabase',
   assert.equal(/integrations\/supabase|supabase\./.test(product), false);
 });
 
+test('billing checkout and history use independent HRing API contracts', async () => {
+  const upgrade = await read('src/pages/Upgrade.tsx');
+  const history = await read('src/pages/PaymentHistory.tsx');
+
+  assert.match(upgrade, /\/billing\/plans/);
+  assert.match(upgrade, /\/billing\/payments\/init/);
+  assert.match(upgrade, /\/billing\/payments\/verify/);
+  assert.match(upgrade, /useEffect\(\(\) => \{/);
+  assert.equal(/useState\(\(\) =>/.test(upgrade), false);
+  assert.equal(/integrations\/supabase|supabase\./.test(upgrade), false);
+
+  assert.match(history, /\/billing\/payments/);
+  assert.match(history, /amount_toman/);
+  assert.equal(/integrations\/supabase|supabase\./.test(history), false);
+});
+
 test('auto-headhunt persists candidates with allowed pending status', async () => {
   const headhunt = await read('supabase/functions/auto-headhunt/index.ts');
   assert.match(headhunt, /status:\s*['\"]pending['\"]/);

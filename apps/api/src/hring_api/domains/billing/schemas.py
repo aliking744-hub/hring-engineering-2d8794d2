@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,3 +41,16 @@ class PaymentVerifyResponse(BaseModel):
     success: bool = True
     ref_id: str | None
     already_verified: bool = False
+
+
+class PaymentTransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    amount_toman: int
+    plan_type: str
+    status: str
+    ref_id: str | None
+    description: str | None
+    created_at: datetime
+    verified_at: datetime | None

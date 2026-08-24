@@ -13,6 +13,7 @@ from hring_api.domains.billing.schemas import (
     BillingPlanUpdateRequest,
     PaymentInitRequest,
     PaymentInitResponse,
+    PaymentTransactionResponse,
     PaymentVerifyRequest,
     PaymentVerifyResponse,
 )
@@ -24,6 +25,7 @@ from hring_api.domains.billing.service import (
     PaymentVerificationError,
     initialize_payment,
     list_billing_plans,
+    list_payment_transactions,
     verify_payment,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
@@ -50,6 +52,15 @@ async def public_billing_plans(
 ) -> list[BillingPlanResponse]:
     plans = await list_billing_plans(db)
     return [BillingPlanResponse.model_validate(plan) for plan in plans]
+
+
+@router.get("/billing/payments", response_model=list[PaymentTransactionResponse])
+async def payment_history(
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[PaymentTransactionResponse]:
+    transactions = await list_payment_transactions(db, principal=principal)
+    return [PaymentTransactionResponse.model_validate(item) for item in transactions]
 
 
 @router.post("/billing/payments/init", response_model=PaymentInitResponse)
