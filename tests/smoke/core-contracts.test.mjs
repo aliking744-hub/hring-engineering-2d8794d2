@@ -41,6 +41,13 @@ test('platform role management is limited to super admins in the UI', async () =
   assert.match(platform, /\/admin\/platform\/users\/\$\{user\.id\}\/roles/);
 });
 
+test('platform audit log refreshes when the audit tab is selected', async () => {
+  const platform = await read('src/pages/PlatformAdmin.tsx');
+  assert.match(platform, /const refreshAuditLogs = useCallback/);
+  assert.match(platform, /if \(value === 'audit'\) void refreshAuditLogs\(\)/);
+  assert.match(platform, /<Tabs value=\{activeTab\} onValueChange=\{handleTabChange\}>/);
+});
+
 test('product admin uses backend product settings and does not import Supabase', async () => {
   const product = await read('src/pages/ProductAdmin.tsx');
   assert.match(product, /\/admin\/product\/settings/);
