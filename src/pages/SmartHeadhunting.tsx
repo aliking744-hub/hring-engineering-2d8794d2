@@ -597,8 +597,9 @@ const SmartHeadhunting = () => {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
               <Link to="/dashboard">
-                <Button variant="outline" size="icon" className="border-slate-700 bg-slate-800/50 hover:bg-slate-700">
-                  <ArrowLeft className="w-5 h-5 text-slate-300" />
+                <Button variant="outline" className="gap-2 border-slate-700 bg-slate-800/50 hover:bg-slate-700">
+                  <ArrowLeft className="h-5 w-5 text-slate-300" />
+                  بازگشت به داشبورد
                 </Button>
               </Link>
               <div>

@@ -71,8 +71,9 @@ const OnboardingRoadmap = () => {
         >
           <div className="flex items-center gap-4">
             <Link to="/dashboard">
-              <Button variant="outline" size="icon" className="border-border bg-secondary/50">
-                <ArrowRight className="w-5 h-5" />
+              <Button variant="outline" className="gap-2 border-border bg-secondary/50">
+                <ArrowRight className="h-5 w-5" />
+                بازگشت به داشبورد
               </Button>
             </Link>
             <div>

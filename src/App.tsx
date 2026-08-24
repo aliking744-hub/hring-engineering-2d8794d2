@@ -27,7 +27,6 @@ const SuccessArchitect = lazy(() => import("./pages/SuccessArchitect"));
 const ToolsGrid = lazy(() => import("./pages/ToolsGrid"));
 const HRDashboard = lazy(() => import("./pages/HRDashboard"));
 const Modules = lazy(() => import("./pages/Modules"));
-const AnalyticsHub = lazy(() => import("./pages/AnalyticsHub"));
 const CostCalculator = lazy(() => import("./pages/CostCalculator"));
 const SmartHeadhunting = lazy(() => import("./pages/SmartHeadhunting"));
 const CampaignDetail = lazy(() => import("./pages/CampaignDetail"));
@@ -152,14 +151,6 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Modules />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/analytics" 
-                element={
-                  <ProtectedRoute>
-                    <AnalyticsHub />
                   </ProtectedRoute>
                 } 
               />

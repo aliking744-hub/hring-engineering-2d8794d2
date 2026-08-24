@@ -319,6 +319,12 @@ export default function Upgrade() {
           <Navbar />
           
           <div className="container mx-auto px-4 py-12">
+            <div className="mb-6 flex justify-start">
+              <Button variant="outline" className="gap-2" onClick={() => navigate('/dashboard')}>
+                <ArrowRight className="h-4 w-4" />
+                بازگشت به داشبورد
+              </Button>
+            </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

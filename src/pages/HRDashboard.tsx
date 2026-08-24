@@ -153,8 +153,9 @@ export default function HRDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" onClick={() => navigate('/dashboard')}>
-              <ArrowRight className="w-5 h-5" />
+            <Button variant="outline" className="gap-2" onClick={() => navigate('/dashboard')}>
+              <ArrowRight className="h-5 w-5" />
+              بازگشت به داشبورد
             </Button>
             <div>
               <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">داشبورد منابع انسانی</h1>

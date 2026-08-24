@@ -266,13 +266,13 @@ const StrategicCompassContent = () => {
             className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8"
           >
             <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                size="icon" 
+              <Button
+                variant="outline"
                 onClick={() => navigate('/dashboard')}
-                className="border-border bg-secondary/50"
+                className="gap-2 border-border bg-secondary/50"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="h-5 w-5" />
+                بازگشت به داشبورد
               </Button>
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">

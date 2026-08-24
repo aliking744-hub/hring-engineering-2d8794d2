@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserContext } from "@/hooks/useUserContext";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useCompany } from "@/hooks/useCompany";
 import { useCredits } from "@/hooks/useCredits";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 import { useSiteSettings, useSiteName } from "@/hooks/useSiteSettings";
@@ -80,13 +81,13 @@ const TIERS = [
 
 const Dashboard = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [openTiers, setOpenTiers] = useState<string[]>(["smart-workspace"]);
-  const [activeTier, setActiveTier] = useState("smart-workspace");
   const { signOut, user } = useAuth();
   const { context, loading: contextLoading } = useUserContext();
   const { isAdmin } = useAdmin();
+  const { company } = useCompany();
   const { credits } = useCredits();
   const navigate = useNavigate();
+  const location = useLocation();
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
   const canonicalBase = getSetting('seo_canonical_base_url', 'https://hring.ir').replace(/\/+$/, '');
@@ -107,11 +108,12 @@ const Dashboard = () => {
     navigate('/');
   };
 
-  const toggleTier = (tierId: string) => {
-    setOpenTiers(prev => 
-      prev.includes(tierId) ? prev.filter(t => t !== tierId) : [...prev, tierId]
-    );
-    setActiveTier(tierId);
+  const showDashboardHome = () => {
+    navigate('/dashboard');
+  };
+
+  const selectTier = (tierId: string) => {
+    navigate(location.hash === `#${tierId}` ? '/dashboard' : `/dashboard#${tierId}`);
   };
 
   if (contextLoading) {
@@ -122,7 +124,21 @@ const Dashboard = () => {
     );
   }
 
-  const currentTier = visibleTiers.find(t => t.id === activeTier) || visibleTiers[0] || TIERS[0];
+  const requestedTierId = location.hash.replace(/^#/, '');
+  const currentTier = visibleTiers.find(t => t.id === requestedTierId) || null;
+  const isCorporateAccount = context?.userType === 'corporate';
+  const personalName =
+    context?.fullName?.trim() ||
+    context?.email?.split('@')[0] ||
+    user?.email?.split('@')[0] ||
+    'کاربر';
+  const accountName = isCorporateAccount && company?.name ? company.name : personalName;
+  const accountSubtitle = isCorporateAccount
+    ? [personalName, context?.title].filter(Boolean).join(' • ')
+    : context?.title || context?.email || '';
+  const welcomeSubject = isCorporateAccount && company?.name
+    ? `شرکت ${company.name}`
+    : personalName;
 
   // Sidebar content (shared between mobile and desktop)
   const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
@@ -134,41 +150,55 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      {/* User Profile & Credit */}
-      <div className="mb-4 px-3 py-3 rounded-xl bg-secondary/50 border border-border/50">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <User className="w-5 h-5 text-primary" />
+      {/* Account identity and credit also act as the dashboard-home control. */}
+      <div className="mb-4 rounded-xl border border-border/50 bg-secondary/50 p-3">
+        <button
+          type="button"
+          onClick={() => {
+            showDashboardHome();
+            onNavigate?.();
+          }}
+          className="w-full rounded-lg p-1 text-right transition-colors hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="بازگشت به خانه داشبورد"
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+              {isCorporateAccount ? (
+                <Building2 className="h-5 w-5 text-primary" />
+              ) : (
+                <User className="h-5 w-5 text-primary" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground">{accountName}</p>
+              <p className="truncate text-xs text-muted-foreground">{accountSubtitle}</p>
+            </div>
+            <Home className="h-4 w-4 shrink-0 text-primary" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {context?.fullName || context?.email || 'کاربر'}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">{context?.title || ''}</p>
+          <div className="flex items-end justify-between">
+            <span className="text-xs text-muted-foreground">{creditLabel}</span>
+            <span className="text-xl font-bold text-primary">{credits.toLocaleString()}</span>
           </div>
-        </div>
-        {/* Company Credit */}
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs text-muted-foreground">{creditLabel}</span>
-          <Link to="/payment-history" className="text-xs text-primary hover:underline flex items-center gap-1" onClick={onNavigate}>
-            <History className="w-3 h-3" />
-            تاریخچه
-          </Link>
-        </div>
-        <div className="text-xl font-bold text-primary mb-2">
-          {credits.toLocaleString()}
-        </div>
+        </button>
+        <Link
+          to="/payment-history"
+          className="mt-2 flex items-center justify-center gap-1 border-t border-border/40 pt-2 text-xs text-primary hover:underline"
+          onClick={onNavigate}
+        >
+          <History className="h-3 w-3" />
+          تاریخچه تراکنش‌ها
+        </Link>
       </div>
 
       {/* 4-Tier Accordion Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto">
         {visibleTiers.map((tier) => {
-          const isOpen = openTiers.includes(tier.id);
-          const isActive = activeTier === tier.id;
+          const isOpen = currentTier?.id === tier.id;
+          const isActive = currentTier?.id === tier.id;
           return (
             <div key={tier.id}>
               <button
-                onClick={() => toggleTier(tier.id)}
+                onClick={() => selectTier(tier.id)}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-right ${
                   isActive
                     ? "bg-primary/10 text-primary border border-primary/20"
@@ -345,22 +375,66 @@ const Dashboard = () => {
             className="glass-card h-full p-4 sm:p-6 overflow-auto max-w-[1920px] mx-auto"
           >
             {/* Header */}
-            <header className="flex items-center justify-between gap-3 mb-6">
-              <div>
-                <h1 className="text-xl font-bold text-foreground">{currentTier.label}</h1>
-                <p className="text-xs text-muted-foreground">{currentTier.labelEn}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="relative hidden sm:block">
-                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder={searchPlaceholder} className="pr-9 w-48 bg-secondary/50 border-border" />
+            <header className="mb-6 flex items-center justify-between gap-3">
+              {currentTier ? (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={showDashboardHome}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary/50 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="بازگشت به خانه داشبورد"
+                    title="بازگشت به خانه داشبورد"
+                  >
+                    <Home className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h1 className="text-xl font-bold text-foreground">{currentTier.label}</h1>
+                    <p className="text-xs text-muted-foreground">{currentTier.labelEn}</p>
+                  </div>
                 </div>
+              ) : (
+                <div>
+                  <h1 className="text-xl font-bold text-foreground">خانه داشبورد</h1>
+                  <p className="text-xs text-muted-foreground">{siteName}</p>
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                {currentTier && (
+                  <div className="relative hidden sm:block">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder={searchPlaceholder} className="w-48 border-border bg-secondary/50 pr-9" />
+                  </div>
+                )}
                 <NotificationsDropdown />
               </div>
             </header>
 
-            {/* Module Cards for Active Tier */}
-            <DashboardModuleCards tier={currentTier} />
+            {currentTier ? (
+              <DashboardModuleCards tier={currentTier} />
+            ) : (
+              <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex min-h-[60vh] items-center justify-center px-4 py-12 text-center"
+              >
+                <div className="max-w-2xl">
+                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-primary/25 bg-primary/10 shadow-lg shadow-primary/10">
+                    {isCorporateAccount ? (
+                      <Building2 className="h-10 w-10 text-primary" />
+                    ) : (
+                      <User className="h-10 w-10 text-primary" />
+                    )}
+                  </div>
+                  <p className="mb-3 text-sm font-medium text-primary">خانه مدیریتی شما</p>
+                  <h2 className="text-3xl font-bold leading-tight text-foreground sm:text-4xl">
+                    {welcomeSubject}، خوش آمدید
+                  </h2>
+                  <p className="mx-auto mt-4 max-w-xl leading-7 text-muted-foreground">
+                    برای شروع، یکی از بخش‌های منوی سمت راست را انتخاب کنید.
+                  </p>
+                </div>
+              </motion.section>
+            )}
           </motion.div>
         </div>
       </div>
