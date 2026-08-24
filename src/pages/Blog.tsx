@@ -9,8 +9,12 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const Blog = () => {
+  const { siteName, getSetting } = useSiteSettings();
+  const canonicalBase = getSetting('seo_canonical_base_url', 'https://hring.ir').replace(/\/+$/, '');
+  const blogUrl = canonicalBase + '/blog';
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ['blog-posts'],
     queryFn: async () => {
@@ -37,11 +41,11 @@ const Blog = () => {
   return (
     <>
       <Helmet>
-        <title>بلاگ - HRing</title>
+        <title>بلاگ - {siteName}</title>
         <meta name="description" content="آخرین مقالات و مطالب تخصصی منابع انسانی، استخدام، آنبوردینگ، رهبری سازمان و قانون کار ایران در بلاگ HRing." />
-        <link rel="canonical" href="https://hring-app.lovable.app/blog" />
+        <link rel="canonical" href={blogUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://hring-app.lovable.app/blog" />
+        <meta property="og:url" content={blogUrl} />
         <meta property="og:title" content="بلاگ HRing — مقالات تخصصی منابع انسانی" />
         <meta property="og:description" content="آخرین مقالات تخصصی منابع انسانی، استخدام و رهبری سازمان در HRing." />
       </Helmet>

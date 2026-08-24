@@ -10,10 +10,14 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const BlogPost = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { siteName, getSetting } = useSiteSettings();
+  const canonicalBase = getSetting('seo_canonical_base_url', 'https://hring.ir').replace(/\/+$/, '');
+  const articleUrl = canonicalBase + '/blog/' + encodeURIComponent(slug || '');
 
   const { data: post, isLoading, error } = useQuery({
     queryKey: ['blog-post', slug],
@@ -54,7 +58,7 @@ const BlogPost = () => {
   return (
     <>
       <Helmet>
-        <title>{post?.title || 'بلاگ'} - HRing</title>
+        <title>{post?.title || 'بلاگ'} - {siteName}</title>
         <meta
           name="description"
           content={
@@ -62,10 +66,10 @@ const BlogPost = () => {
             `مقاله‌ای از بلاگ HRing درباره منابع انسانی، استخدام و رهبری سازمان. برای مطالعه کامل به صفحه مقاله مراجعه کنید.`
           }
         />
-        <link rel="canonical" href={`https://hring-app.lovable.app/blog/${slug}`} />
+        <link rel="canonical" href={articleUrl} />
         <meta property="og:type" content="article" />
-        <meta property="og:url" content={`https://hring-app.lovable.app/blog/${slug}`} />
-        <meta property="og:title" content={`${post?.title || 'بلاگ'} - HRing`} />
+        <meta property="og:url" content={articleUrl} />
+        <meta property="og:title" content={`${post?.title || 'بلاگ'} - ${siteName}`} />
         <meta
           property="og:description"
           content={
@@ -83,7 +87,7 @@ const BlogPost = () => {
               image: post.image_url ? [post.image_url] : undefined,
               datePublished: post.created_at,
               dateModified: post.updated_at || post.created_at,
-              mainEntityOfPage: `https://hring-app.lovable.app/blog/${slug}`,
+              mainEntityOfPage: articleUrl,
             })}
           </script>
         )}

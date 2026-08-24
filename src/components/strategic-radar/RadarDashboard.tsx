@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Settings2, Radar, Save, Loader2 } from "lucide-react";
+import { AlertTriangle, Settings2, Radar, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CompanyProfile } from "@/pages/StrategicRadar";
 import { lazy, Suspense } from "react";
@@ -55,12 +55,12 @@ const RadarDashboard = ({ profile, onEditProfile, onSave, isSaving }: RadarDashb
             <h1 className="text-xl font-bold text-white flex items-center gap-2">
               اتاق جنگ استراتژیک
               <span className="px-2 py-0.5 text-xs bg-cyan-500/20 text-cyan-400 rounded-full font-mono">
-                LIVE
+                برآورد
               </span>
             </h1>
             <p className="text-slate-400 text-sm flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              تحلیل {profile.name} • {profile.sector}
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              تحلیل سناریویی {profile.name} • {profile.sector}
             </p>
           </div>
         </div>
@@ -93,6 +93,13 @@ const RadarDashboard = ({ profile, onEditProfile, onSave, isSaving }: RadarDashb
           </Button>
         </div>
       </motion.header>
+
+      <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+        <p className="leading-6">
+          خروجی‌هایی که منبع مستقیم ندارند برآورد سناریویی‌اند؛ پیش از تصمیم مدیریتی، داده و منبع هر بخش را بررسی کنید.
+        </p>
+      </div>
 
       {/* Bento Grid Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
