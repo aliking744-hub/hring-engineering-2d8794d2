@@ -21,6 +21,7 @@ test('Prometheus scrapes both applications and probes all stateful services', as
   for (const expected of [
     'api:8000',
     'ai:8000',
+    'worker:9808',
     'web/healthz',
     'minio:9000/minio/health/live',
     'postgres:5432',
@@ -56,6 +57,7 @@ test('runtime alert rules cover availability, errors, latency, memory, and confi
     'HRingHighServerErrorRatio',
     'HRingHighRequestLatency',
     'HRingProcessMemoryHigh',
+    'HRingWorkerHeartbeatStale',
     'HRingPrometheusConfigReloadFailed',
   ]) {
     assert.match(alerts, new RegExp(`alert: ${alert}`));
