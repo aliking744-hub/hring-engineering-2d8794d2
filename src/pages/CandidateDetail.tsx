@@ -52,11 +52,36 @@ interface CampaignInfo {
 }
 
 type CandidateStatus = 'pending' | 'approved' | 'rejected' | 'waiting';
+type CandidateDetailData = Omit<DBCandidate, 'status'> & { status: CandidateStatus };
+
+const normalizeCandidateStatus = (status: string): CandidateStatus => {
+  switch (status) {
+    case 'approved':
+    case 'rejected':
+    case 'waiting':
+    case 'pending':
+      return status;
+    default:
+      return 'pending';
+  }
+};
+
+const isLayerScores = (value: unknown): value is LayerScores => {
+  if (!value || typeof value !== 'object') return false;
+  const scores = value as Record<keyof LayerScores, unknown>;
+  return (
+    typeof scores.activitySentiment === 'number' &&
+    typeof scores.hardSkillMatch === 'number' &&
+    typeof scores.careerTrajectory === 'number' &&
+    typeof scores.cultureFit === 'number' &&
+    typeof scores.riskOpportunity === 'number'
+  );
+};
 
 const CandidateDetail = () => {
   const { campaignId, candidateId } = useParams();
   const navigate = useNavigate();
-  const [candidate, setCandidate] = useState<(DBCandidate & { status?: CandidateStatus }) | null>(null);
+  const [candidate, setCandidate] = useState<CandidateDetailData | null>(null);
   const [campaign, setCampaign] = useState<CampaignInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -81,7 +106,8 @@ const CandidateDetail = () => {
         if (candidateError) throw candidateError;
         if (!candidateData) throw new Error("کاندیدا پیدا نشد");
 
-        setCandidate(candidateData as DBCandidate);
+        const row = candidateData as DBCandidate;
+        setCandidate({ ...row, status: normalizeCandidateStatus(row.status) });
 
         // Fetch campaign info
         const { data: campaignData, error: campaignError } = await supabase
@@ -199,7 +225,7 @@ const CandidateDetail = () => {
     );
   }
 
-  const layerScores = candidate.layer_scores as LayerScores | null;
+  const layerScores = isLayerScores(candidate.layer_scores) ? candidate.layer_scores : null;
   const skills = candidate.skills ? candidate.skills.split(",").map(s => s.trim()) : [];
 
   const getScoreColor = (score: number) => {

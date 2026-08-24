@@ -23,3 +23,12 @@ test('agent constitution preserves isolated mirror boundary', async () => {
   assert.match(agents, /isolated engineering mirror/i);
   assert.match(agents, /Never deploy to the production CloudIva service/i);
 });
+
+test('frontend typecheck compiles both application and build-tool projects', async () => {
+  const packageJson = JSON.parse(await read('package.json'));
+  const command = packageJson.scripts?.typecheck ?? '';
+
+  assert.match(command, /tsc\s+-p\s+tsconfig\.app\.json\s+--noEmit/);
+  assert.match(command, /tsc\s+-p\s+tsconfig\.node\.json\s+--noEmit/);
+  assert.notEqual(command.trim(), 'tsc --noEmit');
+});

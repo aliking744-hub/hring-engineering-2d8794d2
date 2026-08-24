@@ -70,9 +70,8 @@ export const useNotifications = () => {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          console.log('Notification change:', payload);
-          fetchNotifications();
+        () => {
+          void fetchNotifications();
         }
       )
       .subscribe();
