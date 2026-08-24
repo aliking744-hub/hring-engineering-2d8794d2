@@ -5,7 +5,7 @@ from fastapi import Request, Response
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, Counter, Gauge, Histogram
 from prometheus_client.exposition import generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.routing import BaseRoute, Match
+from starlette.routing import BaseRoute, Route
 from starlette.types import ASGIApp, Scope
 
 
@@ -63,12 +63,12 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             HTTP_REQUESTS_IN_PROGRESS.labels(service=self.service).dec()
 
     def _route_label(self, scope: Scope) -> str:
+        path = scope.get("path")
+        if not isinstance(path, str):
+            return "unmatched"
         for candidate in self.routes:
-            match, _ = candidate.matches(scope)
-            if match is Match.FULL:
-                route = getattr(candidate, "path", None)
-                if isinstance(route, str):
-                    return route
+            if isinstance(candidate, Route) and candidate.path_regex.fullmatch(path):
+                return candidate.path
         return "unmatched"
 
 
