@@ -4,40 +4,41 @@ import { Link } from "react-router-dom";
 import AuroraBackground from "@/components/AuroraBackground";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const roadmapPhases = [
   {
     phase: "هفته ۱-۲",
     title: "آشنایی و استقرار",
-    progress: 100,
+    progress: 0,
     tasks: [
-      { text: "معرفی به تیم و همکاران", done: true },
-      { text: "تنظیم ابزارها و دسترسی‌ها", done: true },
-      { text: "مطالعه مستندات شرکت", done: true },
-      { text: "آشنایی با فرآیندها", done: true },
-    ]
+      { text: "معرفی به تیم و همکاران", done: false },
+      { text: "تنظیم ابزارها و دسترسی‌ها", done: false },
+      { text: "مطالعه مستندات شرکت", done: false },
+      { text: "آشنایی با فرآیندها", done: false },
+    ],
   },
   {
     phase: "هفته ۳-۴",
     title: "یادگیری و آموزش",
-    progress: 75,
+    progress: 0,
     tasks: [
-      { text: "شرکت در جلسات آموزشی", done: true },
-      { text: "همکاری در پروژه‌های کوچک", done: true },
-      { text: "دریافت بازخورد اولیه", done: true },
+      { text: "شرکت در جلسات آموزشی", done: false },
+      { text: "همکاری در پروژه‌های کوچک", done: false },
+      { text: "دریافت بازخورد اولیه", done: false },
       { text: "تکمیل دوره‌های آنلاین", done: false },
-    ]
+    ],
   },
   {
     phase: "ماه ۲",
     title: "مشارکت فعال",
-    progress: 30,
+    progress: 0,
     tasks: [
-      { text: "شروع کار مستقل", done: true },
+      { text: "شروع کار مستقل", done: false },
       { text: "مشارکت در جلسات تیم", done: false },
       { text: "ارائه ایده‌های بهبود", done: false },
       { text: "جلسه بازخورد ماهانه", done: false },
-    ]
+    ],
   },
   {
     phase: "ماه ۳",
@@ -48,7 +49,7 @@ const roadmapPhases = [
       { text: "منتورینگ اعضای جدید", done: false },
       { text: "ارزیابی دوره آزمایشی", done: false },
       { text: "تعیین اهداف بلندمدت", done: false },
-    ]
+    ],
   },
 ];
 
@@ -75,11 +76,14 @@ const OnboardingRoadmap = () => {
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <UserPlus className="w-6 h-6 text-primary" />
-                نقشه راه ۹۰ روزه
-              </h1>
-              <p className="text-muted-foreground">برنامه آنبوردینگ کارمندان جدید</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                  <UserPlus className="w-6 h-6 text-primary" />
+                  قالب نقشه راه ۹۰ روزه
+                </h1>
+                <Badge variant="secondary">نمونه ساختار</Badge>
+              </div>
+              <p className="text-muted-foreground">تا زمان انتخاب کارمند، هیچ پیشرفتی به‌عنوان داده واقعی ثبت نمی‌شود.</p>
             </div>
           </div>
         </motion.div>
@@ -96,6 +100,9 @@ const OnboardingRoadmap = () => {
             <span className="text-2xl font-bold text-primary">{overallProgress}%</span>
           </div>
           <Progress value={overallProgress} className="h-3" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            این صفحه چارچوب پیشنهادی را نمایش می‌دهد و هنوز به پرونده یک کارمند متصل نشده است.
+          </p>
         </motion.div>
 
         {/* Roadmap Phases */}
@@ -152,20 +159,12 @@ const OnboardingRoadmap = () => {
             <Clock className="w-5 h-5 text-primary" />
             جلسات آینده
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { title: "جلسه بازخورد هفتگی", date: "شنبه ۱۵ دی", time: "۱۰:۰۰" },
-              { title: "آموزش ابزارهای تیم", date: "یکشنبه ۱۶ دی", time: "۱۴:۰۰" },
-              { title: "معرفی به مدیران ارشد", date: "سه‌شنبه ۱۸ دی", time: "۱۱:۰۰" },
-            ].map((event, index) => (
-              <div 
-                key={index}
-                className="p-4 bg-secondary/30 rounded-lg"
-              >
-                <p className="font-medium text-foreground">{event.title}</p>
-                <p className="text-sm text-muted-foreground">{event.date} - {event.time}</p>
-              </div>
-            ))}
+          <div className="rounded-lg bg-secondary/30 p-5 text-center">
+            <p className="font-medium text-foreground">جلسه‌ای برای کارمند انتخاب‌شده ثبت نشده است.</p>
+            <p className="mt-1 text-sm text-muted-foreground">ابتدا یک برنامه ۹۰ روزه متناسب با نقش شغلی بسازید.</p>
+            <Link to="/success-architect" className="mt-4 inline-block">
+              <Button>ساخت برنامه ۹۰ روزه</Button>
+            </Link>
           </div>
         </motion.div>
       </div>

@@ -6,8 +6,13 @@ import dashboardMap from "@/assets/dashboard-map.png";
 import dashboardProfile from "@/assets/dashboard-profile.png";
 import dashboardBirthdays from "@/assets/dashboard-birthdays.png";
 import logoImage from "@/assets/logo.png";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const ProductCatalog = () => {
+  const { getSetting } = useSiteSettings();
+  const canonicalBase = getSetting("seo_canonical_base_url", "https://hring.ir").replace(/\/+$/, "");
+  const catalogUrl = `${canonicalBase}/product-catalog`;
+
   const handlePrint = () => {
     window.print();
   };
@@ -17,9 +22,9 @@ const ProductCatalog = () => {
       <Helmet>
         <title>کاتالوگ محصول hring — راهنمای کامل ماژول‌های منابع انسانی</title>
         <meta name="description" content="کاتالوگ کامل محصول hring: معماری ۴ لایه‌ای منابع انسانی شامل میزکار هوشمند، عملیات HR، پنل راهبری و مشاوره حقوقی با هوش مصنوعی." />
-        <link rel="canonical" href="https://hring-app.lovable.app/product-catalog" />
+        <link rel="canonical" href={catalogUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://hring-app.lovable.app/product-catalog" />
+        <meta property="og:url" content={catalogUrl} />
         <meta property="og:title" content="کاتالوگ محصول hring" />
         <meta property="og:description" content="معماری ۴ لایه‌ای hring برای مدیریت کامل منابع انسانی مبتنی بر هوش مصنوعی." />
         <script type="application/ld+json">
@@ -28,12 +33,11 @@ const ProductCatalog = () => {
             '@type': 'CollectionPage',
             name: 'کاتالوگ محصول hring',
             description: 'معماری ۴ لایه‌ای hring شامل میزکار هوشمند، عملیات HR، پنل راهبری و مشاوره حقوقی.',
-            url: 'https://hring-app.lovable.app/product-catalog',
+            url: catalogUrl,
           })}
         </script>
-        <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
       </Helmet>
-      <div dir="rtl" style={{ fontFamily: "'Vazirmatn', sans-serif", background: '#0a0e1a', color: '#e2e8f0', lineHeight: 1.8, minHeight: '100vh' }}>
+      <div dir="rtl" style={{ fontFamily: "var(--font-body), 'BNazanin', system-ui, sans-serif", background: '#0a0e1a', color: '#e2e8f0', lineHeight: 1.8, minHeight: '100vh' }}>
         <style>{`
           .cat-page { max-width: 1000px; margin: 0 auto; padding: 60px 40px; }
           .cat-cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%); padding: 40px; position: relative; }
@@ -76,7 +80,7 @@ const ProductCatalog = () => {
           .cat-screenshot-label { text-align: center; font-size: 13px; color: #64748b; margin-top: 8px; }
           .cat-highlight { background: linear-gradient(135deg, #7c3aed10, #06b6d410); border: 1px solid #7c3aed30; border-radius: 16px; padding: 32px; margin: 32px 0; }
           .download-bar { position: fixed; top: 24px; left: 24px; z-index: 1000; display: flex; gap: 12px; }
-          .download-btn { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 15px; font-weight: 700; transition: all 0.2s; }
+          .download-btn { display: flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-family: var(--font-button), 'BNazanin', system-ui, sans-serif; font-size: 15px; font-weight: 700; transition: all 0.2s; }
           .download-btn-primary { background: linear-gradient(135deg, #7c3aed, #06b6d4); color: white; box-shadow: 0 4px 20px rgba(124,58,237,0.4); }
           .download-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(124,58,237,0.6); }
 
@@ -108,7 +112,7 @@ const ProductCatalog = () => {
           <h1>hring</h1>
           <div className="subtitle">دستیار هوشمند منابع انسانی نسل جدید</div>
           <div className="tagline">🚀 مبتنی بر هوش مصنوعی • ابری • امن</div>
-          <div className="version">نسخه ۲.۰ — بهمن ۱۴۰۴</div>
+          <div className="version">نسخه مستقل — ۱۴۰۵</div>
         </div>
 
         {/* OVERVIEW */}
@@ -408,20 +412,20 @@ const ProductCatalog = () => {
           <p className="cat-desc">امنیت داده‌های پرسنلی اولویت اول ماست. تمام اطلاعات با بالاترین استانداردهای امنیتی محافظت می‌شوند.</p>
           <div className="cat-grid">
             <div className="cat-card">
-              <h4>🔒 Row Level Security (RLS)</h4>
-              <p>هر کاربر و هر سازمان فقط به داده‌های خود دسترسی دارد — جداسازی کامل داده‌ها در سطح پایگاه داده</p>
+              <h4>🔒 جداسازی سازمانی و RBAC</h4>
+              <p>مجوزها و مرز سازمان‌ها در API مستقل و سمت سرور کنترل می‌شوند تا هر کاربر فقط به داده‌های مجاز دسترسی داشته باشد.</p>
             </div>
             <div className="cat-card">
-              <h4>🔐 رمزنگاری End-to-End</h4>
-              <p>تمام ارتباطات بین کاربر و سرور با پروتکل TLS رمزنگاری می‌شوند</p>
+              <h4>🔐 رمزنگاری ارتباطات</h4>
+              <p>تمام ارتباطات بین کاربر و سرور با پروتکل TLS محافظت می‌شوند.</p>
             </div>
             <div className="cat-card">
-              <h4>🛡️ احراز هویت امن</h4>
-              <p>ورود با ایمیل و رمز عبور، ورود با گوگل (OAuth 2.0) و تأیید ایمیل</p>
+              <h4>🛡️ احراز هویت مستقل</h4>
+              <p>ورود با ایمیل و رمز عبور، نشست امن، بازیابی رمز و احراز هویت چندمرحله‌ای برای حساب‌های حساس.</p>
             </div>
             <div className="cat-card">
               <h4>📋 Audit Logs</h4>
-              <p>ثبت و پیگیری تمام فعالیت‌های کاربران با جزئیات IP و زمان — قابلیت بررسی تاریخچه عملیات</p>
+              <p>عملیات حساس مدیریتی و مالی همراه با زمان، عامل و اطلاعات پیگیری ثبت می‌شوند.</p>
             </div>
           </div>
         </div>
@@ -435,10 +439,12 @@ const ProductCatalog = () => {
             <span className="cat-tag">📘 TypeScript</span>
             <span className="cat-tag">⚡ Vite</span>
             <span className="cat-tag">🎨 Tailwind CSS</span>
-            <span className="cat-tag">🗄️ PostgreSQL</span>
-            <span className="cat-tag">🔐 Row Level Security</span>
-            <span className="cat-tag">🤖 AI (GPT-5 & Gemini)</span>
-            <span className="cat-tag">🌐 Edge Functions (Deno)</span>
+            <span className="cat-tag">⚙️ FastAPI + Pydantic</span>
+            <span className="cat-tag">🗄️ PostgreSQL + pgvector</span>
+            <span className="cat-tag">🔐 Server-side RBAC</span>
+            <span className="cat-tag">🤖 درگاه هوش مصنوعی چندارائه‌دهنده</span>
+            <span className="cat-tag">📦 Redis + MinIO</span>
+            <span className="cat-tag">🐳 Docker Compose</span>
             <span className="cat-tag">📊 Recharts</span>
             <span className="cat-tag">🎭 Framer Motion</span>
           </div>
