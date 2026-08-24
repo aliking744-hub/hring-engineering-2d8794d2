@@ -18,8 +18,8 @@ AI_FEATURES = (
     AiFeatureDefinition("compat.generate-job-profile", "تولید پروفایل شغلی", "جذب و استخدام", "ساخت شرح و پروفایل استاندارد یک موقعیت شغلی."),
     AiFeatureDefinition("compat.generate-interview-guide", "راهنمای مصاحبه", "جذب و استخدام", "ساخت راهنمای مرحله‌به‌مرحله مصاحبه."),
     AiFeatureDefinition("compat.generate-interview-kit", "کیت مصاحبه", "جذب و استخدام", "تولید مجموعه سؤال، معیار و فرم ارزیابی مصاحبه."),
-    AiFeatureDefinition("compat.generate-onboarding-plan", "برنامه ورود و آنبوردینگ", "توسعه کارکنان", "ساخت برنامه ورود و شروع به کار نیروی جدید."),
-    AiFeatureDefinition("compat.generate-learning-path", "مسیر یادگیری", "توسعه کارکنان", "ساخت مسیر توسعه مهارت و یادگیری شخصی‌سازی‌شده."),
+    AiFeatureDefinition("development.onboarding_plan", "برنامه ورود و آنبوردینگ", "توسعه کارکنان", "ساخت برنامه ورود و شروع به کار نیروی جدید."),
+    AiFeatureDefinition("development.learning_path", "مسیر یادگیری", "توسعه کارکنان", "ساخت مسیر توسعه مهارت و یادگیری شخصی‌سازی‌شده."),
     AiFeatureDefinition("compat.generate-mental-prism", "منشور ذهنی", "توسعه کارکنان", "تحلیل و تولید خروجی منشور ذهنی."),
     AiFeatureDefinition("compat.analyze-competitor", "تحلیل رقیب", "استراتژی", "تحلیل کلی یک رقیب و موقعیت آن."),
     AiFeatureDefinition("compat.analyze-competitor-swot", "تحلیل SWOT رقیب", "استراتژی", "تحلیل نقاط قوت، ضعف، فرصت و تهدید رقیب."),
@@ -43,4 +43,4 @@ COMPAT_AI_FUNCTIONS = frozenset(
     feature.feature_key.removeprefix("compat.")
     for feature in AI_FEATURES
     if feature.feature_key.startswith("compat.")
-)
+) | frozenset({"generate-onboarding-plan", "generate-learning-path"})

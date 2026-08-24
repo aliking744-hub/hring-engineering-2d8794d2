@@ -6,9 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useCredits, CREDIT_COSTS } from "@/hooks/useCredits";
-import { ArrowRight, Route, Loader2, Sparkles, Download, Copy, Mail, Coins } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ApiError, apiRequest } from "@/lib/api";
+import { ArrowRight, Route, Loader2, Sparkles, Copy, Mail } from "lucide-react";
 import logo from "@/assets/logo.png";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -27,6 +26,11 @@ const expectations = [
   { value: "innovation", label: "نوآوری و خلاقیت" },
 ];
 
+interface OnboardingPlanResponse {
+  plan: string;
+  welcomeEmail: string;
+}
+
 const SuccessArchitect = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [seniority, setSeniority] = useState("");
@@ -36,8 +40,8 @@ const SuccessArchitect = () => {
   const [welcomeEmail, setWelcomeEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
-  const { credits, hasEnoughCredits } = useCredits();
 
   const handleGenerate = async () => {
     if (!jobTitle || !seniority || !expectation) {
@@ -49,67 +53,35 @@ const SuccessArchitect = () => {
       return;
     }
 
-    // Check credits
-    if (!hasEnoughCredits('ONBOARDING_PLAN')) {
-      toast({
-        title: "اعتبار ناکافی",
-        description: `برای این عملیات ${CREDIT_COSTS.ONBOARDING_PLAN} جم نیاز دارید. اعتبار فعلی: ${credits}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
     setGeneratedPlan("");
     setWelcomeEmail("");
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-onboarding-plan", {
-        body: {
-          jobTitle,
-          seniority,
-          expectation,
-          mentorRole,
+      const requestKey = idempotencyKeyRef.current || crypto.randomUUID();
+      idempotencyKeyRef.current = requestKey;
+      const data = await apiRequest<OnboardingPlanResponse>(
+        "/development/onboarding-plans/generate",
+        {
+          method: "POST",
+          headers: { "X-Idempotency-Key": requestKey },
+          body: JSON.stringify({
+            job_title: jobTitle,
+            seniority,
+            expectation,
+            mentor_role: mentorRole || null,
+          }),
         },
-      });
+      );
 
-      if (error) {
-        console.error("Error:", error);
-        const apiError = error as { context?: { status?: number } };
-        const status = apiError.context?.status;
-        
-        if (status === 429) {
-          toast({
-            title: "محدودیت درخواست",
-            description: "لطفاً کمی صبر کنید و دوباره تلاش کنید",
-            variant: "destructive",
-          });
-        } else if (status === 402) {
-          toast({
-            title: "اعتبار ناکافی",
-            description: "اعتبار هوش مصنوعی کافی نیست",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "خطا",
-            description: "مشکلی در تولید نقشه راه پیش آمد",
-            variant: "destructive",
-          });
-        }
-        return;
-      }
-
-      if (data?.plan) {
-        setGeneratedPlan(data.plan);
-      }
-      if (data?.welcomeEmail) {
-        setWelcomeEmail(data.welcomeEmail);
-      }
+      setGeneratedPlan(data.plan);
+      setWelcomeEmail(data.welcomeEmail);
+      idempotencyKeyRef.current = null;
+      window.dispatchEvent(new Event("hring:credits-changed"));
 
       toast({
         title: "موفق",
-        description: "نقشه راه ۹۰ روزه با موفقیت تولید شد",
+        description: "نقشه راه ۹۰ روزه با موفقیت تولید و ذخیره شد",
       });
 
       setTimeout(() => {
@@ -117,11 +89,28 @@ const SuccessArchitect = () => {
       }, 100);
     } catch (err) {
       console.error("Error:", err);
-      toast({
-        title: "خطا",
-        description: "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-        variant: "destructive",
-      });
+      if (err instanceof ApiError && (err.status < 500 || err.status === 502)) {
+        idempotencyKeyRef.current = null;
+      }
+      if (err instanceof ApiError && err.status === 402) {
+        toast({
+          title: "اعتبار ناکافی",
+          description: "برای تولید این برنامه اعتبار کافی ندارید",
+          variant: "destructive",
+        });
+      } else if (err instanceof ApiError && err.status === 502) {
+        toast({
+          title: "سرویس هوش مصنوعی آماده نیست",
+          description: "اتصال ارائه‌دهنده هوش مصنوعی را بررسی کنید و دوباره تلاش کنید",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "خطا",
+          description: "مشکلی در تولید نقشه راه پیش آمد. دوباره تلاش کنید.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
