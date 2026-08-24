@@ -51,7 +51,6 @@ interface FeaturePermission {
 
 const ALL_TIERS: SubscriptionTier[] = [
   'individual_free',
-  'individual_expert',
   'individual_pro',
   'individual_plus',
   'corporate_expert',

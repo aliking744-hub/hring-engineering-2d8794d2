@@ -29,7 +29,6 @@ class CompassRole(StrEnum):
 
 class SubscriptionTier(StrEnum):
     INDIVIDUAL_FREE = "individual_free"
-    INDIVIDUAL_EXPERT = "individual_expert"
     INDIVIDUAL_PRO = "individual_pro"
     INDIVIDUAL_PLUS = "individual_plus"
     CORPORATE_EXPERT = "corporate_expert"

@@ -426,7 +426,6 @@ const CorporateUserManager = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="individual_free">رایگان</SelectItem>
-                            <SelectItem value="individual_expert">کارشناس</SelectItem>
                             <SelectItem value="individual_pro">حرفه‌ای</SelectItem>
                             <SelectItem value="individual_plus">پلاس</SelectItem>
                           </SelectContent>

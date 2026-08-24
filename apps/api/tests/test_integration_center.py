@@ -299,3 +299,35 @@ def test_anthropic_probe_uses_models_endpoint_and_required_version_header() -> N
     headers = _probe_headers(provider, "anthropic-secret")
     assert headers["X-API-Key"] == "anthropic-secret"
     assert headers["anthropic-version"] == "2023-06-01"
+
+
+def test_integration_center_rejects_adapters_without_runtime_consumers() -> None:
+    with TestClient(app) as client:
+        super_admin = _register_with_platform_role(
+            client,
+            "integration-runtime-contract",
+            "super_admin",
+        )
+        header = _auth(super_admin)
+        unsupported = [
+            ("sms", "farazsms"),
+            ("email", "smtp"),
+            ("payment", "generic_http"),
+            ("embedding", "openai_compatible"),
+        ]
+
+        for provider_type, adapter in unsupported:
+            response = client.post(
+                "/api/v1/admin/platform/integrations/providers",
+                headers=header,
+                json={
+                    "provider_key": f"unsupported-{uuid4().hex}",
+                    "display_name": f"Unsupported {adapter}",
+                    "provider_type": provider_type,
+                    "adapter": adapter,
+                    "base_url": "https://api.example.com",
+                    "auth_scheme": "none",
+                },
+            )
+            assert response.status_code == 422, response.text
+            assert "not runtime-backed" in response.json()["detail"]

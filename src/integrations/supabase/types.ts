@@ -1638,7 +1638,6 @@ export type Database = {
       compass_role: "ceo" | "deputy" | "manager" | "expert"
       subscription_tier:
         | "individual_free"
-        | "individual_expert"
         | "individual_pro"
         | "individual_plus"
         | "corporate_expert"
@@ -1777,7 +1776,6 @@ export const Constants = {
       compass_role: ["ceo", "deputy", "manager", "expert"],
       subscription_tier: [
         "individual_free",
-        "individual_expert",
         "individual_pro",
         "individual_plus",
         "corporate_expert",
