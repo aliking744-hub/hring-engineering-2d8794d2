@@ -1,18 +1,44 @@
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Diamond, Crown, Zap, Building2, Users, Briefcase } from "lucide-react";
+import { Check, Diamond, Crown, Zap, Building2, Users, Briefcase, Loader2, type LucideIcon } from "lucide-react";
 import { useSectionVisible } from "@/hooks/useSectionVisible";
+import { useAuth } from "@/hooks/useAuth";
+import { DIAMOND_COSTS } from "@/hooks/useCredits";
+import { apiRequest } from "@/lib/api";
 
-const individualPlans = [
-  {
-    name: "رایگان",
-    price: "0",
-    period: "",
-    credits: 50,
-    creditsNote: "یکبار مصرف",
+interface BillingPlan {
+  plan_type: string;
+  display_name: string;
+  scope: "individual" | "corporate";
+  price_toman: number;
+  monthly_credits: number;
+  is_active: boolean;
+}
+
+interface PlanPresentation {
+  icon: LucideIcon;
+  features: string[];
+  hidden: string[];
+  popular: boolean;
+  seats?: number;
+}
+
+interface DisplayPlan extends PlanPresentation {
+  name: string;
+  price: string;
+  priceValue: number;
+  period: string;
+  credits: number;
+  creditsNote: string;
+  tier: string;
+}
+
+const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
+  individual_free: {
     icon: Diamond,
     features: [
       "ماژول‌های پایه",
@@ -21,14 +47,8 @@ const individualPlans = [
     ],
     hidden: ["هدهانتینگ هوشمند", "آنبوردینگ", "قطب‌نمای استراتژیک"],
     popular: false,
-    tier: "individual_free",
   },
-  {
-    name: "حرفه‌ای",
-    price: "۴۹۰,۰۰۰",
-    period: "/ ماهانه",
-    credits: 600,
-    creditsNote: "ماهانه",
+  individual_pro: {
     icon: Zap,
     features: [
       "تمام ماژول‌ها",
@@ -37,14 +57,8 @@ const individualPlans = [
     ],
     hidden: ["آنبوردینگ", "قطب‌نمای استراتژیک"],
     popular: false,
-    tier: "individual_pro",
   },
-  {
-    name: "پلاس",
-    price: "۹۹۰,۰۰۰",
-    period: "/ ماهانه",
-    credits: 2500,
-    creditsNote: "ماهانه",
+  individual_plus: {
     icon: Crown,
     features: [
       "تمام ماژول‌ها",
@@ -55,45 +69,30 @@ const individualPlans = [
     ],
     hidden: [],
     popular: true,
-    tier: "individual_plus",
   },
-];
-
-const corporatePlans = [
-  {
-    name: "اکسپرت",
-    price: "۲,۵۰۰,۰۰۰",
-    period: "/ ماهانه",
-    seats: 5,
-    credits: 5000,
+  corporate_expert: {
     icon: Building2,
     features: [
       "دسترسی کامل ماژول‌ها",
       "آنبوردینگ کامل",
       "Credit Pool مشترک",
     ],
-    tier: "corporate_expert",
+    hidden: [],
+    popular: false,
+    seats: 5,
   },
-  {
-    name: "مدیریتی",
-    price: "۵,۰۰۰,۰۰۰",
-    period: "/ ماهانه",
-    seats: 10,
-    credits: 12000,
+  corporate_decision_support: {
     icon: Users,
     features: [
       "تمام امکانات اکسپرت",
       "قطب‌نمای استراتژیک (محدود)",
       "داشبورد تحلیلی",
     ],
-    tier: "corporate_decision_support",
+    hidden: [],
+    popular: false,
+    seats: 10,
   },
-  {
-    name: "سازمانی",
-    price: "۱۲,۰۰۰,۰۰۰",
-    period: "/ ماهانه",
-    seats: 50,
-    credits: 30000,
+  corporate_decision_making: {
     icon: Briefcase,
     features: [
       "تمام امکانات",
@@ -101,13 +100,72 @@ const corporatePlans = [
       "داشبورد مدیریتی پیشرفته",
       "پشتیبانی اختصاصی",
     ],
-    tier: "corporate_decision_making",
+    hidden: [],
+    popular: false,
+    seats: 50,
   },
-];
+};
+
+const formatPrice = (price: number) => new Intl.NumberFormat("fa-IR").format(price);
+
+const toDisplayPlan = (plan: BillingPlan): DisplayPlan | null => {
+  const presentation = PLAN_PRESENTATIONS[plan.plan_type];
+  if (!presentation || !plan.is_active) return null;
+  return {
+    ...presentation,
+    name: plan.display_name,
+    price: plan.price_toman === 0 ? "رایگان" : formatPrice(plan.price_toman),
+    priceValue: plan.price_toman,
+    period: plan.price_toman === 0 ? "" : " تومان / ماهانه",
+    credits: plan.monthly_credits,
+    creditsNote: plan.price_toman === 0 ? "یکبار مصرف" : "ماهانه",
+    tier: plan.plan_type,
+  };
+};
 
 const PricingSection = () => {
   const showIndividual = useSectionVisible('pricing_individual');
   const showCorporate = useSectionVisible('pricing_corporate');
+  const { user } = useAuth();
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [plansError, setPlansError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadPlans = async () => {
+      try {
+        const plans = await apiRequest<BillingPlan[]>(
+          "/billing/plans",
+          undefined,
+          { auth: false, retryAuth: false },
+        );
+        if (active) setBillingPlans(plans);
+      } catch (error) {
+        console.error("Landing billing plan load failed:", error);
+        if (active) setPlansError(true);
+      } finally {
+        if (active) setPlansLoading(false);
+      }
+    };
+    void loadPlans();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const { individualPlans, corporatePlans } = useMemo(() => {
+    const visiblePlans = billingPlans.flatMap((plan) => {
+      const displayed = toDisplayPlan(plan);
+      return displayed ? [displayed] : [];
+    });
+    return {
+      individualPlans: visiblePlans.filter((plan) => plan.tier.startsWith("individual_")),
+      corporatePlans: visiblePlans.filter((plan) => plan.tier.startsWith("corporate_")),
+    };
+  }, [billingPlans]);
+  const planTarget = user ? "/upgrade" : "/auth";
+
   return (
     <section id="pricing" className="py-20 px-4" dir="rtl">
       <div className="container mx-auto">
@@ -126,8 +184,26 @@ const PricingSection = () => {
           </p>
         </motion.div>
 
+        {plansLoading && (
+          <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>در حال دریافت پلن‌های فعال...</span>
+          </div>
+        )}
+
+        {plansError && (
+          <Card className="mx-auto mb-12 max-w-xl border-destructive/30 bg-card/60 text-center">
+            <CardContent className="p-6">
+              <p className="mb-4 text-muted-foreground">قیمت‌های به‌روز در حال حاضر قابل دریافت نیستند.</p>
+              <Link to={planTarget}>
+                <Button variant="outline">مشاهده صفحه پلن‌ها</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Individual Plans */}
-        {showIndividual && (
+        {!plansLoading && !plansError && showIndividual && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -190,9 +266,9 @@ const PricingSection = () => {
                         </ul>
                       </div>
                     )}
-                    <Link to="/auth" className="block pt-2">
+                    <Link to={planTarget} className="block pt-2">
                       <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
-                        {plan.price === "0" ? "شروع رایگان" : "انتخاب پلن"}
+                        {plan.priceValue === 0 ? "شروع رایگان" : "انتخاب پلن"}
                       </Button>
                     </Link>
                   </CardContent>
@@ -204,7 +280,7 @@ const PricingSection = () => {
         )}
 
         {/* Corporate Plans */}
-        {showCorporate && (
+        {!plansLoading && !plansError && showCorporate && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -252,7 +328,7 @@ const PricingSection = () => {
                         </li>
                       ))}
                     </ul>
-                    <Link to="/auth" className="block pt-2">
+                    <Link to={planTarget} className="block pt-2">
                       <Button className="w-full" variant="outline">
                         درخواست مشاوره
                       </Button>
@@ -284,20 +360,20 @@ const PricingSection = () => {
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="text-2xl font-bold text-primary">۵</div>
+                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.JOB_PROFILE.toLocaleString("fa-IR")}</div>
                   <div className="text-xs text-muted-foreground">تولید متن</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="text-2xl font-bold text-primary">۲۰</div>
+                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.ONBOARDING_PLAN.toLocaleString("fa-IR")}</div>
+                  <div className="text-xs text-muted-foreground">برنامه آنبوردینگ</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-background/50">
+                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.SMART_AD_IMAGE.toLocaleString("fa-IR")}</div>
                   <div className="text-xs text-muted-foreground">تولید تصویر</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="text-2xl font-bold text-primary">۳۰</div>
-                  <div className="text-xs text-muted-foreground">جستجوی عمیق</div>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="text-2xl font-bold text-primary">۴۰</div>
-                  <div className="text-xs text-muted-foreground">تحلیل پیچیده</div>
+                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.HEADHUNTING.toLocaleString("fa-IR")}</div>
+                  <div className="text-xs text-muted-foreground">هدهانتینگ هوشمند</div>
                 </div>
               </div>
             </CardContent>

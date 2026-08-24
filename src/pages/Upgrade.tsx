@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserContext } from '@/hooks/useUserContext';
-import { apiRequest } from '@/lib/api';
+import { ApiError, apiRequest } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import AuroraBackground from '@/components/AuroraBackground';
 
@@ -130,6 +130,19 @@ const errorMessage = (error: unknown, fallback: string) => (
   error instanceof Error ? error.message : fallback
 );
 
+const paymentErrorMessage = (error: unknown) => {
+  if (error instanceof ApiError && error.status === 503) {
+    return 'درگاه پرداخت هنوز توسط مدیر سیستم فعال نشده است';
+  }
+  if (error instanceof ApiError && error.status === 403) {
+    return 'این پلن فقط برای مدیرعامل یا معاون شرکت قابل انتخاب است';
+  }
+  if (error instanceof ApiError && error.status === 404) {
+    return 'پلن انتخابی در حال حاضر قابل خرید نیست';
+  }
+  return errorMessage(error, 'شروع پرداخت انجام نشد');
+};
+
 export default function Upgrade() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -247,7 +260,7 @@ export default function Upgrade() {
       console.error('Payment error:', error);
       toast({
         title: 'خطا در شروع پرداخت',
-        description: errorMessage(error, 'شروع پرداخت انجام نشد'),
+        description: paymentErrorMessage(error),
         variant: 'destructive',
       });
     } finally {

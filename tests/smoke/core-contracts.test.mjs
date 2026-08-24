@@ -82,6 +82,45 @@ test('navbar reflects the authenticated session instead of showing login', async
   assert.match(navbar, /to="\/auth"/);
 });
 
+test('landing pricing uses backend plans and the shared diamond cost catalog', async () => {
+  const pricing = await read('src/components/landing/PricingSection.tsx');
+
+  assert.match(pricing, /\/billing\/plans/);
+  assert.match(pricing, /auth: false/);
+  assert.match(pricing, /price_toman/);
+  assert.match(pricing, /monthly_credits/);
+  assert.match(pricing, /DIAMOND_COSTS/);
+  assert.equal(/۲,۵۰۰,۰۰۰|۵,۰۰۰,۰۰۰|۱۲,۰۰۰,۰۰۰/.test(pricing), false);
+});
+
+test('product catalogs describe the independent runtime and omit retired claims', async () => {
+  const catalog = await read('src/pages/ProductCatalog.tsx');
+  const staticCatalog = await read('public/hring-product-catalog.html');
+
+  for (const source of [catalog, staticCatalog]) {
+    assert.equal(/hring-app\.lovable\.app|Supabase \(PostgreSQL\)|Edge Functions \(Deno\)|Row Level Security/.test(source), false);
+    assert.match(source, /FastAPI \+ Pydantic/);
+    assert.match(source, /PostgreSQL \+ pgvector/);
+    assert.match(source, /Server-side RBAC/);
+  }
+  assert.equal(/Unicorn Lab|یونیکورن/.test(staticCatalog), false);
+});
+
+test('onboarding roadmap does not present invented employee activity as real data', async () => {
+  const onboarding = await read('src/pages/OnboardingRoadmap.tsx');
+
+  assert.match(onboarding, /نمونه ساختار/);
+  assert.match(onboarding, /ساخت برنامه ۹۰ روزه/);
+  assert.equal(/progress: (?:30|75|100)|done: true|شنبه ۱۵ دی|یکشنبه ۱۶ دی|سه‌شنبه ۱۸ دی/.test(onboarding), false);
+});
+
+test('payment setup errors are actionable for staging users', async () => {
+  const upgrade = await read('src/pages/Upgrade.tsx');
+
+  assert.match(upgrade, /error\.status === 503/);
+  assert.match(upgrade, /درگاه پرداخت هنوز توسط مدیر سیستم فعال نشده است/);
+});
+
 test('auto-headhunt persists candidates with allowed pending status', async () => {
   const headhunt = await read('supabase/functions/auto-headhunt/index.ts');
   assert.match(headhunt, /status:\s*['\"]pending['\"]/);
