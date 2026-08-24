@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { ApiError, apiRequest } from "@/lib/api";
 import AuroraBackground from "@/components/AuroraBackground";
 import { useSiteName } from "@/hooks/useSiteSettings";
 
@@ -42,6 +42,7 @@ interface SavedRecord {
   experience_years: number;
   training_months: number | null;
   result: LearningPathResult;
+  last_emailed_at: string | null;
   created_at: string;
 }
 
@@ -66,6 +67,7 @@ export default function LearningPath() {
   const { toast } = useToast();
   const siteName = useSiteName();
   const printRef = useRef<HTMLDivElement>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const [form, setForm] = useState({
     employeeName: "",
@@ -98,40 +100,16 @@ export default function LearningPath() {
   /* ── Fetch history ─────────────────────────────────────── */
   const fetchHistory = async () => {
     setHistoryLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from("learning_path_records") as any)
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) setHistory(data.map((r: SavedRecord & { result: unknown }) => ({ ...r, result: r.result as LearningPathResult })) as SavedRecord[]);
-    setHistoryLoading(false);
+    try {
+      setHistory(await apiRequest<SavedRecord[]>("/development/learning-paths"));
+    } catch (error) {
+      console.error("Learning-path history failed:", error);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
-
-  /* ── Save record ───────────────────────────────────────── */
-  const saveRecord = async (aiResult: LearningPathResult) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from("learning_path_records") as any)
-      .insert({
-        user_id: user.id,
-        employee_name: form.employeeName.trim() || "—",
-        employee_email: form.employeeEmail || null,
-        job_title: form.jobTitle,
-        industry: form.industry,
-        seniority_level: form.seniorityLevel,
-        education_level: form.educationLevel,
-        field_of_study: form.fieldOfStudy || null,
-        experience_years: Number(form.experienceYears),
-        training_months: form.trainingMonths ? Number(form.trainingMonths) : null,
-        result: aiResult,
-      })
-      .select()
-      .single();
-    if (error) { console.error("Save error:", error); return null; }
-    return data?.id ?? null;
-  };
+  useEffect(() => { void fetchHistory(); }, []);
 
   /* ── Generate ──────────────────────────────────────────── */
   const handleSubmit = async () => {
@@ -144,33 +122,45 @@ export default function LearningPath() {
     setSavedRecordId(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-learning-path", {
-        body: {
-          jobTitle: form.jobTitle,
-          industry: form.industry,
-          seniorityLevel: form.seniorityLevel,
-          educationLevel: form.educationLevel,
-          fieldOfStudy: form.fieldOfStudy,
-          experienceYears: Number(form.experienceYears),
-          trainingMonths: form.trainingMonths ? Number(form.trainingMonths) : null,
+      const requestKey = idempotencyKeyRef.current || crypto.randomUUID();
+      idempotencyKeyRef.current = requestKey;
+      const data = await apiRequest<SavedRecord>(
+        "/development/learning-paths/generate",
+        {
+          method: "POST",
+          headers: { "X-Idempotency-Key": requestKey },
+          body: JSON.stringify({
+            employee_name: form.employeeName.trim() || null,
+            employee_email: form.employeeEmail || null,
+            job_title: form.jobTitle,
+            industry: form.industry,
+            seniority_level: form.seniorityLevel,
+            education_level: form.educationLevel,
+            field_of_study: form.fieldOfStudy || null,
+            experience_years: Number(form.experienceYears),
+            training_months: form.trainingMonths ? Number(form.trainingMonths) : null,
+          }),
         },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+      );
 
-      const aiResult = data as LearningPathResult;
-      setResult(aiResult);
-
-      // Auto-save
-        const newId = await saveRecord(aiResult);
-        if (newId) {
-          setSavedRecordId(newId);
-          const nameLabel = form.employeeName.trim() ? `برای ${form.employeeName}` : "";
-          toast({ title: "نقشه راه ذخیره شد ✓", description: nameLabel });
-          fetchHistory();
-        }
+      setResult(data.result);
+      setSavedRecordId(data.id);
+      idempotencyKeyRef.current = null;
+      setHistory((current) => [data, ...current.filter((item) => item.id !== data.id)]);
+      window.dispatchEvent(new Event("hring:credits-changed"));
+      const nameLabel = form.employeeName.trim() ? `برای ${form.employeeName}` : "";
+      toast({ title: "نقشه راه ذخیره شد ✓", description: nameLabel });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "خطا در ارتباط با سرور";
+      if (e instanceof ApiError && (e.status < 500 || e.status === 502)) {
+        idempotencyKeyRef.current = null;
+      }
+      const msg = e instanceof ApiError && e.status === 402
+        ? "اعتبار کافی برای تولید مسیر یادگیری ندارید"
+        : e instanceof ApiError && e.status === 502
+          ? "سرویس هوش مصنوعی هنوز متصل یا در دسترس نیست"
+          : e instanceof Error
+            ? e.message
+            : "خطا در ارتباط با سرور";
       toast({ title: "خطا", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -179,30 +169,23 @@ export default function LearningPath() {
 
   /* ── Send Email ────────────────────────────────────────── */
   const handleSendEmail = async (record?: SavedRecord) => {
-    const targetEmail = record ? record.employee_email : form.employeeEmail;
-    const targetName = record ? record.employee_name : (form.employeeName.trim() || form.jobTitle);
-    const targetResult = record ? record.result : result;
-    const targetJobTitle = record ? record.job_title : form.jobTitle;
+    const savedRecord = record || history.find((item) => item.id === savedRecordId);
+    const targetEmail = savedRecord?.employee_email;
+    const targetRecordId = record ? record.id : savedRecordId;
 
     if (!targetEmail) {
       toast({ title: "ایمیل کارمند وارد نشده", description: "لطفاً ایمیل کارمند را وارد کنید", variant: "destructive" });
       return;
     }
-    if (!targetName) {
-      toast({ title: "نام کارمند وارد نشده", description: "برای ارسال ایمیل، نام کارمند را وارد کنید", variant: "destructive" });
+    if (!targetRecordId) {
+      toast({ title: "ابتدا نقشه راه را تولید و ذخیره کنید", variant: "destructive" });
       return;
     }
     setSendingEmail(true);
     try {
-      const { error } = await supabase.functions.invoke("send-learning-path-email", {
-        body: {
-          employeeName: targetName,
-          employeeEmail: targetEmail,
-          jobTitle: targetJobTitle,
-          result: targetResult,
-        },
+      await apiRequest(`/development/learning-paths/${targetRecordId}/email`, {
+        method: "POST",
       });
-      if (error) throw new Error(error.message);
       toast({ title: "ایمیل ارسال شد ✓", description: `نقشه راه به ${targetEmail} ارسال شد` });
     } catch (e: unknown) {
       toast({ title: "خطا در ارسال ایمیل", description: (e instanceof Error ? e.message : "خطای ناشناخته"), variant: "destructive" });
@@ -213,11 +196,20 @@ export default function LearningPath() {
 
   /* ── Delete record ─────────────────────────────────────── */
   const handleDelete = async (id: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("learning_path_records") as any).delete().eq("id", id);
-    if (!error) {
+    try {
+      await apiRequest(`/development/learning-paths/${id}`, { method: "DELETE" });
       setHistory((h) => h.filter((r) => r.id !== id));
+      if (savedRecordId === id) {
+        setSavedRecordId(null);
+        setResult(null);
+      }
       toast({ title: "رکورد حذف شد" });
+    } catch (error) {
+      toast({
+        title: "حذف رکورد ناموفق بود",
+        description: error instanceof Error ? error.message : "خطای ناشناخته",
+        variant: "destructive",
+      });
     }
   };
 

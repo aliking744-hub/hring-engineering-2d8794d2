@@ -918,13 +918,12 @@ _COMPAT_CREDIT_COSTS = {
 }
 
 
-async def compatibility_credit_cost(
+async def feature_credit_cost(
     session: AsyncSession,
     *,
-    function_name: str,
-    body: Any,
+    feature_key: str,
+    default_cost: int,
 ) -> int:
-    feature_key = f"compat.{function_name}"
     configured = await session.scalar(
         select(FeaturePermission).where(
             FeaturePermission.feature_key == feature_key,
@@ -933,9 +932,25 @@ async def compatibility_credit_cost(
     )
     if configured is not None and configured.credit_cost > 0:
         return int(configured.credit_cost)
+    return max(0, default_cost)
+
+
+async def compatibility_credit_cost(
+    session: AsyncSession,
+    *,
+    function_name: str,
+    body: Any,
+) -> int:
+    feature_key = f"compat.{function_name}"
     if function_name == "generate-job-ad":
-        return 25 if isinstance(body, dict) and body.get("generateImage") is True else 5
-    return _COMPAT_CREDIT_COSTS.get(function_name, 0)
+        default_cost = 25 if isinstance(body, dict) and body.get("generateImage") is True else 5
+    else:
+        default_cost = _COMPAT_CREDIT_COSTS.get(function_name, 0)
+    return await feature_credit_cost(
+        session,
+        feature_key=feature_key,
+        default_cost=default_cost,
+    )
 
 
 async def list_credit_accounts_for_admin(
