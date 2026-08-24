@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLogos, useFonts, useSiteName, useSiteSettings } from "@/hooks/useSiteSettings";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserContext } from "@/hooks/useUserContext";
 import defaultLogo from "@/assets/logo.png";
 
 const allNavLinks = [
@@ -23,6 +25,12 @@ const Navbar = () => {
   const isVisible = (id: string) => getSetting(`section_visible_${id}`, 'true') !== 'false';
   const navLinks = allNavLinks.filter((l) => isVisible(l.id));
   const showLogin = isVisible('nav_login');
+  const { user, loading: authLoading } = useAuth();
+  const { context: userContext } = useUserContext();
+  const accountLabel = userContext?.fullName?.trim()
+    || user?.email?.split('@')[0]
+    || 'حساب کاربری';
+  const accountInitial = accountLabel.slice(0, 1).toLocaleUpperCase('fa-IR');
 
   // Use dynamic logo or fallback to default
   const logo = logos.main || defaultLogo;
@@ -64,12 +72,29 @@ const Navbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            {showLogin && (
-              <Link to="/auth">
-                <Button className="glow-button text-foreground font-medium px-6">
-                  ورود
-                </Button>
-              </Link>
+            {showLogin && !authLoading && (
+              user ? (
+                <Link to="/profile" aria-label={`حساب کاربری ${accountLabel}`}>
+                  <Button
+                    variant="outline"
+                    className="max-w-48 border-primary/40 bg-primary/10 px-3 font-medium text-foreground hover:bg-primary/20"
+                  >
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground"
+                      aria-hidden="true"
+                    >
+                      {accountInitial}
+                    </span>
+                    <span className="max-w-28 truncate">{accountLabel}</span>
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/auth">
+                  <Button className="glow-button text-foreground font-medium px-6">
+                    ورود
+                  </Button>
+                </Link>
+              )
             )}
           </div>
 
@@ -135,18 +160,39 @@ const Navbar = () => {
                   </motion.div>
                 ))}
                 
-                {showLogin && (
+                {showLogin && !authLoading && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
                     className="mt-4"
                   >
-                    <Link to="/auth" onClick={() => setIsOpen(false)}>
-                      <Button className="glow-button w-full text-foreground font-medium">
-                        ورود / ثبت‌نام
-                      </Button>
-                    </Link>
+                    {user ? (
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsOpen(false)}
+                        aria-label={`حساب کاربری ${accountLabel}`}
+                      >
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start border-primary/40 bg-primary/10 font-medium text-foreground hover:bg-primary/20"
+                        >
+                          <span
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground"
+                            aria-hidden="true"
+                          >
+                            {accountInitial}
+                          </span>
+                          <span className="truncate">{accountLabel}</span>
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link to="/auth" onClick={() => setIsOpen(false)}>
+                        <Button className="glow-button w-full text-foreground font-medium">
+                          ورود / ثبت‌نام
+                        </Button>
+                      </Link>
+                    )}
                   </motion.div>
                 )}
               </div>

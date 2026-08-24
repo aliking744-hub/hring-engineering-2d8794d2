@@ -70,6 +70,18 @@ test('billing checkout and history use independent HRing API contracts', async (
   assert.equal(/integrations\/supabase|supabase\./.test(history), false);
 });
 
+test('navbar reflects the authenticated session instead of showing login', async () => {
+  const navbar = await read('src/components/Navbar.tsx');
+
+  assert.match(navbar, /useAuth/);
+  assert.match(navbar, /useUserContext/);
+  assert.match(navbar, /userContext\?\.fullName\?\.trim\(\)/);
+  assert.match(navbar, /user\?\.email\?\.split\('@'\)\[0\]/);
+  assert.match(navbar, /showLogin && !authLoading/);
+  assert.match(navbar, /to="\/profile"/);
+  assert.match(navbar, /to="\/auth"/);
+});
+
 test('auto-headhunt persists candidates with allowed pending status', async () => {
   const headhunt = await read('supabase/functions/auto-headhunt/index.ts');
   assert.match(headhunt, /status:\s*['\"]pending['\"]/);
