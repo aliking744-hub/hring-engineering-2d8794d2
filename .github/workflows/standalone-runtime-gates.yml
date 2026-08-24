@@ -49,6 +49,24 @@ jobs:
             --profile local-ai-vllm \
             config --quiet
 
+      - name: Validate monitoring configuration and alert rules
+        run: |
+          docker run --rm \
+            --entrypoint /bin/promtool \
+            --volume "$PWD/infra/monitoring:/etc/prometheus:ro" \
+            prom/prometheus:v3.13.2 \
+            check config /etc/prometheus/prometheus.yml
+          docker run --rm \
+            --entrypoint /bin/amtool \
+            --volume "$PWD/infra/monitoring:/etc/alertmanager:ro" \
+            prom/alertmanager:v0.34.0 \
+            check-config /etc/alertmanager/alertmanager.yml
+          docker run --rm \
+            --volume "$PWD/infra/monitoring:/etc/blackbox_exporter:ro" \
+            prom/blackbox-exporter:v0.28.0 \
+            --config.file=/etc/blackbox_exporter/blackbox.yml \
+            --config.check
+
       - name: Build standalone web image
         run: docker build --file infra/docker/web.Dockerfile --build-arg PUBLIC_BASE_URL=https://hring.ir --tag hring-web-ci .
 
