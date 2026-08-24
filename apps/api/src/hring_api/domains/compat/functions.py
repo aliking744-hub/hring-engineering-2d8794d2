@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from typing import Any
 from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
 from hring_api.domains.ai.feature_catalog import COMPAT_AI_FUNCTIONS
 from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
 from hring_api.domains.ai.gateway_client import AiGatewayError, generate_with_ai_gateway
+from hring_api.domains.billing.credit_service import (
+    compatibility_credit_cost,
+    run_with_credit_reservation,
+)
 from hring_api.domains.identity.dependencies import Principal
 
 
@@ -69,6 +76,9 @@ async def invoke_ai_function(
     body: Any,
     principal: Principal | None,
     settings: Settings,
+    session: AsyncSession | None = None,
+    request_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> Any:
     if name not in AI_FUNCTIONS:
         if name in BLOCKED_SENSITIVE_FUNCTIONS:
@@ -96,20 +106,50 @@ async def invoke_ai_function(
         default_provider=settings.recruiting_ai_provider,
         default_model=settings.recruiting_ai_model,
     )
-    try:
-        result = await generate_with_ai_gateway(
-            feature_key=feature_key,
-            user_id=principal.user_id if principal is not None else None,
-            company_id=_company_id(principal),
-            provider=route.provider,
-            model=route.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_output_tokens=12_000,
-            metadata_json={"ai_route_source": route.source},
-        )
-    except AiGatewayError as exc:
-        raise CompatFunctionError("HRing AI service is unavailable") from exc
-    return _response_value(result.content)
+    if principal is not None and session is None:
+        raise CompatFunctionError("Credit-controlled AI execution requires a database session")
+    cost = (
+        await compatibility_credit_cost(session, function_name=name, body=body)
+        if principal is not None and session is not None
+        else 0
+    )
+
+    async def generate() -> Any:
+        try:
+            result = await generate_with_ai_gateway(
+                feature_key=feature_key,
+                user_id=principal.user_id if principal is not None else None,
+                company_id=_company_id(principal),
+                provider=route.provider,
+                model=route.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                credits_charged=cost,
+                max_output_tokens=12_000,
+                metadata_json={"ai_route_source": route.source},
+            )
+        except AiGatewayError as exc:
+            raise CompatFunctionError("HRing AI service is unavailable") from exc
+        return _response_value(result.content)
+
+    if principal is None:
+        return await generate()
+    if cost <= 0:
+        return await generate()
+    assert session is not None
+    raw_key = (idempotency_key or "").strip()
+    if not raw_key:
+        raise CompatFunctionError("AI request idempotency key is required")
+    operation_key = f"compat:{sha256(f'{name}:{raw_key}'.encode()).hexdigest()}"
+    return await run_with_credit_reservation(
+        session,
+        principal=principal,
+        amount=cost,
+        idempotency_key=operation_key,
+        feature_key=feature_key,
+        description=f"Compatibility AI execution: {name}",
+        request_id=request_id,
+        operation=generate,
+    )

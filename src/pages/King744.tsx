@@ -11,14 +11,14 @@ import { ArrowRight, Settings, Users, FileText, Diamond, Database, Shield, Loade
 import { useAuth } from '@/hooks/useAuth';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { toast } from 'sonner';
-import UsersCreditsManager from '@/components/admin/UsersCreditsManager';
+import CreditLedgerPanel from '@/components/admin/CreditLedgerPanel';
 import BlogManager from '@/components/admin/BlogManager';
 import ProductManager from '@/components/admin/ProductManager';
 import CompanyManager from '@/components/admin/CompanyManager';
 import CorporateUserManager from '@/components/admin/CorporateUserManager';
 import FeatureFlagsManager from '@/components/admin/FeatureFlagsManager';
 import TestimonialsManager from '@/components/admin/TestimonialsManager';
-import CreditAnalytics from '@/components/admin/CreditAnalytics';
+import AiEconomicsPanel from '@/components/admin/AiEconomicsPanel';
 import AuditLogsViewer from '@/components/admin/AuditLogsViewer';
 import KnowledgeBaseStatus from '@/components/admin/KnowledgeBaseStatus';
 import LegalImporter from '@/components/admin/LegalImporter';
@@ -372,7 +372,7 @@ const King744 = () => {
             </TabsContent>
 
             <TabsContent value="users" className="space-y-6">
-              <UsersCreditsManager />
+              <CreditLedgerPanel canManage />
             </TabsContent>
 
             <TabsContent value="companies" className="space-y-6">
@@ -403,7 +403,7 @@ const King744 = () => {
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
-              <CreditAnalytics />
+              <AiEconomicsPanel />
             </TabsContent>
 
             <TabsContent value="logs" className="space-y-6">

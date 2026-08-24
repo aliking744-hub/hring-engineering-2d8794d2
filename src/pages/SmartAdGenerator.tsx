@@ -50,7 +50,7 @@ const SmartAdGenerator = () => {
   const resultRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { credits, deductCredits, hasEnoughCredits } = useCredits();
+  const { credits } = useCredits();
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,18 +106,6 @@ const SmartAdGenerator = () => {
     setGeneratedImage(null);
 
     try {
-      // Deduct credits first
-      const deducted = await deductCredits(requiredCredits);
-      if (!deducted) {
-        toast({
-          title: "خطا",
-          description: "کسر اعتبار با مشکل مواجه شد",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
       const selectedFormat = imageFormats.find((f) => f.value === imageFormat);
       const { data, error } = await supabase.functions.invoke("generate-job-ad", {
         body: {
@@ -137,15 +125,11 @@ const SmartAdGenerator = () => {
       if (error) {
         console.error("Error:", error);
 
-        const status = (error as any)?.context?.status as number | undefined;
-        let serverMessage: string | undefined;
-
-        try {
-          const body = await (error as any)?.context?.json?.();
-          if (body?.error) serverMessage = String(body.error);
-        } catch {
-          // ignore
-        }
+        const apiError = error as { context?: { status?: number; detail?: unknown } };
+        const status = apiError.context?.status;
+        const serverMessage = typeof apiError.context?.detail === 'string'
+          ? apiError.context.detail
+          : undefined;
 
         if (status === 429) {
           toast({

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from './useAuth';
 import { useSuperAdmin } from './useSuperAdmin';
+import { apiRequest } from '@/lib/api';
 
 // Diamond costs for different AI operations
 export const DIAMOND_COSTS = {
@@ -51,6 +51,15 @@ export const CREDIT_COSTS = DIAMOND_COSTS;
 
 export type CreditOperation = keyof typeof CREDIT_COSTS;
 
+interface CreditBalance {
+  available_credits: number;
+}
+
+interface CreditPreflight {
+  allowed: boolean;
+  available_credits: number;
+}
+
 export const useCredits = () => {
   const [credits, setCredits] = useState<number>(0);
   const [loading, setLoading] = useState(true);
@@ -61,7 +70,7 @@ export const useCredits = () => {
   // Authorization and billing bypasses must be decided server-side, never from browser identity data.
   const isFatherAdmin = isSuperAdmin;
 
-  const fetchCredits = async () => {
+  const fetchCredits = useCallback(async () => {
     if (!user) {
       setCredits(0);
       setLoading(false);
@@ -69,42 +78,38 @@ export const useCredits = () => {
     }
 
     try {
-      const { data, error } = await supabase.rpc('get_user_credits');
-
-      if (error) throw error;
-      setCredits(data ?? 0);
+      const balance = await apiRequest<CreditBalance>('/billing/credits/me');
+      setCredits(balance.available_credits);
     } catch (error) {
       console.error('Error fetching credits:', error);
       setCredits(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     void fetchCredits();
-  }, [user]);
+    const handleCreditsChanged = () => void fetchCredits();
+    window.addEventListener('hring:credits-changed', handleCreditsChanged);
+    return () => window.removeEventListener('hring:credits-changed', handleCreditsChanged);
+  }, [fetchCredits]);
 
-  const deductCredits = async (amount: number, featureKey?: string): Promise<boolean> => {
+  // Transitional name: this performs an authoritative server preflight only.
+  // Metered operations reserve and consume credits inside the backend transaction.
+  const preflightCredits = useCallback(async (amount: number, featureKey?: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.rpc('deduct_credits', {
-        amount,
-        feature_key: featureKey || null,
-        description: featureKey ? DIAMOND_COST_LABELS[featureKey as CreditOperation] : null,
-      } as any);
-
-      if (error) throw error;
-
-      if (data && user) {
-        await fetchCredits();
-      }
-
-      return data ?? false;
+      const result = await apiRequest<CreditPreflight>('/billing/credits/preflight', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      });
+      setCredits(result.available_credits);
+      return result.allowed;
     } catch (error) {
-      console.error('Error deducting credits:', error);
+      console.error(`Credit preflight failed${featureKey ? ` for ${featureKey}` : ''}:`, error);
       return false;
     }
-  };
+  }, []);
 
   const hasEnoughCredits = (operation: CreditOperation): boolean => {
     return credits >= CREDIT_COSTS[operation];
@@ -127,12 +132,16 @@ export const useCredits = () => {
     if (credits < cost) {
       return false;
     }
-    return deductCredits(cost, operation);
+    return preflightCredits(cost, operation);
   };
+
+  // Source-compatible aliases. They never mutate balance in the browser.
+  const deductCredits = preflightCredits;
 
   return {
     credits,
     loading,
+    preflightCredits,
     deductCredits,
     deductForOperation,
     hasEnoughCredits,

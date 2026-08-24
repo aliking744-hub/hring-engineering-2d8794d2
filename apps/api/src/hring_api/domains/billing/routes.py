@@ -77,6 +77,7 @@ async def init_payment(
 @router.post("/billing/payments/verify", response_model=PaymentVerifyResponse)
 async def verify_payment_route(
     payload: PaymentVerifyRequest,
+    request: Request,
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -87,6 +88,8 @@ async def verify_payment_route(
             principal=principal,
             authority=payload.authority,
             settings=settings,
+            request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+            ip_address=request.client.host if request.client else None,
         )
     except BillingError as exc:
         raise _billing_http_error(exc) from exc

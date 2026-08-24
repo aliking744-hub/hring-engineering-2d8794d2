@@ -8,6 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
+from hring_api.domains.admin.repository import add_audit_log
+from hring_api.domains.billing.credit_service import CreditError, replace_available_credits_for_plan
 from hring_api.domains.billing.models import BillingPlan, PaymentTransaction
 from hring_api.domains.identity.dependencies import Principal
 from hring_api.domains.identity.models import Company, Profile
@@ -58,7 +60,9 @@ def _callback_url(settings: Settings) -> str:
     return f"{settings.public_app_url.rstrip('/')}{settings.payment_callback_path}"
 
 
-async def list_billing_plans(db: AsyncSession, *, include_inactive: bool = False) -> list[BillingPlan]:
+async def list_billing_plans(
+    db: AsyncSession, *, include_inactive: bool = False
+) -> list[BillingPlan]:
     statement = select(BillingPlan).order_by(BillingPlan.price_toman.asc())
     if not include_inactive:
         statement = statement.where(BillingPlan.is_active.is_(True))
@@ -127,6 +131,8 @@ async def verify_payment(
     principal: Principal,
     authority: str,
     settings: Settings,
+    request_id: str | None = None,
+    ip_address: str | None = None,
 ) -> PaymentVerifiedResult:
     result = await db.execute(
         select(PaymentTransaction).where(PaymentTransaction.authority == authority)
@@ -154,6 +160,7 @@ async def verify_payment(
         select(PaymentTransaction)
         .where(PaymentTransaction.id == transaction.id)
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     locked = locked_result.scalar_one()
     if locked.status == "verified":
@@ -167,11 +174,26 @@ async def verify_payment(
     if plan is None:
         raise BillingNotFoundError("Billing plan no longer exists")
     now = datetime.now(UTC)
-    if locked.company_id is not None:
-        company_result = await db.execute(
-            select(Company).where(Company.id == locked.company_id).with_for_update()
+    owner_type = "company" if locked.company_id is not None else "user"
+    owner_id = locked.company_id or locked.user_id
+    try:
+        await replace_available_credits_for_plan(
+            db,
+            owner_type=owner_type,
+            owner_id=owner_id,
+            target_credits=plan.monthly_credits,
+            operation_key=f"payment:{locked.id}",
+            actor_user_id=principal.user_id,
+            request_id=request_id,
+            grant_reason="Verified plan credit grant",
+            source="verified_payment",
         )
-        company = company_result.scalar_one_or_none()
+    except CreditError as exc:
+        await db.rollback()
+        raise PaymentVerificationError("Payment credit reconciliation failed") from exc
+
+    if locked.company_id is not None:
+        company = await db.get(Company, locked.company_id)
         if company is None:
             raise BillingNotFoundError("Company no longer exists")
         company.subscription_tier = plan.plan_type
@@ -180,10 +202,7 @@ async def verify_payment(
         company.credit_pool = plan.monthly_credits
         company.last_credit_reset = now
     else:
-        profile_result = await db.execute(
-            select(Profile).where(Profile.id == locked.user_id).with_for_update()
-        )
-        profile = profile_result.scalar_one_or_none()
+        profile = await db.get(Profile, locked.user_id)
         if profile is None:
             raise BillingNotFoundError("User profile no longer exists")
         profile.subscription_tier = plan.plan_type
@@ -194,6 +213,22 @@ async def verify_payment(
     locked.status = "verified"
     locked.ref_id = verified.ref_id
     locked.verified_at = now
+    await add_audit_log(
+        db,
+        actor_user_id=principal.user_id,
+        company_id=locked.company_id,
+        action="billing.payment.verified",
+        resource_type="payment_transaction",
+        resource_id=str(locked.id),
+        metadata_json={
+            "plan_type": plan.plan_type,
+            "monthly_credits": plan.monthly_credits,
+            "authority": authority,
+            "ref_id": verified.ref_id or "",
+            "request_id": request_id or "",
+        },
+        ip_address=ip_address,
+    )
     await db.commit()
     return PaymentVerifiedResult(
         ref_id=verified.ref_id,
