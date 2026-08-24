@@ -98,7 +98,7 @@ const Dashboard = () => {
     .map(t => ({ ...t, modules: t.modules.filter(m => isVisibleSetting(`dash_mod_${m.id}`)) }))
     .filter(t => t.modules.length > 0);
 
-  const creditLabel = getSetting('dashboard_credit_label', context?.userType === 'company' ? 'اعتبار شرکت' : 'اعتبار موجود');
+  const creditLabel = getSetting('dashboard_credit_label', context?.userType === 'corporate' ? 'اعتبار شرکت' : 'اعتبار موجود');
   const logoutText = getSetting('dashboard_logout_btn', 'خروج');
   const searchPlaceholder = getSetting('dashboard_search_placeholder', 'جستجو...');
 
