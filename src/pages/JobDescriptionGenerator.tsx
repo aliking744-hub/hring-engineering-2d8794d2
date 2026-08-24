@@ -311,8 +311,9 @@ const JobDescriptionGenerator = () => {
       <div className="relative z-10 container mx-auto px-4 py-8">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 mb-8">
           <Link to="/dashboard">
-            <Button variant="outline" size="icon" className="border-border bg-secondary/50">
-              <ArrowRight className="w-5 h-5" />
+            <Button variant="outline" className="gap-2 border-border bg-secondary/50">
+              <ArrowRight className="h-5 w-5" />
+              بازگشت به داشبورد
             </Button>
           </Link>
           <div>

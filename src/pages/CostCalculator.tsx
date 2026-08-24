@@ -312,8 +312,9 @@ export default function CostCalculator() {
         {/* Header */}
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => navigate('/dashboard')} className="print:hidden">
-              <ArrowRight className="w-5 h-5" />
+            <Button variant="outline" onClick={() => navigate('/dashboard')} className="gap-2 print:hidden">
+              <ArrowRight className="h-5 w-5" />
+              بازگشت به داشبورد
             </Button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent print:text-foreground print:bg-none">

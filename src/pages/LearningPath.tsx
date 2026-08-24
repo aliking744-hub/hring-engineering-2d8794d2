@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "react-router-dom";
 import {
   GraduationCap, Loader2, Download, CheckCircle2, BookOpen,
   Users, Calendar, AlertCircle, ArrowRight, Lightbulb, Wrench,
@@ -259,12 +260,12 @@ export default function LearningPath() {
 
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />
-        <a href="/dashboard" className="fixed top-6 right-6 z-50 no-print">
-          <Button variant="outline" className="border-border bg-secondary/80 backdrop-blur-sm shadow-lg gap-2 mx-[1000px]">
-            <ArrowRight className="w-4 h-4" />
+        <Link to="/dashboard" className="fixed right-6 top-6 z-50 no-print">
+          <Button variant="outline" className="gap-2 border-border bg-secondary/80 shadow-lg backdrop-blur-sm">
+            <ArrowRight className="h-4 w-4" />
             بازگشت به داشبورد
           </Button>
-        </a>
+        </Link>
         <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
 
           {/* Header */}

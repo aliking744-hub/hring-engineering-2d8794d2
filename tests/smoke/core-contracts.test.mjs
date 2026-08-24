@@ -24,6 +24,46 @@ test('core HRing routes remain registered', async () => {
   }
 });
 
+test('retired analytics hub is removed from application routing', async () => {
+  const app = await read('src/App.tsx');
+
+  assert.equal(/AnalyticsHub|path="\/analytics"/.test(app), false);
+});
+
+test('dashboard opens on a real welcome home and supports reversible section navigation', async () => {
+  const dashboard = await read('src/pages/Dashboard.tsx');
+
+  assert.match(dashboard, /useCompany/);
+  assert.match(dashboard, /location\.hash/);
+  assert.match(dashboard, /const currentTier = visibleTiers\.find[\s\S]*\|\| null/);
+  assert.match(dashboard, /welcomeSubject/);
+  assert.match(dashboard, /خوش آمدید/);
+  assert.match(dashboard, /aria-label="بازگشت به خانه داشبورد"/);
+  assert.match(dashboard, /DashboardModuleCards tier=\{currentTier\}/);
+});
+
+test('dashboard modules expose a visible return to the dashboard home', async () => {
+  const modulePages = await Promise.all([
+    read('src/pages/JobDescriptionGenerator.tsx'),
+    read('src/pages/InterviewAssistant.tsx'),
+    read('src/pages/SmartAdGenerator.tsx'),
+    read('src/pages/SuccessArchitect.tsx'),
+    read('src/pages/OnboardingRoadmap.tsx'),
+    read('src/pages/LearningPath.tsx'),
+    read('src/pages/Profile.tsx'),
+    read('src/pages/HRDashboard.tsx'),
+    read('src/pages/CostCalculator.tsx'),
+    read('src/pages/SmartHeadhunting.tsx'),
+    read('src/pages/StrategicCompass.tsx'),
+    read('src/pages/LegalAdvisor.tsx'),
+  ]);
+
+  for (const page of modulePages) {
+    assert.match(page, /["']\/dashboard["']/);
+    assert.match(page, /بازگشت به داشبورد/);
+  }
+});
+
 test('admin hub derives control-plane access from server-issued user context', async () => {
   const admin = await read('src/pages/Admin.tsx');
   assert.match(admin, /useUserContext/);
@@ -129,11 +169,10 @@ test('auto-headhunt persists candidates with allowed pending status', async () =
 
 test('dashboard and tool navigation only target registered product routes', async () => {
   const tools = await read('src/pages/ToolsGrid.tsx');
-  const analytics = await read('src/pages/AnalyticsHub.tsx');
   const individual = await read('src/components/dashboard/IndividualDashboard.tsx');
   const corporate = await read('src/components/dashboard/CorporateDashboard.tsx');
   const featureGate = await read('src/components/FeatureGate.tsx');
-  const navigationSources = [tools, analytics, individual, corporate];
+  const navigationSources = [tools, individual, corporate];
 
   for (const page of navigationSources) {
     assert.equal(/["']\/smart-ad["']/.test(page), false);
@@ -168,12 +207,9 @@ test('FAQ reuses the live pricing and credit catalogs', async () => {
   assert.equal(/individual_expert/.test(faq), false);
 });
 
-test('sample and estimated analytics are visibly labelled', async () => {
-  const analytics = await read('src/pages/AnalyticsHub.tsx');
+test('estimated strategic analytics are visibly labelled', async () => {
   const radar = await read('src/components/strategic-radar/RadarDashboard.tsx');
 
-  assert.match(analytics, /داده‌های نمایشی/);
-  assert.match(analytics, /گزارش عملیاتی سازمان شما نیستند/);
   assert.match(radar, /برآورد سناریویی/);
   assert.equal(/>\s*LIVE\s*</.test(radar), false);
 });
