@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from hring_api.api.v1.router import api_router
 from hring_api.config import get_settings
+from hring_api.observability import MetricsMiddleware, metrics_response
 from hring_api.security.middleware import (
     SecurityHeadersMiddleware,
     SensitiveRouteRateLimitMiddleware,
@@ -19,10 +20,11 @@ app = FastAPI(
     redoc_url="/redoc" if settings.environment != "production" else None,
     openapi_url="/openapi.json" if settings.environment != "production" else None,
 )
+app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=settings.trusted_hosts,
+    allowed_hosts=[*settings.trusted_hosts, "api"],
 )
 app.add_middleware(
     CORSMiddleware,
@@ -33,5 +35,9 @@ app.add_middleware(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SensitiveRouteRateLimitMiddleware, settings=settings)
+app.add_middleware(MetricsMiddleware, service="hring-api")
 
-app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics() -> Response:
+    return metrics_response()

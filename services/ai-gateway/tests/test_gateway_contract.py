@@ -51,6 +51,18 @@ def test_health_only_reports_provider_names(monkeypatch) -> None:
     get_settings.cache_clear()
 
 
+def test_gateway_exposes_internal_prometheus_metrics() -> None:
+    with TestClient(app) as client:
+        client.get("/health")
+        response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "hring_http_requests_total" in response.text
+    assert 'service="hring-ai-gateway"' in response.text
+    assert 'route="/health"' in response.text
+
+
 def test_openai_compatible_usage_is_normalized() -> None:
     assert normalize_usage(
         {

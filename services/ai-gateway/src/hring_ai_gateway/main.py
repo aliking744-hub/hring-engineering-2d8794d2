@@ -1,9 +1,10 @@
 from hmac import compare_digest
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 
 from hring_ai_gateway.config import GatewaySettings, get_settings
+from hring_ai_gateway.observability import MetricsMiddleware, metrics_response
 from hring_ai_gateway.providers import (
     ProviderResponseError,
     ProviderUnavailableError,
@@ -36,6 +37,11 @@ def require_internal_key(
 @app.get("/health", response_model=HealthResponse)
 async def health(settings: GatewaySettings = Depends(get_settings)) -> HealthResponse:
     return HealthResponse(enabled_providers=enabled_provider_names(settings))
+
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics() -> Response:
+    return metrics_response()
 
 
 @app.post(
@@ -75,3 +81,9 @@ async def generate(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI provider returned an invalid response",
         ) from exc
+
+
+app.add_middleware(
+    MetricsMiddleware,
+    service="hring-ai-gateway",
+)

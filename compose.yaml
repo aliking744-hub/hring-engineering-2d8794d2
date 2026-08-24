@@ -182,6 +182,72 @@ services:
       - "${WEB_PORT:-8080}:80"
     networks: [hring_internal]
 
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    volumes:
+      - ./infra/monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    networks: [hring_internal]
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./infra/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - hring_alertmanager:/alertmanager
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    networks: [hring_internal]
+
+  prometheus:
+    image: prom/prometheus:v3.13.2
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+      web:
+        condition: service_started
+      blackbox-exporter:
+        condition: service_started
+      alertmanager:
+        condition: service_started
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - hring_prometheus:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    networks: [hring_internal]
+
 networks:
   hring_internal:
     driver: bridge
@@ -190,3 +256,5 @@ volumes:
   hring_postgres:
   hring_redis:
   hring_minio:
+  hring_prometheus:
+  hring_alertmanager:
