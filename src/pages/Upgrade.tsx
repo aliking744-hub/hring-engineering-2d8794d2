@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,46 +7,62 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { useUserContext } from '@/hooks/useUserContext';
-import { supabase } from '@/integrations/supabase/client';
+import { apiRequest } from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import AuroraBackground from '@/components/AuroraBackground';
 
-interface Plan {
-  id: string;
-  name: string;
-  price: number;
+interface BillingPlan {
+  plan_type: string;
+  display_name: string;
+  scope: 'individual' | 'corporate';
+  price_toman: number;
+  monthly_credits: number;
+  is_active: boolean;
+}
+
+interface PlanPresentation {
   period: string;
   description: string;
   features: string[];
   icon: React.ReactNode;
   popular?: boolean;
-  corporate?: boolean;
 }
 
-const individualPlans: Plan[] = [
-  {
-    id: 'individual_free',
-    name: 'رایگان',
-    price: 0,
+interface Plan extends PlanPresentation {
+  id: string;
+  name: string;
+  scope: BillingPlan['scope'];
+  price: number;
+  monthlyCredits: number;
+}
+
+interface PaymentInitResponse {
+  success: boolean;
+  payment_url: string;
+}
+
+interface PaymentVerifyResponse {
+  success: boolean;
+  ref_id: string | null;
+}
+
+const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
+  individual_free: {
     period: 'یکبار',
     description: 'برای شروع و آشنایی با پلتفرم',
     features: [
-      '۵۰ الماس (یکبار)',
       'دسترسی به ماژول‌ها',
       'محاسبه هزینه استخدام',
       'بدون ذخیره‌سازی ابری',
     ],
     icon: <Zap className="h-6 w-6" />,
   },
-  {
-    id: 'individual_pro',
-    name: 'حرفه‌ای',
-    price: 490000,
+  individual_pro: {
     period: 'ماهانه',
     description: 'برای متخصصان HR',
     features: [
-      '۶۰۰ الماس ماهانه',
       'تمام ماژول‌ها',
       'هدهانتینگ هوشمند',
       'داشبورد HR',
@@ -55,14 +71,10 @@ const individualPlans: Plan[] = [
     icon: <Sparkles className="h-6 w-6" />,
     popular: true,
   },
-  {
-    id: 'individual_plus',
-    name: 'پلاس',
-    price: 990000,
+  individual_plus: {
     period: 'ماهانه',
     description: 'برای کاربران پیشرفته',
     features: [
-      '۲,۵۰۰ الماس ماهانه',
       'تمام ویژگی‌های Pro',
       'دموی قطب‌نمای استراتژیک',
       'دموی آنبوردینگ',
@@ -71,33 +83,21 @@ const individualPlans: Plan[] = [
     ],
     icon: <Crown className="h-6 w-6" />,
   },
-];
-
-const corporatePlans: Plan[] = [
-  {
-    id: 'corporate_expert',
-    name: 'کارشناس',
-    price: 1490000,
+  corporate_expert: {
     period: 'ماهانه',
     description: 'تا ۵ کاربر',
     features: [
-      '۱,۰۰۰ الماس ماهانه تیمی',
       'تا ۵ عضو تیم',
       'تمام ماژول‌ها + هدهانتینگ',
       'ایجاد برنامه آنبوردینگ',
       'ذخیره‌سازی ابری',
     ],
     icon: <Building2 className="h-6 w-6" />,
-    corporate: true,
   },
-  {
-    id: 'corporate_decision_support',
-    name: 'پشتیبان تصمیم',
-    price: 2990000,
+  corporate_decision_support: {
     period: 'ماهانه',
     description: 'تا ۱۰ کاربر',
     features: [
-      '۳,۰۰۰ الماس ماهانه تیمی',
       'تا ۱۰ عضو تیم',
       'قطب‌نمای استراتژیک (محدود)',
       'داشبورد HR پیشرفته',
@@ -105,17 +105,12 @@ const corporatePlans: Plan[] = [
       'پشتیبانی اختصاصی',
     ],
     icon: <Crown className="h-6 w-6" />,
-    corporate: true,
     popular: true,
   },
-  {
-    id: 'corporate_decision_making',
-    name: 'تصمیم‌ساز',
-    price: 5990000,
+  corporate_decision_making: {
     period: 'ماهانه',
     description: 'تا ۵۰ کاربر',
     features: [
-      '۱۰,۰۰۰ الماس ماهانه تیمی',
       'تا ۵۰ عضو تیم',
       'تمام ویژگی‌های بدون محدودیت',
       'منشور ذهنی CEO',
@@ -124,34 +119,60 @@ const corporatePlans: Plan[] = [
       'مشاور اختصاصی',
     ],
     icon: <Sparkles className="h-6 w-6" />,
-    corporate: true,
   },
-];
+};
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('fa-IR').format(price);
 };
 
+const errorMessage = (error: unknown, fallback: string) => (
+  error instanceof Error ? error.message : fallback
+);
+
 export default function Upgrade() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context, loading: contextLoading } = useUserContext();
+  const { user } = useAuth();
+  const { context, loading: contextLoading, refetch: refetchContext } = useUserContext();
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  
+
   const status = searchParams.get('Status');
   const authority = searchParams.get('Authority');
 
-  // Handle payment callback
-  useState(() => {
-    if (status && authority) {
-      verifyPayment(authority, status);
-    }
-  });
+  useEffect(() => {
+    let active = true;
+    const loadPlans = async () => {
+      try {
+        const plans = await apiRequest<BillingPlan[]>(
+          '/billing/plans',
+          undefined,
+          { auth: false, retryAuth: false },
+        );
+        if (active) setBillingPlans(plans);
+      } catch (error) {
+        console.error('Billing plan load failed:', error);
+        toast({
+          title: 'خطا در دریافت پلن‌ها',
+          description: errorMessage(error, 'پلن‌های فعال دریافت نشدند'),
+          variant: 'destructive',
+        });
+      } finally {
+        if (active) setPlansLoading(false);
+      }
+    };
+    void loadPlans();
+    return () => {
+      active = false;
+    };
+  }, [toast]);
 
-  const verifyPayment = async (authority: string, status: string) => {
-    if (status !== 'OK') {
+  const verifyPayment = useCallback(async (paymentAuthority: string, paymentStatus: string) => {
+    if (paymentStatus !== 'OK') {
       toast({
         title: 'پرداخت ناموفق',
         description: 'پرداخت شما انجام نشد یا لغو شد',
@@ -163,36 +184,34 @@ export default function Upgrade() {
 
     setProcessing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const response = await supabase.functions.invoke('zarinpal-payment', {
-        body: { action: 'verify', authority },
+      const response = await apiRequest<PaymentVerifyResponse>('/billing/payments/verify', {
+        method: 'POST',
+        body: JSON.stringify({ authority: paymentAuthority }),
       });
-
-      if (response.error) throw response.error;
-
-      if (response.data?.success) {
-        toast({
-          title: 'پرداخت موفق',
-          description: `کد پیگیری: ${response.data.ref_id}`,
-        });
-        navigate('/dashboard', { replace: true });
-      } else {
-        throw new Error(response.data?.error || 'Verification failed');
-      }
-    } catch (error: any) {
+      if (!response.success) throw new Error('تأیید پرداخت انجام نشد');
+      await refetchContext();
+      window.dispatchEvent(new Event('hring:credits-changed'));
+      toast({
+        title: 'پرداخت موفق',
+        description: response.ref_id ? `کد پیگیری: ${response.ref_id}` : 'پرداخت با موفقیت ثبت شد',
+      });
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
       console.error('Verify error:', error);
       toast({
         title: 'خطا در تأیید پرداخت',
-        description: error.message,
+        description: errorMessage(error, 'تأیید پرداخت انجام نشد'),
         variant: 'destructive',
       });
+      navigate('/upgrade', { replace: true });
     } finally {
       setProcessing(false);
-      navigate('/upgrade', { replace: true });
     }
-  };
+  }, [navigate, refetchContext, toast]);
+
+  useEffect(() => {
+    if (status && authority) void verifyPayment(authority, status);
+  }, [authority, status, verifyPayment]);
 
   const handleUpgrade = async (planId: string) => {
     if (planId === 'individual_free') {
@@ -209,34 +228,26 @@ export default function Upgrade() {
     setProcessing(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!user) {
         navigate('/auth');
         return;
       }
 
-      const callbackUrl = `${window.location.origin}/upgrade`;
-
-      const response = await supabase.functions.invoke('zarinpal-payment', {
-        body: {
-          action: 'init',
-          plan_type: planId,
-          callback_url: callbackUrl,
-        },
+      const response = await apiRequest<PaymentInitResponse>('/billing/payments/init', {
+        method: 'POST',
+        body: JSON.stringify({ plan_type: planId }),
       });
 
-      if (response.error) throw response.error;
-
-      if (response.data?.success && response.data?.payment_url) {
-        window.location.href = response.data.payment_url;
+      if (response.success && response.payment_url) {
+        window.location.href = response.payment_url;
       } else {
-        throw new Error(response.data?.error || 'Failed to initialize payment');
+        throw new Error('درگاه پرداخت آدرس معتبری برنگرداند');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Payment error:', error);
       toast({
         title: 'خطا در شروع پرداخت',
-        description: error.message,
+        description: errorMessage(error, 'شروع پرداخت انجام نشد'),
         variant: 'destructive',
       });
     } finally {
@@ -245,9 +256,31 @@ export default function Upgrade() {
     }
   };
 
+  const plans = useMemo<Plan[]>(() => billingPlans.flatMap((plan) => {
+    const presentation = PLAN_PRESENTATIONS[plan.plan_type];
+    if (!presentation) return [];
+    const creditLabel = plan.scope === 'corporate'
+      ? `${formatPrice(plan.monthly_credits)} الماس ماهانه تیمی`
+      : plan.price_toman === 0
+        ? `${formatPrice(plan.monthly_credits)} الماس (یکبار)`
+        : `${formatPrice(plan.monthly_credits)} الماس ماهانه`;
+    return [{
+      ...presentation,
+      id: plan.plan_type,
+      name: plan.display_name,
+      scope: plan.scope,
+      price: plan.price_toman,
+      monthlyCredits: plan.monthly_credits,
+      features: [creditLabel, ...presentation.features],
+    }];
+  }), [billingPlans]);
+
   const currentTier = context?.companyTier || context?.subscriptionTier;
   const isCorporate = context?.userType === 'corporate';
+  const individualPlans = plans.filter((plan) => plan.scope === 'individual');
+  const corporatePlans = plans.filter((plan) => plan.scope === 'corporate');
   const plansToShow = isCorporate ? corporatePlans : individualPlans;
+  const currentTierName = plans.find((plan) => plan.id === currentTier)?.name || currentTier;
 
   if (processing && authority) {
     return (
@@ -284,11 +317,21 @@ export default function Upgrade() {
               </p>
               {currentTier && (
                 <Badge variant="outline" className="mt-4">
-                  پلن فعلی: {currentTier}
+                  پلن فعلی: {currentTierName}
                 </Badge>
               )}
             </motion.div>
 
+            {plansLoading && (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            )}
+            {!plansLoading && plansToShow.length === 0 && (
+              <div className="py-12 text-center text-muted-foreground">
+                پلن فعالی برای این نوع حساب تعریف نشده است.
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {plansToShow.map((plan, index) => (
                 <motion.div
@@ -348,7 +391,7 @@ export default function Upgrade() {
                       <Button
                         className="w-full"
                         variant={currentTier === plan.id ? 'outline' : plan.popular ? 'default' : 'secondary'}
-                        disabled={processing || currentTier === plan.id || plan.price === 0}
+                        disabled={processing || contextLoading || currentTier === plan.id || plan.price === 0}
                         onClick={() => handleUpgrade(plan.id)}
                       >
                         {processing && selectedPlan === plan.id ? (
@@ -370,7 +413,7 @@ export default function Upgrade() {
               ))}
             </div>
 
-            {!isCorporate && (
+            {!plansLoading && !isCorporate && corporatePlans.length > 0 && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
