@@ -26,6 +26,10 @@ test('backup is atomic, checksummed, private, and covers PostgreSQL plus MinIO',
   assert.match(backup, /flock -n/);
   assert.match(backup, /pg_dump --format=custom/);
   assert.match(backup, /mc mirror --overwrite hring\/hring-private/);
+  assert.match(backup, /docker cp "\$\{minio_container\}:\/tmp\/hring-export\/hring-private"/);
+  assert.match(backup, /find "\$\{partial_dir\}\/hring-private" -type f/);
+  assert.match(backup, /tar -C "\$\{partial_dir\}" -czf/);
+  assert.doesNotMatch(backup, /find \/tmp\/hring-export|tar -C \/tmp\/hring-export/);
   assert.match(backup, /sha256sum postgres\.dump minio\.tar\.gz manifest\.txt/);
   assert.match(backup, /\.partial/);
   assert.match(backup, /mv -- "\$\{partial_dir\}" "\$\{target_dir\}"/);
