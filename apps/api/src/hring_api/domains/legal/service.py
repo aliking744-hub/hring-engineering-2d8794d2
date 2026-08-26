@@ -203,6 +203,15 @@ async def ingest_document(
         duplicate = False
     else:
         source = existing
+        active_versions = await session.scalars(
+            select(LegalSource).where(
+                LegalSource.source_key == source.source_key,
+                LegalSource.status == "active",
+                LegalSource.id != source.id,
+            )
+        )
+        for previous in active_versions.all():
+            previous.status = "superseded"
         source.title = metadata.title
         source.category = metadata.category
         source.source_url = metadata.source_url
