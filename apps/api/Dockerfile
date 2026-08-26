@@ -6,6 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Legal ingestion is deliberately local: Poppler renders scanned PDFs and
+# Tesseract performs Persian/English OCR without sending documents off-host.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        poppler-utils \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-fas \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY alembic ./alembic

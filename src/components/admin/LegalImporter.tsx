@@ -1,214 +1,193 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
+import {
+  AlertCircle,
+  CheckCircle,
+  ClipboardPaste,
+  Database,
+  FileText,
+  Globe,
+  Loader2,
+  ScanText,
+  Upload,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { Loader2, FileText, Database, Globe, CheckCircle, AlertCircle, ClipboardPaste, Upload } from 'lucide-react';
+import { apiRequest } from '@/lib/api';
 
 const CATEGORIES = [
   { value: 'labor_law', label: 'قانون کار' },
-  { value: 'social_security', label: 'تامین اجتماعی' },
+  { value: 'social_security', label: 'تأمین اجتماعی' },
   { value: 'court_rulings', label: 'آرای دیوان' },
+  { value: 'other', label: 'سایر منابع' },
 ];
 
+interface LegalSource {
+  id: string;
+  title: string;
+  version: number;
+  chunk_count: number;
+  checksum: string;
+}
+
+interface LegalImportResponse {
+  success: boolean;
+  duplicate: boolean;
+  ocr_used: boolean;
+  source: LegalSource;
+  logs: string[];
+}
+
 const LegalImporter = () => {
-  const [sourceUrl, setSourceUrl] = useState('');
+  const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [htmlContent, setHtmlContent] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [stats, setStats] = useState<{ totalChunks?: number; savedCount?: number; contentLength?: number } | null>(null);
-  
-  // Manual HTML paste mode
-  const [htmlContent, setHtmlContent] = useState('');
-  const [manualSourceUrl, setManualSourceUrl] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const docFileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Document upload state
-  const [docSourceUrl, setDocSourceUrl] = useState('');
-  const [docCategory, setDocCategory] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [lastImport, setLastImport] = useState<LegalImportResponse | null>(null);
+  const htmlFileInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const finishImport = (result: LegalImportResponse) => {
+    setLogs(result.logs);
+    setLastImport(result);
+    window.dispatchEvent(new CustomEvent('hring:legal-kb-changed'));
+    if (result.duplicate) {
+      toast.info('این سند قبلاً ثبت شده بود؛ رکورد تکراری ساخته نشد');
+    } else {
+      toast.success(`${result.source.chunk_count.toLocaleString('fa-IR')} بخش ایندکس شد`);
+    }
+  };
+
+  const runImport = async (
+    operation: () => Promise<LegalImportResponse>,
+    start: string,
+  ): Promise<boolean> => {
+    setIsProcessing(true);
+    setLogs([start]);
+    setLastImport(null);
+    try {
+      finishImport(await operation());
+      return true;
+    } catch (error) {
+      console.error('Legal import failed:', error);
+      const message = error instanceof Error ? error.message : 'خطای ناشناخته';
+      setLogs((current) => [...current, `خطا: ${message}`]);
+      toast.error(message);
+      return false;
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDocumentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    if (!file.name.endsWith('.html') && !file.name.endsWith('.htm')) {
-      toast.error('لطفاً فقط فایل HTML آپلود کنید');
+    const extension = `.${file.name.split('.').pop()?.toLowerCase()}`;
+    const allowed = ['.pdf', '.docx', '.txt', '.rtf', '.png', '.jpg', '.jpeg', '.webp', '.tif', '.tiff'];
+    if (!allowed.includes(extension)) {
+      toast.error('فرمت فایل پشتیبانی نمی‌شود');
+      event.target.value = '';
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('حداکثر حجم فایل ۱۰ مگابایت است');
+      event.target.value = '';
+      return;
+    }
+    setSelectedFile(file);
+    if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''));
+  };
 
+  const handleHtmlFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!/\.html?$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
+      toast.error('فقط فایل HTML تا حجم ۱۰ مگابایت مجاز است');
+      event.target.value = '';
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setHtmlContent(content);
-      toast.success(`فایل ${file.name} بارگذاری شد`);
+    reader.onload = () => {
+      setHtmlContent(String(reader.result || ''));
+      if (!title.trim()) setTitle(file.name.replace(/\.html?$/i, ''));
     };
-    reader.onerror = () => {
-      toast.error('خطا در خواندن فایل');
-    };
+    reader.onerror = () => toast.error('خواندن فایل HTML ناموفق بود');
     reader.readAsText(file, 'UTF-8');
   };
 
-  const handleDocFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    const validTypes = ['.pdf', '.doc', '.docx', '.txt', '.rtf'];
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    
-    if (!validTypes.includes(ext)) {
-      toast.error('فرمت فایل پشتیبانی نمی‌شود. فرمت‌های مجاز: PDF, Word, TXT');
+  const importDocument = () => {
+    if (!selectedFile || !title.trim() || !category) {
+      toast.error('عنوان، دسته‌بندی و فایل را کامل کنید');
       return;
     }
-    
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('حداکثر حجم فایل 10 مگابایت است');
-      return;
-    }
-    
-    setSelectedFile(file);
-    toast.success(`فایل ${file.name} انتخاب شد`);
-  };
-
-  const handleDocumentProcess = async () => {
-    if (!selectedFile || !docCategory) {
-      toast.error('لطفاً فایل و دسته‌بندی را انتخاب کنید');
-      return;
-    }
-
-    setIsProcessing(true);
-    setLogs(['شروع پردازش فایل...']);
-    setStats(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('category', docCategory);
-      formData.append('sourceUrl', docSourceUrl || 'uploaded-document');
-
-      const response = await fetch(
-        '/functions/v1/extract-document-text',
-        {
+    const body = new FormData();
+    body.append('file', selectedFile);
+    body.append('title', title.trim());
+    body.append('category', category);
+    if (sourceUrl.trim()) body.append('source_url', sourceUrl.trim());
+    void (async () => {
+      const succeeded = await runImport(
+        () => apiRequest<LegalImportResponse>('/legal/admin/sources/upload', {
           method: 'POST',
-          body: formData,
-        }
+          body,
+        }),
+        'استخراج امن متن و ساخت embedding محلی آغاز شد...',
       );
-
-      const data = await response.json();
-
-      if (data.logs) {
-        setLogs(data.logs);
-      }
-
-      if (data.stats) {
-        setStats(data.stats);
-      }
-
-      if (data.success) {
-        toast.success(`${data.stats?.savedCount || 0} بخش با موفقیت وارد شد`);
+      if (succeeded) {
         setSelectedFile(null);
-        if (docFileInputRef.current) {
-          docFileInputRef.current.value = '';
-        }
-      } else {
-        toast.error(data.error || 'خطا در پردازش');
+        if (documentInputRef.current) documentInputRef.current.value = '';
       }
-    } catch (error) {
-      console.error('Error processing document:', error);
-      const errorMessage = error instanceof Error ? error.message : 'خطای ناشناخته';
-      setLogs(prev => [...prev, `خطا: ${errorMessage}`]);
-      toast.error(errorMessage);
-    } finally {
-      setIsProcessing(false);
-    }
+    })();
   };
 
-  const handleProcess = async () => {
-    if (!sourceUrl || !category) {
-      toast.error('لطفاً URL و دسته‌بندی را وارد کنید');
+  const importHtml = () => {
+    if (!title.trim() || !category || htmlContent.trim().length < 20) {
+      toast.error('عنوان، دسته‌بندی و محتوای HTML را کامل کنید');
       return;
     }
-
-    setIsProcessing(true);
-    setLogs(['شروع پردازش...']);
-    setStats(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('scrape-legal-docs', {
-        body: { sourceUrl, category }
-      });
-
-      if (error) throw error;
-
-      if (data.logs) {
-        setLogs(data.logs);
-      }
-
-      if (data.stats) {
-        setStats(data.stats);
-      }
-
-      if (data.success) {
-        toast.success(`${data.stats?.savedCount || 0} ماده با موفقیت وارد شد`);
-      } else {
-        toast.error(data.error || 'خطا در پردازش');
-      }
-    } catch (error) {
-      console.error('Error processing:', error);
-      const errorMessage = error instanceof Error ? error.message : 'خطای ناشناخته';
-      setLogs(prev => [...prev, `خطا: ${errorMessage}`]);
-      toast.error(errorMessage);
-    } finally {
-      setIsProcessing(false);
-    }
+    void (async () => {
+      const succeeded = await runImport(
+        () => apiRequest<LegalImportResponse>('/legal/admin/sources/html', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: title.trim(),
+            category,
+            source_url: sourceUrl.trim() || null,
+            html_content: htmlContent,
+          }),
+        }),
+        'پاک‌سازی HTML و ایندکس منبع آغاز شد...',
+      );
+      if (succeeded) setHtmlContent('');
+    })();
   };
 
-  const handleManualProcess = async () => {
-    if (!htmlContent || !category || !manualSourceUrl) {
-      toast.error('لطفاً HTML، URL منبع و دسته‌بندی را وارد کنید');
+  const importUrl = () => {
+    if (!title.trim() || !category || !sourceUrl.trim()) {
+      toast.error('عنوان، دسته‌بندی و URL را کامل کنید');
       return;
     }
-
-    setIsProcessing(true);
-    setLogs(['شروع پردازش محتوای دستی...']);
-    setStats(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('process-legal-html', {
-        body: { htmlContent, sourceUrl: manualSourceUrl, category }
-      });
-
-      if (error) throw error;
-
-      if (data.logs) {
-        setLogs(data.logs);
-      }
-
-      if (data.stats) {
-        setStats(data.stats);
-      }
-
-      if (data.success) {
-        toast.success(`${data.stats?.savedCount || 0} ماده با موفقیت وارد شد`);
-        setHtmlContent('');
-      } else {
-        toast.error(data.error || 'خطا در پردازش');
-      }
-    } catch (error) {
-      console.error('Error processing:', error);
-      const errorMessage = error instanceof Error ? error.message : 'خطای ناشناخته';
-      setLogs(prev => [...prev, `خطا: ${errorMessage}`]);
-      toast.error(errorMessage);
-    } finally {
-      setIsProcessing(false);
-    }
+    void runImport(
+      () => apiRequest<LegalImportResponse>('/legal/admin/sources/url', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title.trim(),
+          category,
+          source_url: sourceUrl.trim(),
+        }),
+      }),
+      'اعتبارسنجی URL عمومی و دریافت منبع آغاز شد...',
+    );
   };
 
   return (
@@ -216,349 +195,199 @@ const LegalImporter = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
+            <FileText className="h-5 w-5" />
             وارد کردن اسناد حقوقی
           </CardTitle>
           <CardDescription>
-            صفحات قوانین را وارد کرده و در پایگاه دانش ذخیره کنید
+            فایل، HTML یا URL را با metadata منبع ثبت و بدون وابستگی به سرویس خارجی ایندکس کنید.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="legalTitle">عنوان منبع</Label>
+              <Input
+                id="legalTitle"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="مثال: قانون کار جمهوری اسلامی ایران"
+                disabled={isProcessing}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                دسته‌بندی
+              </Label>
+              <Select value={category} onValueChange={setCategory} disabled={isProcessing}>
+                <SelectTrigger><SelectValue placeholder="انتخاب دسته‌بندی..." /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <Tabs defaultValue="document" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="document" className="flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                آپلود فایل
+            <TabsList className="grid h-auto w-full grid-cols-3">
+              <TabsTrigger value="document" className="gap-2">
+                <Upload className="h-4 w-4" />آپلود فایل
               </TabsTrigger>
-              <TabsTrigger value="manual" className="flex items-center gap-2">
-                <ClipboardPaste className="w-4 h-4" />
-                ورود دستی HTML
+              <TabsTrigger value="manual" className="gap-2">
+                <ClipboardPaste className="h-4 w-4" />ورود HTML
               </TabsTrigger>
-              <TabsTrigger value="url" className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                اسکرپ از URL
+              <TabsTrigger value="url" className="gap-2">
+                <Globe className="h-4 w-4" />دریافت URL
               </TabsTrigger>
             </TabsList>
 
-            {/* Document Upload Tab */}
-            <TabsContent value="document" className="space-y-4 mt-4">
-              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800 p-4">
-                <h4 className="font-semibold text-green-800 dark:text-green-300 mb-2">فرمت‌های پشتیبانی شده:</h4>
-                <p className="text-sm text-green-700 dark:text-green-400">
-                  PDF، Word (doc, docx)، متن ساده (txt) - حداکثر ۱۰ مگابایت
+            <TabsContent value="document" className="mt-4 space-y-4">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
+                PDF، DOCX، TXT، RTF و تصاویر اسکن‌شده؛ حداکثر ۱۰ مگابایت. OCR فارسی داخل سرور انجام می‌شود.
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="documentSourceUrl">URL مرجع (اختیاری)</Label>
+                <Input
+                  id="documentSourceUrl"
+                  type="url"
+                  dir="ltr"
+                  className="text-left"
+                  value={sourceUrl}
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                  placeholder="https://example.com/law.pdf"
+                  disabled={isProcessing}
+                />
+              </div>
+              <div className="rounded-lg border-2 border-dashed p-7 text-center">
+                <input
+                  ref={documentInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,.rtf,.png,.jpg,.jpeg,.webp,.tif,.tiff"
+                  onChange={handleDocumentSelect}
+                  className="hidden"
+                  disabled={isProcessing}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => documentInputRef.current?.click()}
+                  disabled={isProcessing}
+                >
+                  <Upload className="ml-2 h-4 w-4" />انتخاب فایل
+                </Button>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {selectedFile
+                    ? `${selectedFile.name} — ${(selectedFile.size / 1024).toLocaleString('fa-IR', { maximumFractionDigits: 1 })} KB`
+                    : 'هنوز فایلی انتخاب نشده است'}
                 </p>
               </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="docSourceUrl" className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    آدرس URL منبع (اختیاری)
-                  </Label>
-                  <Input
-                    id="docSourceUrl"
-                    type="url"
-                    placeholder="https://example.com/law.pdf"
-                    value={docSourceUrl}
-                    onChange={(e) => setDocSourceUrl(e.target.value)}
-                    disabled={isProcessing}
-                    dir="ltr"
-                    className="text-left"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="docCategory" className="flex items-center gap-2">
-                    <Database className="w-4 h-4" />
-                    دسته‌بندی
-                  </Label>
-                  <Select value={docCategory} onValueChange={setDocCategory} disabled={isProcessing}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب دسته‌بندی..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  انتخاب فایل
-                </Label>
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.txt,.rtf"
-                    onChange={handleDocFileSelect}
-                    ref={docFileInputRef}
-                    className="hidden"
-                    disabled={isProcessing}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    onClick={() => docFileInputRef.current?.click()}
-                    disabled={isProcessing}
-                    className="mb-2"
-                  >
-                    <Upload className="w-5 h-5 ml-2" />
-                    انتخاب فایل
-                  </Button>
-                  {selectedFile ? (
-                    <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-                      ✅ {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      فایل PDF، Word یا متنی را انتخاب کنید
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <Button 
-                onClick={handleDocumentProcess} 
-                disabled={isProcessing || !selectedFile || !docCategory}
-                className="w-full"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                    در حال پردازش با هوش مصنوعی...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4 ml-2" />
-                    استخراج متن و ذخیره
-                  </>
-                )}
+              <Button className="w-full" onClick={importDocument} disabled={isProcessing || !selectedFile}>
+                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ScanText className="ml-2 h-4 w-4" />}
+                استخراج، OCR و ایندکس
               </Button>
             </TabsContent>
 
-            {/* Manual HTML Tab */}
-            <TabsContent value="manual" className="space-y-4 mt-4">
-              <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-4">
-                <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">راهنما:</h4>
-                <ol className="list-decimal list-inside text-sm text-blue-700 dark:text-blue-400 space-y-1">
-                  <li>صفحه قانون را در مرورگر خود باز کنید</li>
-                  <li>کلید F12 را بزنید یا راست کلیک → Inspect</li>
-                  <li>در تب Elements، روی تگ html راست کلیک → Copy → Copy outerHTML</li>
-                  <li>محتوا را در کادر زیر paste کنید</li>
-                </ol>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="manualSourceUrl" className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    آدرس URL منبع
-                  </Label>
-                  <Input
-                    id="manualSourceUrl"
-                    type="url"
-                    placeholder="https://qavanin.ir/Law/..."
-                    value={manualSourceUrl}
-                    onChange={(e) => setManualSourceUrl(e.target.value)}
-                    disabled={isProcessing}
-                    dir="ltr"
-                    className="text-left"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="manualCategory" className="flex items-center gap-2">
-                    <Database className="w-4 h-4" />
-                    دسته‌بندی
-                  </Label>
-                  <Select value={category} onValueChange={setCategory} disabled={isProcessing}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب دسته‌بندی..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
+            <TabsContent value="manual" className="mt-4 space-y-4">
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="htmlContent" className="flex items-center gap-2">
-                    <ClipboardPaste className="w-4 h-4" />
-                    محتوای HTML صفحه
-                  </Label>
-                  <div>
-                    <input
-                      type="file"
-                      accept=".html,.htm"
-                      onChange={handleFileUpload}
-                      ref={fileInputRef}
-                      className="hidden"
-                      disabled={isProcessing}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isProcessing}
-                    >
-                      <Upload className="w-4 h-4 ml-2" />
-                      آپلود فایل HTML
-                    </Button>
-                  </div>
+                <Label htmlFor="manualSourceUrl">URL مرجع (اختیاری)</Label>
+                <Input
+                  id="manualSourceUrl"
+                  type="url"
+                  dir="ltr"
+                  className="text-left"
+                  value={sourceUrl}
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                  placeholder="https://qavanin.ir/..."
+                  disabled={isProcessing}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="htmlContent">محتوای HTML</Label>
+                  <input
+                    ref={htmlFileInputRef}
+                    type="file"
+                    accept=".html,.htm"
+                    onChange={handleHtmlFile}
+                    className="hidden"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => htmlFileInputRef.current?.click()}>
+                    <Upload className="ml-2 h-4 w-4" />فایل HTML
+                  </Button>
                 </div>
                 <Textarea
                   id="htmlContent"
-                  placeholder="محتوای HTML را اینجا paste کنید یا فایل آپلود کنید..."
-                  value={htmlContent}
-                  onChange={(e) => setHtmlContent(e.target.value)}
-                  disabled={isProcessing}
                   dir="ltr"
-                  className="text-left font-mono text-xs min-h-[200px]"
+                  className="min-h-[220px] text-left font-mono text-xs"
+                  value={htmlContent}
+                  onChange={(event) => setHtmlContent(event.target.value)}
+                  placeholder="HTML را اینجا جای‌گذاری کنید..."
+                  disabled={isProcessing}
                 />
-                {htmlContent && (
-                  <p className="text-xs text-muted-foreground">
-                    {htmlContent.length.toLocaleString('fa-IR')} کاراکتر
-                  </p>
-                )}
               </div>
-
-              <Button 
-                onClick={handleManualProcess} 
-                disabled={isProcessing || !htmlContent || !category || !manualSourceUrl}
-                className="w-full"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                    در حال پردازش...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4 ml-2" />
-                    پردازش و ذخیره
-                  </>
-                )}
+              <Button className="w-full" onClick={importHtml} disabled={isProcessing || htmlContent.trim().length < 20}>
+                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <FileText className="ml-2 h-4 w-4" />}
+                پاک‌سازی و ایندکس HTML
               </Button>
             </TabsContent>
 
-            {/* URL Scrape Tab */}
-            <TabsContent value="url" className="space-y-4 mt-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="sourceUrl" className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    آدرس URL منبع
-                  </Label>
-                  <Input
-                    id="sourceUrl"
-                    type="url"
-                    placeholder="https://rc.majlis.ir/fa/law/..."
-                    value={sourceUrl}
-                    onChange={(e) => setSourceUrl(e.target.value)}
-                    disabled={isProcessing}
-                    dir="ltr"
-                    className="text-left"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category" className="flex items-center gap-2">
-                    <Database className="w-4 h-4" />
-                    دسته‌بندی
-                  </Label>
-                  <Select value={category} onValueChange={setCategory} disabled={isProcessing}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب دسته‌بندی..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <TabsContent value="url" className="mt-4 space-y-4">
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-muted-foreground">
+                فقط URL عمومی HTTP/HTTPS پذیرفته می‌شود؛ مسیرهای داخلی، redirect و فایل بیش از ۱۰ مگابایت مسدودند.
               </div>
-
-              <Button 
-                onClick={handleProcess} 
-                disabled={isProcessing || !sourceUrl || !category}
-                className="w-full"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                    در حال پردازش...
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4 ml-2" />
-                    پردازش و ذخیره
-                  </>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="remoteSourceUrl">URL منبع</Label>
+                <Input
+                  id="remoteSourceUrl"
+                  type="url"
+                  dir="ltr"
+                  className="text-left"
+                  value={sourceUrl}
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                  placeholder="https://rc.majlis.ir/fa/law/..."
+                  disabled={isProcessing}
+                />
+              </div>
+              <Button className="w-full" onClick={importUrl} disabled={isProcessing || !sourceUrl.trim()}>
+                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Globe className="ml-2 h-4 w-4" />}
+                دریافت امن و ایندکس URL
               </Button>
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      {/* Logs Section */}
       {logs.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              📋 گزارش پردازش
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[200px] w-full rounded-md border bg-muted/30 p-4">
-              <div className="space-y-2 font-mono text-sm">
+          <CardHeader className="pb-3"><CardTitle className="text-base">گزارش پردازش</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <ScrollArea className="h-[190px] rounded-md border bg-muted/30 p-4">
+              <div className="space-y-2 text-sm">
                 {logs.map((log, index) => (
-                  <div 
-                    key={index} 
-                    className="flex items-start gap-2"
-                  >
-                    {log.includes('خطا') ? (
-                      <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                    ) : log.includes('ذخیره شد') || log.includes('موفقیت') ? (
-                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <span className="w-4 h-4 shrink-0" />
-                    )}
+                  <div key={`${index}-${log}`} className="flex items-start gap-2">
+                    {log.includes('خطا')
+                      ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                      : <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />}
                     <span className={log.includes('خطا') ? 'text-destructive' : ''}>{log}</span>
                   </div>
                 ))}
               </div>
             </ScrollArea>
-
-            {stats && (
-              <div className="mt-4 grid grid-cols-3 gap-4">
+            {lastImport && (
+              <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg bg-primary/10 p-3 text-center">
-                  <div className="text-2xl font-bold text-primary">{stats.totalChunks || 0}</div>
-                  <div className="text-xs text-muted-foreground">ماده یافت شده</div>
-                </div>
-                <div className="rounded-lg bg-green-500/10 p-3 text-center">
-                  <div className="text-2xl font-bold text-green-600">{stats.savedCount || 0}</div>
-                  <div className="text-xs text-muted-foreground">ذخیره شده</div>
+                  <div className="text-2xl font-bold text-primary">{lastImport.source.chunk_count.toLocaleString('fa-IR')}</div>
+                  <div className="text-xs text-muted-foreground">بخش یکتا</div>
                 </div>
                 <div className="rounded-lg bg-blue-500/10 p-3 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{stats.contentLength?.toLocaleString('fa-IR') || 0}</div>
-                  <div className="text-xs text-muted-foreground">کاراکتر</div>
+                  <div className="text-2xl font-bold text-blue-600">{lastImport.source.version.toLocaleString('fa-IR')}</div>
+                  <div className="text-xs text-muted-foreground">نسخه منبع</div>
+                </div>
+                <div className="rounded-lg bg-green-500/10 p-3 text-center">
+                  <div className="text-lg font-bold text-green-600">{lastImport.ocr_used ? 'انجام شد' : lastImport.duplicate ? 'تکراری' : 'آماده'}</div>
+                  <div className="text-xs text-muted-foreground">وضعیت</div>
                 </div>
               </div>
             )}

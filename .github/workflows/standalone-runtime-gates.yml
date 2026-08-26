@@ -10,7 +10,7 @@ on:
       - ".dockerignore"
       - ".env.standalone.example"
       - "infra/**"
-      - "apps/api/Dockerfile"
+      - "apps/api/**"
       - "services/ai-gateway/**"
       - "index.html"
       - "public/**"
@@ -27,9 +27,45 @@ permissions:
 jobs:
   validate-standalone-runtime:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: hring
+          POSTGRES_USER: hring
+          POSTGRES_PASSWORD: hring
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hring -d hring"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install API checks
+        run: pip install -e './apps/api[dev]'
+
+      - name: Validate API types, migration, and native legal contracts
+        working-directory: apps/api
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: postgresql+asyncpg://hring:hring@127.0.0.1:5432/hring
+          RATE_LIMIT_ENABLED: "false"
+        run: |
+          ruff check src tests
+          mypy src/hring_api
+          alembic upgrade head
+          pytest -q tests/test_legal_domain.py
 
       - name: Validate Compose configuration
         run: |
@@ -69,6 +105,9 @@ jobs:
 
       - name: Build standalone web image
         run: docker build --file infra/docker/web.Dockerfile --build-arg PUBLIC_BASE_URL=https://hring.ir --tag hring-web-ci .
+
+      - name: Build standalone API image with local OCR and pgvector client
+        run: docker build --file apps/api/Dockerfile --tag hring-api-ci apps/api
 
       - name: Build private AI gateway image
         run: docker build --file services/ai-gateway/Dockerfile --tag hring-ai-gateway-ci services/ai-gateway
