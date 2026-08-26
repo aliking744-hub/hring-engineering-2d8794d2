@@ -63,7 +63,7 @@ jobs:
           RATE_LIMIT_ENABLED: "false"
         run: |
           ruff check src tests
-          mypy
+          mypy src/hring_api
           alembic upgrade head
           pytest -q tests/test_legal_domain.py
 
