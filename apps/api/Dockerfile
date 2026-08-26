@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_DEFAULT_TIMEOUT=120
+ARG PIP_RETRIES=8
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -21,7 +25,10 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
 
-RUN pip install --no-cache-dir --upgrade pip \
+RUN export PIP_INDEX_URL="${PIP_INDEX_URL}" \
+        PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT}" \
+        PIP_RETRIES="${PIP_RETRIES}" \
+    && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
 
 RUN addgroup --system hring \
