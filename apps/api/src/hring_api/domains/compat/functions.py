@@ -13,7 +13,12 @@ from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
 from hring_api.domains.ai.gateway_client import (
     AiCitation,
     AiGatewayError,
+    AiGatewayResult,
     generate_with_ai_gateway,
+)
+from hring_api.domains.ai.prompt_service import (
+    PromptRegistryError,
+    generate_with_managed_prompt,
 )
 from hring_api.domains.billing.credit_service import (
     compatibility_credit_cost,
@@ -118,11 +123,6 @@ async def invoke_ai_function(
         "Return the structured result expected by this HRing capability as JSON."
     )
     feature_key = f"compat.{name}"
-    route = await resolve_runtime_feature_route(
-        feature_key=feature_key,
-        default_provider=settings.recruiting_ai_provider,
-        default_model=settings.recruiting_ai_model,
-    )
     if principal is not None and session is None:
         raise CompatFunctionError("Credit-controlled AI execution requires a database session")
     cost = (
@@ -131,23 +131,46 @@ async def invoke_ai_function(
         else 0
     )
 
+    async def fallback() -> AiGatewayResult:
+        route = await resolve_runtime_feature_route(
+            feature_key=feature_key,
+            default_provider=settings.recruiting_ai_provider,
+            default_model=settings.recruiting_ai_model,
+        )
+        return await generate_with_ai_gateway(
+            feature_key=feature_key,
+            user_id=principal.user_id if principal is not None else None,
+            company_id=_company_id(principal),
+            provider=route.provider,
+            model=route.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            credits_charged=cost,
+            max_output_tokens=12_000,
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": feature_key,
+                "prompt_mode": "embedded_fallback",
+            },
+        )
+
     async def generate() -> Any:
         try:
-            result = await generate_with_ai_gateway(
-                feature_key=feature_key,
+            result = await generate_with_managed_prompt(
+                session,
+                prompt_key=feature_key,
+                variables={
+                    "capability_name": name,
+                    "request_json": serialized,
+                },
                 user_id=principal.user_id if principal is not None else None,
                 company_id=_company_id(principal),
-                provider=route.provider,
-                model=route.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+                fallback=fallback,
                 credits_charged=cost,
-                max_output_tokens=12_000,
-                metadata_json={"ai_route_source": route.source},
             )
-        except AiGatewayError as exc:
+        except (AiGatewayError, PromptRegistryError) as exc:
             raise CompatFunctionError("HRing AI service is unavailable") from exc
         return _response_with_citations(result.content, result.citations)
 

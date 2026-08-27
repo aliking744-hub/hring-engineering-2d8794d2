@@ -120,6 +120,7 @@ async def generate_onboarding_plan(
             company_id=company_id,
             credits_charged=cost,
             settings=settings,
+            session=session,
         )
         return await create_onboarding_plan(
             session,
@@ -182,6 +183,7 @@ async def generate_learning_path(
             company_id=company_id,
             credits_charged=cost,
             settings=settings,
+            session=session,
         )
         return await create_learning_path(
             session,

@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from hring_api.db.session import SessionFactory
 from hring_api.domains.access.models import PlatformRoleAssignment
 from hring_api.domains.ai import prompt_service
+from hring_api.domains.ai.feature_catalog import AI_FEATURES
 from hring_api.domains.ai.gateway_client import AiGatewayResult
 from hring_api.domains.identity.mfa_security import generate_totp_code
 from hring_api.main import app
@@ -106,9 +107,10 @@ def test_prompt_registry_draft_test_publish_compare_and_rollback(monkeypatch) ->
         platform_headers = _auth(platform_admin)
         content_headers = _auth(content_admin)
 
-        assert client.get(
-            "/api/v1/admin/platform/ai/prompts", headers=platform_headers
-        ).status_code == 200
+        assert (
+            client.get("/api/v1/admin/platform/ai/prompts", headers=platform_headers).status_code
+            == 200
+        )
         forbidden = client.post(
             "/api/v1/admin/platform/ai/prompts",
             headers=platform_headers,
@@ -187,6 +189,11 @@ def test_prompt_registry_draft_test_publish_compare_and_rollback(monkeypatch) ->
         summary = next(item for item in listed.json() if item["id"] == prompt_id)
         assert summary["published_provider_alias"] == "gemini"
         assert summary["published_model"] == "gemini-2.5-flash"
+        prompt_by_key = {item["prompt_key"]: item for item in listed.json()}
+        assert {feature.feature_key for feature in AI_FEATURES}.issubset(prompt_by_key)
+        assert all(
+            prompt_by_key[feature.feature_key]["draft_version"] == 1 for feature in AI_FEATURES
+        )
 
         draft = client.post(
             f"/api/v1/admin/platform/ai/prompts/{prompt_id}/drafts",
@@ -271,6 +278,45 @@ def test_prompt_registry_draft_test_publish_compare_and_rollback(monkeypatch) ->
         assert isinstance(runtime_metadata, dict)
         assert runtime_metadata["prompt_mode"] == "runtime"
         assert runtime_metadata["prompt_version"] == 3
+
+        fallback_calls = 0
+
+        async def managed_fallback() -> AiGatewayResult:
+            nonlocal fallback_calls
+            fallback_calls += 1
+            return AiGatewayResult(
+                request_id=uuid4(),
+                content='{"summary":"Embedded fallback"}',
+                provider="fallback",
+                model="fallback-model",
+                usage={},
+                provider_cost_microusd=0,
+            )
+
+        async def run_managed_prompts() -> tuple[AiGatewayResult, AiGatewayResult]:
+            async with SessionFactory() as session:
+                published = await prompt_service.generate_with_managed_prompt(
+                    session,
+                    prompt_key=prompt_key,
+                    variables={"company_name": "Acme", "candidate_name": "Sara"},
+                    user_id=UUID(super_admin["user"]["id"]),
+                    company_id=None,
+                    fallback=managed_fallback,
+                )
+                draft_only = await prompt_service.generate_with_managed_prompt(
+                    session,
+                    prompt_key="compat.generate-job-ad",
+                    variables={"capability_name": "generate-job-ad", "request_json": "{}"},
+                    user_id=UUID(super_admin["user"]["id"]),
+                    company_id=None,
+                    fallback=managed_fallback,
+                )
+                return published, draft_only
+
+        managed_published, managed_draft = asyncio.run(run_managed_prompts())
+        assert managed_published.content == '{"summary":"Strong profile"}'
+        assert managed_draft.content == '{"summary":"Embedded fallback"}'
+        assert fallback_calls == 1
 
         logs = client.get("/api/v1/admin/platform/audit-logs", headers=super_headers)
         assert logs.status_code == 200, logs.text

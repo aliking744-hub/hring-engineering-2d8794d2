@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 from uuid import uuid4
 
 from hring_api.config import Settings
@@ -28,9 +29,16 @@ def test_analysis_preserves_source_identity_and_does_not_send_raw_data(monkeypat
             provider_cost_microusd=1,
         )
 
+    async def fake_route(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(provider="test", model="test-model", source="test")
+
     monkeypatch.setattr(
         "hring_api.domains.recruiting.ai_service.generate_with_ai_gateway",
         fake_generate,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.recruiting.ai_service.resolve_runtime_feature_route",
+        fake_route,
     )
 
     result = asyncio.run(

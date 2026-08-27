@@ -204,6 +204,7 @@ async def execute_compat_rpc(
 async def public_support(
     payload: CompatFunctionRequest,
     settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
 ) -> CompatQueryResponse:
     try:
         data = await invoke_ai_function(
@@ -211,6 +212,7 @@ async def public_support(
             body=payload.body,
             principal=None,
             settings=settings,
+            session=db,
         )
     except CompatFunctionError as exc:
         raise _compat_http_error(exc) from exc
