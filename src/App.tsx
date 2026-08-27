@@ -34,8 +34,6 @@ const CandidateDetail = lazy(() => import("./pages/CandidateDetail"));
 const King744 = lazy(() => import("./pages/King744"));
 const LegalSearchPage = lazy(() => import("./pages/LegalSearchPage"));
 const LegalAdvisor = lazy(() => import("./pages/LegalAdvisor"));
-const StrategicCompass = lazy(() => import("./pages/StrategicCompass"));
-const StrategicRadar = lazy(() => import("./pages/StrategicRadar"));
 const CompanyMembers = lazy(() => import("./pages/CompanyMembers"));
 const CompanySettings = lazy(() => import("./pages/CompanySettings"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
@@ -186,15 +184,7 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/strategic-compass" 
-                element={
-                  <ProtectedRoute>
-                    <StrategicCompass />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
+<Route 
                 path="/company-members" 
                 element={
                   <ProtectedRoute>
@@ -304,15 +294,7 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/strategic-radar" 
-                element={
-                  <ProtectedRoute>
-                    <StrategicRadar />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
+<Route 
                 path="/learning-path" 
                 element={
                   <ProtectedRoute>

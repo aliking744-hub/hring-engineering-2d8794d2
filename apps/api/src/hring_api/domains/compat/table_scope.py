@@ -49,24 +49,12 @@ TABLE_SCOPES: dict[str, TableScope] = {
     "learning_path_records": TableScope("personal", "user_id"),
     "legal_conversations": TableScope("personal", "user_id"),
     "site_feedback": TableScope("personal", "user_id"),
-    "strategic_radar_analyses": TableScope("personal", "user_id"),
     "support_chat_logs": TableScope("personal", "user_id"),
-    "unicorn_analyses": TableScope("personal", "user_id"),
     "user_credits": TableScope("personal", "user_id"),
     "user_purchases": TableScope("personal", "user_id"),
     "user_roles": TableScope("personal", "user_id"),
 
     # Relationship/CEO/assignee rules. These must never inherit company-wide visibility.
-    "behaviors": TableScope("compass"),
-    "bet_allocations": TableScope("compass"),
-    "decision_journals": TableScope("compass"),
-    "intent_assignments": TableScope("compass"),
-    "scenario_responses": TableScope("compass"),
-    "scenarios": TableScope("compass"),
-    "strategic_achievements": TableScope("compass"),
-    "strategic_bets": TableScope("compass"),
-    "strategic_intents": TableScope("compass"),
-    "compass_user_roles": TableScope("compass"),
     "legal_messages": TableScope("compass"),
 
     # Financial/audit data must not become generic tenant data.
