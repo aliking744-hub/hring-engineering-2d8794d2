@@ -1,24 +1,20 @@
-import { FileText, Download } from "lucide-react";
+import { Download, FileText, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import ScrollReveal from "@/components/ScrollReveal";
 import { Button } from "@/components/ui/button";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
-
-const documents = [
-  { title: "قرارداد کار تمام‌وقت", category: "قراردادها", downloads: "۲.۴k" },
-  { title: "قرارداد پاره‌وقت", category: "قراردادها", downloads: "۱.۸k" },
-  { title: "تعهدنامه رازداری", category: "قانونی", downloads: "۳.۱k" },
-  { title: "فرم ارزیابی عملکرد", category: "ارزیابی", downloads: "۱.۲k" },
-  { title: "چک‌لیست آنبوردینگ", category: "آنبوردینگ", downloads: "۲.۹k" },
-  { title: "قرارداد پروژه‌ای", category: "قراردادها", downloads: "۱.۵k" },
-];
+import { useDigitalProducts } from "@/hooks/useDigitalProducts";
 
 const ShopTeaser = () => {
   const { getSetting } = useSiteSettings();
-  
+  const { products, loading } = useDigitalProducts();
+
   const shopTitle = getSetting('shop_title', 'فروشگاه اسناد HR');
   const shopSubtitle = getSetting('shop_subtitle', 'قالب‌های آماده قرارداد و مستندات منابع انسانی');
+  const publishedProducts = products
+    .filter((product) => product.is_active)
+    .slice(0, 6);
 
   return (
     <section className="py-24 px-4" dir="rtl">
@@ -41,33 +37,46 @@ const ShopTeaser = () => {
           </div>
         </ScrollReveal>
 
-        <div className="horizontal-scroll pb-4">
-          {documents.map((doc, index) => (
-            <ScrollReveal key={doc.title} delay={index * 0.05}>
-              <motion.div
-                whileHover={{ y: -5 }}
-                className="glass-card p-6 w-72 cursor-pointer group"
-              >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <FileText className="w-6 h-6 text-primary" />
-                </div>
-                
-                <span className="text-xs text-primary font-medium">
-                  {doc.category}
-                </span>
-                
-                <h3 className="text-lg font-semibold text-foreground mt-1 mb-3">
-                  {doc.title}
-                </h3>
-                
-                <div className="flex items-center gap-1 text-muted-foreground text-sm">
-                  <Download className="w-4 h-4" />
-                  <span>{doc.downloads} دانلود</span>
-                </div>
-              </motion.div>
-            </ScrollReveal>
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+            <span>در حال دریافت محصولات منتشرشده...</span>
+          </div>
+        ) : publishedProducts.length > 0 ? (
+          <div className="horizontal-scroll pb-4">
+            {publishedProducts.map((product, index) => (
+              <ScrollReveal key={product.id} delay={index * 0.05}>
+                <Link to="/shop" className="block">
+                  <motion.div
+                    whileHover={{ y: -5 }}
+                    className="glass-card p-6 w-72 cursor-pointer group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                      <FileText className="w-6 h-6 text-primary" />
+                    </div>
+
+                    <span className="text-xs text-primary font-medium">
+                      {product.category || 'عمومی'}
+                    </span>
+
+                    <h3 className="text-lg font-semibold text-foreground mt-1 mb-3">
+                      {product.name}
+                    </h3>
+
+                    <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                      <Download className="w-4 h-4" />
+                      <span>{product.download_count.toLocaleString('fa-IR')} دانلود</span>
+                    </div>
+                  </motion.div>
+                </Link>
+              </ScrollReveal>
+            ))}
+          </div>
+        ) : (
+          <p className="py-12 text-center text-muted-foreground">
+            هنوز محصولی برای نمایش عمومی منتشر نشده است.
+          </p>
+        )}
       </div>
     </section>
   );
