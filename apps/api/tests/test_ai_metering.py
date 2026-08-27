@@ -12,6 +12,7 @@ from hring_api.domains.ai.service import (
     calculate_estimated_cost_microusd,
     record_ai_usage,
 )
+from hring_api.domains.ai.schemas import SUPPORTED_USAGE_METRICS
 
 
 def test_ai_metering_calculates_historical_provider_cost() -> None:
@@ -90,3 +91,7 @@ def test_usage_ledger_does_not_copy_prompts_or_generated_content() -> None:
     assert "content" not in columns
     assert "response" not in columns
     assert {"feature_key", "metrics_json", "estimated_cost_microusd"} <= columns
+
+
+def test_search_cost_drivers_are_supported_usage_metrics() -> None:
+    assert {"citation_tokens", "search_queries"} <= SUPPORTED_USAGE_METRICS

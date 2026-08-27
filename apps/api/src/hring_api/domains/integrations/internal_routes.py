@@ -45,6 +45,12 @@ class InternalAiProviderResponse(BaseModel):
     max_tokens_field: str | None
 
 
+class InternalAiProviderSummaryResponse(BaseModel):
+    provider_key: str
+    adapter: str
+    default_model: str | None
+
+
 def _require_internal_key(authorization: str | None, settings: Settings) -> None:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
@@ -105,6 +111,37 @@ def _safe_endpoint_path(value: str | None) -> str | None:
     ):
         return None
     return value
+
+
+@router.get(
+    "/internal/integrations/ai/providers",
+    response_model=list[InternalAiProviderSummaryResponse],
+    include_in_schema=False,
+)
+async def internal_ai_provider_summaries(
+    response: Response,
+    authorization: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> list[InternalAiProviderSummaryResponse]:
+    """Return the healthy runtime inventory without provider secrets."""
+
+    _require_internal_key(authorization, settings)
+    response.headers["Cache-Control"] = "private, no-store"
+    providers = await list_runtime_providers(
+        db,
+        provider_type="llm",
+        adapters=AI_ADAPTERS,
+        settings=settings,
+    )
+    return [
+        InternalAiProviderSummaryResponse(
+            provider_key=provider.provider_key,
+            adapter=provider.adapter,
+            default_model=provider.default_model,
+        )
+        for provider in providers
+    ]
 
 
 @router.get(

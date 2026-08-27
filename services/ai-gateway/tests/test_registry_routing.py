@@ -4,7 +4,11 @@ import httpx
 
 from hring_ai_gateway.config import GatewaySettings
 from hring_ai_gateway.providers import generate_openai_compatible
-from hring_ai_gateway.registry import ProviderConfig, parse_registry_provider
+from hring_ai_gateway.registry import (
+    ProviderConfig,
+    fetch_registry_provider_names,
+    parse_registry_provider,
+)
 from hring_ai_gateway.schemas import GenerateRequest
 
 
@@ -47,6 +51,34 @@ def test_registry_payload_supports_native_anthropic_defaults() -> None:
     assert provider.max_tokens_field == "max_tokens"
 
 
+def test_registry_health_inventory_fails_closed_on_invalid_json(monkeypatch) -> None:
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, _exc_type, _exc, _traceback) -> None:
+            return None
+
+        async def get(self, url: str, *, headers: dict) -> httpx.Response:
+            _ = headers
+            return httpx.Response(
+                200,
+                request=httpx.Request("GET", url),
+                content=b"not-json",
+            )
+
+    monkeypatch.setattr(
+        "hring_ai_gateway.registry.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+    settings = GatewaySettings(hring_api_base_url="http://api:8000/api/v1")
+
+    assert asyncio.run(fetch_registry_provider_names(settings)) == []
+
+
 def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) -> None:
     calls: list[tuple[str, str]] = []
 
@@ -74,6 +106,13 @@ def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) ->
                     "id": "result-1",
                     "choices": [{"message": {"content": "fallback ok"}}],
                     "usage": {"prompt_tokens": 10, "completion_tokens": 3},
+                    "citations": ["https://example.com/report"],
+                    "search_results": [
+                        {
+                            "url": "https://example.com/report",
+                            "title": "Official report",
+                        }
+                    ],
                 },
             )
 
@@ -131,6 +170,9 @@ def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) ->
     assert result.model == "qwen-fallback-model"
     assert result.content == "fallback ok"
     assert result.usage == {"input_tokens": 10, "output_tokens": 3}
+    assert len(result.citations) == 1
+    assert result.citations[0].url == "https://example.com/report"
+    assert result.citations[0].title == "Official report"
 
 
 def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> None:
@@ -218,4 +260,3 @@ def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> 
     assert result.content == '{"ok":true}'
     assert result.usage == {"input_tokens": 11, "output_tokens": 4}
     assert result.provider_request_id == "anthropic-request"
-

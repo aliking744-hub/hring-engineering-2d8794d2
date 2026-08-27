@@ -9,6 +9,8 @@ SUPPORTED_USAGE_METRICS = {
     "output_tokens",
     "cached_input_tokens",
     "reasoning_tokens",
+    "citation_tokens",
+    "search_queries",
     "characters",
     "audio_seconds",
     "video_seconds",
