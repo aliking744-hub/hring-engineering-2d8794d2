@@ -32,6 +32,47 @@ const imageFormats = [
   { value: "9:16", label: "عمودی (9:16) - مناسب استوری", width: 1080, height: 1920 },
 ];
 
+type UnknownRecord = Record<string, unknown>;
+
+const formatGeneratedJobAd = (payload: unknown): string => {
+  if (typeof payload === "string") return payload.trim();
+  if (!payload || typeof payload !== "object") return "";
+
+  const response = payload as UnknownRecord;
+  for (const key of ["generatedText", "content", "text"]) {
+    const value = response[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+
+  const candidate = response.generated_job_ad ?? response.generatedAd ?? response.job_ad;
+  if (typeof candidate === "string") return candidate.trim();
+  if (candidate && typeof candidate === "object") {
+    const ad = candidate as UnknownRecord;
+    const lines: string[] = [];
+    const append = (label: string, value: unknown) => {
+      if (typeof value === "string" && value.trim()) {
+        lines.push(`${label}\n${value.trim()}`);
+      } else if (Array.isArray(value) && value.length > 0) {
+        lines.push(`${label}\n${value.map((item) => `• ${String(item)}`).join("\n")}`);
+      }
+    };
+
+    append("عنوان آگهی", ad.title);
+    append("شرکت", ad.company ?? response.company);
+    append("معرفی فرصت شغلی", ad.summary);
+    append("مسئولیت‌ها", ad.responsibilities);
+    append("شرایط و مهارت‌های موردنیاز", ad.requirements);
+    append("ویژگی‌های ترجیحی", ad.preferred_profile);
+    append("نوع همکاری", ad.employment_type);
+    append("نحوه ارسال درخواست", ad.application_note);
+
+    if (lines.length > 0) return lines.join("\n\n");
+  }
+
+  const fallback = JSON.stringify(payload, null, 2);
+  return fallback === "{}" ? "" : fallback;
+};
+
 const SmartAdGenerator = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -162,13 +203,25 @@ const SmartAdGenerator = () => {
         return;
       }
 
-      if (data?.generatedText) {
-        setGeneratedText(data.generatedText);
-        setEditableText(data.generatedText);
+      const responseText = formatGeneratedJobAd(data);
+      const responseImage = typeof data?.imageUrl === "string" ? data.imageUrl : null;
+
+      if (!responseText && !responseImage) {
+        toast({
+          title: "خروجی دریافت نشد",
+          description: "سرویس پاسخ قابل نمایش برنگرداند. لطفاً دوباره تلاش کنید.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      if (data?.imageUrl) {
-        setGeneratedImage(data.imageUrl);
+      if (responseText) {
+        setGeneratedText(responseText);
+        setEditableText(responseText);
+      }
+
+      if (responseImage) {
+        setGeneratedImage(responseImage);
       }
 
       toast({

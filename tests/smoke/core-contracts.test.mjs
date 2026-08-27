@@ -289,3 +289,13 @@ test('integration center only activates adapters backed by runtime consumers', a
   assert.match(service, /_validate_runtime_adapter/);
   assert.match(service, /not runtime-backed/);
 });
+
+
+test('smart ad displays structured independent AI responses and rejects empty success', async () => {
+  const page = await read('src/pages/SmartAdGenerator.tsx');
+
+  assert.match(page, /formatGeneratedJobAd/);
+  assert.match(page, /generated_job_ad/);
+  assert.match(page, /if \(!responseText && !responseImage\)/);
+  assert.match(page, /سرویس پاسخ قابل نمایش برنگرداند/);
+});
