@@ -5,10 +5,19 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
 from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
-from hring_api.domains.ai.gateway_client import AiGatewayError, generate_with_ai_gateway
+from hring_api.domains.ai.gateway_client import (
+    AiGatewayError,
+    AiGatewayResult,
+    generate_with_ai_gateway,
+)
+from hring_api.domains.ai.prompt_service import (
+    PromptRegistryError,
+    generate_with_managed_prompt,
+)
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
     LearningPathResult,
@@ -46,6 +55,7 @@ async def generate_onboarding_content(
     company_id: UUID | None,
     credits_charged: int,
     settings: Settings,
+    session: AsyncSession | None = None,
 ) -> tuple[str, str]:
     system_prompt = """تو معمار ارشد تجربه ورود کارکنان هستی. یک برنامه عملی، سنجش‌پذیر و واقع‌بینانه برای ۹۰ روز اول بساز. برنامه باید دقیقاً سه بخش روزهای ۱ تا ۳۰، ۳۱ تا ۶۰ و ۶۱ تا ۹۰ داشته باشد و برای هر بخش هدف‌ها، اقدام‌ها، نقش منتور و شاخص موفقیت را بنویسد. همچنین یک ایمیل خوش‌آمدگویی حرفه‌ای و گرم آماده کن. اطلاعات هویتی یا سازمانی را حدس نزن. پاسخ فقط JSON معتبر با دو کلید plan و welcomeEmail و بدون markdown fence باشد؛ مقدار هر دو کلید متن Markdown فارسی است."""
     user_prompt = (
@@ -54,13 +64,14 @@ async def generate_onboarding_content(
         f"انتظار اصلی: {expectation}\n"
         f"نقش منتور: {mentor_role or 'تعیین نشده'}"
     )
-    try:
+
+    async def fallback() -> AiGatewayResult:
         route = await resolve_runtime_feature_route(
             feature_key=ONBOARDING_FEATURE_KEY,
             default_provider=settings.recruiting_ai_provider,
             default_model=settings.recruiting_ai_model,
         )
-        result = await generate_with_ai_gateway(
+        return await generate_with_ai_gateway(
             feature_key=ONBOARDING_FEATURE_KEY,
             user_id=user_id,
             company_id=company_id,
@@ -73,9 +84,29 @@ async def generate_onboarding_content(
             credits_charged=credits_charged,
             max_output_tokens=8_000,
             response_format="json_object",
-            metadata_json={"ai_route_source": route.source},
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": ONBOARDING_FEATURE_KEY,
+                "prompt_mode": "embedded_fallback",
+            },
         )
-    except AiGatewayError as exc:
+
+    try:
+        result = await generate_with_managed_prompt(
+            session,
+            prompt_key=ONBOARDING_FEATURE_KEY,
+            variables={
+                "job_title": job_title,
+                "seniority": seniority,
+                "expectation": expectation,
+                "mentor_role": mentor_role or "تعیین نشده",
+            },
+            user_id=user_id,
+            company_id=company_id,
+            fallback=fallback,
+            credits_charged=credits_charged,
+        )
+    except (AiGatewayError, PromptRegistryError) as exc:
         raise DevelopmentAiError("سرویس تولید برنامه آنبوردینگ در دسترس نیست") from exc
 
     payload = _json_object(result.content)
@@ -97,6 +128,7 @@ async def generate_learning_path_content(
     company_id: UUID | None,
     credits_charged: int,
     settings: Settings,
+    session: AsyncSession | None = None,
 ) -> LearningPathResult:
     # Deliberately omit employee name/email. They are needed for HRing storage and
     # delivery only, not for the model to design a role-based learning plan.
@@ -119,13 +151,14 @@ async def generate_learning_path_content(
 }
 حداقل دو مهارت سخت، دو مهارت نرم و یک مرحله نقشه راه ارائه کن."""
     user_prompt = json.dumps(provider_input, ensure_ascii=False)
-    try:
+
+    async def fallback() -> AiGatewayResult:
         route = await resolve_runtime_feature_route(
             feature_key=LEARNING_PATH_FEATURE_KEY,
             default_provider=settings.recruiting_ai_provider,
             default_model=settings.recruiting_ai_model,
         )
-        result = await generate_with_ai_gateway(
+        return await generate_with_ai_gateway(
             feature_key=LEARNING_PATH_FEATURE_KEY,
             user_id=user_id,
             company_id=company_id,
@@ -138,9 +171,24 @@ async def generate_learning_path_content(
             credits_charged=credits_charged,
             max_output_tokens=8_000,
             response_format="json_object",
-            metadata_json={"ai_route_source": route.source},
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": LEARNING_PATH_FEATURE_KEY,
+                "prompt_mode": "embedded_fallback",
+            },
         )
-    except AiGatewayError as exc:
+
+    try:
+        result = await generate_with_managed_prompt(
+            session,
+            prompt_key=LEARNING_PATH_FEATURE_KEY,
+            variables={"role_profile_json": json.dumps(provider_input, ensure_ascii=False)},
+            user_id=user_id,
+            company_id=company_id,
+            fallback=fallback,
+            credits_charged=credits_charged,
+        )
+    except (AiGatewayError, PromptRegistryError) as exc:
         raise DevelopmentAiError("سرویس تولید مسیر یادگیری در دسترس نیست") from exc
 
     try:

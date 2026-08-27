@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from string import Formatter
@@ -204,7 +205,43 @@ async def generate_with_registered_prompt(
     return result
 
 
-def _schema_validation_error(value: object, schema: dict[str, object], path: str = "$") -> str | None:
+async def generate_with_managed_prompt(
+    session: AsyncSession | None,
+    *,
+    prompt_key: str,
+    variables: dict[str, str],
+    user_id: UUID | None,
+    company_id: UUID | None,
+    fallback: Callable[[], Awaitable[AiGatewayResult]],
+    credits_charged: int = 0,
+) -> AiGatewayResult:
+    """Use a published registry prompt, or preserve the embedded product prompt.
+
+    The fallback keeps existing product behavior intact while a seeded draft is
+    reviewed and tested. Once a Super Admin publishes that draft, the runtime
+    switches to the immutable registry version without another deployment.
+    Invalid or failing published prompts do not silently fall back: they fail
+    closed so an administrator can detect and roll them back.
+    """
+
+    if session is None:
+        return await fallback()
+    try:
+        return await generate_with_registered_prompt(
+            session,
+            prompt_key=prompt_key,
+            variables=variables,
+            user_id=user_id,
+            company_id=company_id,
+            credits_charged=credits_charged,
+        )
+    except (PromptNotFoundError, PromptConflictError):
+        return await fallback()
+
+
+def _schema_validation_error(
+    value: object, schema: dict[str, object], path: str = "$"
+) -> str | None:
     expected = schema.get("type")
     if expected == "object":
         if not isinstance(value, dict):
@@ -232,13 +269,9 @@ def _schema_validation_error(value: object, schema: dict[str, object], path: str
                     return error
     elif expected == "string" and not isinstance(value, str):
         return f"{path} must be a string"
-    elif expected == "integer" and (
-        isinstance(value, bool) or not isinstance(value, int)
-    ):
+    elif expected == "integer" and (isinstance(value, bool) or not isinstance(value, int)):
         return f"{path} must be an integer"
-    elif expected == "number" and (
-        isinstance(value, bool) or not isinstance(value, int | float)
-    ):
+    elif expected == "number" and (isinstance(value, bool) or not isinstance(value, int | float)):
         return f"{path} must be a number"
     elif expected == "boolean" and not isinstance(value, bool):
         return f"{path} must be a boolean"
@@ -452,9 +485,7 @@ async def create_draft(
     if locked_prompt is None:
         raise PromptNotFoundError("Prompt was not found")
     prompt = locked_prompt
-    if await get_prompt_version_by_status(
-        session, prompt_id=prompt.id, status="draft"
-    ) is not None:
+    if await get_prompt_version_by_status(session, prompt_id=prompt.id, status="draft") is not None:
         raise PromptConflictError("This prompt already has a draft")
     source = None
     if source_version_id is not None:
@@ -728,9 +759,7 @@ async def rollback_prompt(
     )
     if target is None or target.status != "archived":
         raise PromptConflictError("Rollback target must be an archived version")
-    if await get_prompt_version_by_status(
-        session, prompt_id=prompt.id, status="draft"
-    ) is not None:
+    if await get_prompt_version_by_status(session, prompt_id=prompt.id, status="draft") is not None:
         raise PromptConflictError("Discard or publish the current draft before rollback")
     current = await get_prompt_version_by_status(
         session,

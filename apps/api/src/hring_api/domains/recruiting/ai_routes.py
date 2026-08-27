@@ -48,6 +48,7 @@ async def analyze_candidate_batch(
     payload: AnalyzeCandidatesRequest,
     principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
 ) -> AnalyzeCandidatesResponse:
     try:
         return await analyze_candidates(
@@ -57,6 +58,7 @@ async def analyze_candidate_batch(
             user_id=principal.user_id,
             company_id=_company_id(principal),
             settings=settings,
+            session=db,
         )
     except RecruitingAiError as exc:
         raise _ai_error(exc) from exc
@@ -111,6 +113,7 @@ async def auto_source_campaign(
             user_id=principal.user_id,
             company_id=campaign.company_id,
             settings=settings,
+            session=db,
         )
 
         await update_owner_campaign(

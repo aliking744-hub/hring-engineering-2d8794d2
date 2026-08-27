@@ -5,10 +5,19 @@ from uuid import UUID
 
 import httpx
 from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
 from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
-from hring_api.domains.ai.gateway_client import AiGatewayError, generate_with_ai_gateway
+from hring_api.domains.ai.gateway_client import (
+    AiGatewayError,
+    AiGatewayResult,
+    generate_with_ai_gateway,
+)
+from hring_api.domains.ai.prompt_service import (
+    PromptRegistryError,
+    generate_with_managed_prompt,
+)
 from hring_api.domains.recruiting.schemas import (
     AnalyzeCandidatesResponse,
     AnalyzedCandidate,
@@ -104,9 +113,15 @@ async def _enrich_candidate(
     user_id: UUID,
     company_id: UUID | None,
     settings: Settings,
+    session: AsyncSession | None,
 ) -> str:
     if not settings.recruiting_web_enrichment_enabled or not candidate.name:
         return ""
+    variables = {
+        "candidate_name": candidate.name,
+        "last_company": candidate.last_company or "",
+        "target_industry": job.industry or "",
+    }
     messages = [
         {
             "role": "system",
@@ -121,13 +136,14 @@ async def _enrich_candidate(
             ),
         },
     ]
-    try:
+
+    async def fallback() -> AiGatewayResult:
         route = await resolve_runtime_feature_route(
             feature_key="smart_headhunting.web_enrichment",
             default_provider=settings.recruiting_enrichment_provider,
             default_model=settings.recruiting_enrichment_model,
         )
-        result = await generate_with_ai_gateway(
+        return await generate_with_ai_gateway(
             feature_key="smart_headhunting.web_enrichment",
             user_id=user_id,
             company_id=company_id,
@@ -135,10 +151,24 @@ async def _enrich_candidate(
             model=route.model,
             messages=messages,
             max_output_tokens=800,
-            metadata_json={"ai_route_source": route.source},
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": "smart_headhunting.web_enrichment",
+                "prompt_mode": "embedded_fallback",
+            },
+        )
+
+    try:
+        result = await generate_with_managed_prompt(
+            session,
+            prompt_key="smart_headhunting.web_enrichment",
+            variables=variables,
+            user_id=user_id,
+            company_id=company_id,
+            fallback=fallback,
         )
         return result.content[:12_000]
-    except AiGatewayError:
+    except (AiGatewayError, PromptRegistryError):
         logger.info("Recruiting web enrichment unavailable for candidate", exc_info=True)
         return ""
 
@@ -151,6 +181,7 @@ async def analyze_candidates(
     user_id: UUID,
     company_id: UUID | None,
     settings: Settings,
+    session: AsyncSession | None = None,
 ) -> AnalyzeCandidatesResponse:
     if len(candidates) > settings.recruiting_analysis_max_candidates:
         raise RecruitingAiError(
@@ -167,6 +198,7 @@ async def analyze_candidates(
                 user_id=user_id,
                 company_id=company_id,
                 settings=settings,
+                session=session,
             )
             if web_info:
                 row["webResearchInfo"] = web_info
@@ -174,13 +206,13 @@ async def analyze_candidates(
 
     user_prompt = f"""الزامات شغلی:\n{_job_text(job)}\n\nکاندیداها:\n{json.dumps(prepared, ensure_ascii=False)}\n\nبرای هر کاندیدا فقط تحلیل پنج‌لایه و sourceIndex خودش را برگردان. اطلاعات هویتی و رزومه‌ای را در پاسخ تولید نکن. نتایج می‌توانند بر اساس matchScore مرتب شوند چون تطبیق با sourceIndex انجام می‌شود."""
 
-    try:
+    async def fallback() -> AiGatewayResult:
         route = await resolve_runtime_feature_route(
             feature_key="smart_headhunting.candidate_analysis",
             default_provider=settings.recruiting_ai_provider,
             default_model=settings.recruiting_ai_model,
         )
-        result = await generate_with_ai_gateway(
+        return await generate_with_ai_gateway(
             feature_key="smart_headhunting.candidate_analysis",
             user_id=user_id,
             company_id=company_id,
@@ -191,9 +223,26 @@ async def analyze_candidates(
                 {"role": "user", "content": user_prompt},
             ],
             max_output_tokens=12_000,
-            metadata_json={"ai_route_source": route.source},
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": "smart_headhunting.candidate_analysis",
+                "prompt_mode": "embedded_fallback",
+            },
         )
-    except AiGatewayError as exc:
+
+    try:
+        result = await generate_with_managed_prompt(
+            session,
+            prompt_key="smart_headhunting.candidate_analysis",
+            variables={
+                "job_requirements": _job_text(job),
+                "candidates_json": json.dumps(prepared, ensure_ascii=False),
+            },
+            user_id=user_id,
+            company_id=company_id,
+            fallback=fallback,
+        )
+    except (AiGatewayError, PromptRegistryError) as exc:
         raise RecruitingAiError("سرویس تحلیل هوش مصنوعی در دسترس نیست") from exc
 
     raw_rows = _extract_json_array(result.content)
@@ -279,7 +328,9 @@ async def fetch_sourced_candidates(
             response.raise_for_status()
             raw: object = response.json()
     except (httpx.HTTPError, ValueError) as exc:
-        raise RecruitingSourcingUnavailableError("دریافت کاندیدا از سرویس sourcing ناموفق بود") from exc
+        raise RecruitingSourcingUnavailableError(
+            "دریافت کاندیدا از سرویس sourcing ناموفق بود"
+        ) from exc
 
     if isinstance(raw, list):
         rows = raw
