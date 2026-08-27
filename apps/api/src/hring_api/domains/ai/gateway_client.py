@@ -14,6 +14,14 @@ class AiGatewayError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class AiCitation:
+    url: str
+    title: str | None = None
+    published_at: str | None = None
+    snippet: str | None = None
+
+
+@dataclass(frozen=True)
 class AiGatewayResult:
     request_id: UUID
     content: str
@@ -21,6 +29,7 @@ class AiGatewayResult:
     model: str
     usage: dict[str, int]
     provider_cost_microusd: int | None
+    citations: tuple[AiCitation, ...] = ()
 
 
 def _usage_dict(value: object) -> dict[str, int]:
@@ -41,6 +50,34 @@ def _optional_int(value: object) -> int | None:
     if isinstance(value, bool):
         return None
     return value if isinstance(value, int) else None
+
+
+def _optional_text(value: object, *, limit: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized[:limit] if normalized else None
+
+
+def _citations(value: object) -> tuple[AiCitation, ...]:
+    if not isinstance(value, list):
+        return ()
+    citations: list[AiCitation] = []
+    for item in value[:100]:
+        if not isinstance(item, dict):
+            continue
+        url = _optional_text(item.get("url"), limit=4096)
+        if url is None:
+            continue
+        citations.append(
+            AiCitation(
+                url=url,
+                title=_optional_text(item.get("title"), limit=500),
+                published_at=_optional_text(item.get("published_at"), limit=120),
+                snippet=_optional_text(item.get("snippet"), limit=2000),
+            )
+        )
+    return tuple(citations)
 
 
 async def generate_with_ai_gateway(
@@ -99,11 +136,21 @@ async def generate_with_ai_gateway(
         actual_model = returned_model if isinstance(returned_model, str) else model
         usage = _usage_dict(body.get("usage"))
         provider_cost = _optional_int(body.get("provider_cost_microusd"))
+        citations = _citations(body.get("citations"))
         latency_ms = round((monotonic() - started) * 1000)
         gateway_request_id = body.get("provider_request_id")
         metadata: dict[str, object] = dict(metadata_json or {})
         if isinstance(gateway_request_id, str):
             metadata["provider_request_id"] = gateway_request_id[:200]
+        if citations:
+            metadata["citations"] = [
+                {
+                    "url": citation.url,
+                    "title": citation.title,
+                    "published_at": citation.published_at,
+                }
+                for citation in citations
+            ]
 
         await persist_ai_usage_isolated(
             request_id=request_id,
@@ -128,6 +175,7 @@ async def generate_with_ai_gateway(
             model=actual_model,
             usage=usage,
             provider_cost_microusd=provider_cost,
+            citations=citations,
         )
     except Exception as exc:
         latency_ms = round((monotonic() - started) * 1000)

@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from hring_ai_gateway.config import GatewaySettings, get_settings
 from hring_ai_gateway.main import app
-from hring_ai_gateway.providers import normalize_usage, provider_config
+from hring_ai_gateway.providers import extract_citations, normalize_usage, provider_config
 
 
 def test_gateway_requires_internal_bearer_key() -> None:
@@ -47,6 +47,28 @@ def test_health_only_reports_provider_names(monkeypatch) -> None:
         response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["enabled_providers"] == ["gemini"]
+    assert "super-secret-provider-value" not in response.text
+    get_settings.cache_clear()
+
+
+def test_health_combines_environment_and_registry_provider_names(monkeypatch) -> None:
+    async def registry_names(_settings: GatewaySettings) -> list[str]:
+        return ["avalai.primary", "avalai.search"]
+
+    monkeypatch.setenv("GEMINI_API_KEY", "super-secret-provider-value")
+    monkeypatch.setattr(
+        "hring_ai_gateway.main.fetch_registry_provider_names",
+        registry_names,
+    )
+    get_settings.cache_clear()
+    with TestClient(app) as client:
+        response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["enabled_providers"] == [
+        "avalai.primary",
+        "avalai.search",
+        "gemini",
+    ]
     assert "super-secret-provider-value" not in response.text
     get_settings.cache_clear()
 
@@ -109,3 +131,29 @@ def test_perplexity_usage_keeps_search_cost_drivers() -> None:
         "citation_tokens": 12,
         "search_queries": 3,
     }
+
+
+def test_provider_citations_are_normalized_deduplicated_and_safe() -> None:
+    citations = extract_citations(
+        {
+            "citations": [
+                "https://example.com/report",
+                "javascript:alert(1)",
+            ],
+            "search_results": [
+                {
+                    "url": "https://example.com/report",
+                    "title": "Official report",
+                    "date": "2026-08-26",
+                    "snippet": "Verified source",
+                },
+                {"url": "https://news.example.com/item", "title": "News"},
+            ],
+        }
+    )
+    assert [item.url for item in citations] == [
+        "https://example.com/report",
+        "https://news.example.com/item",
+    ]
+    assert citations[0].title == "Official report"
+    assert citations[0].published_at == "2026-08-26"

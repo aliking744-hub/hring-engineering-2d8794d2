@@ -10,7 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hring_api.config import Settings
 from hring_api.domains.ai.feature_catalog import COMPAT_AI_FUNCTIONS
 from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
-from hring_api.domains.ai.gateway_client import AiGatewayError, generate_with_ai_gateway
+from hring_api.domains.ai.gateway_client import (
+    AiCitation,
+    AiGatewayError,
+    generate_with_ai_gateway,
+)
 from hring_api.domains.billing.credit_service import (
     compatibility_credit_cost,
     run_with_credit_reservation,
@@ -68,6 +72,19 @@ def _response_value(content: str) -> Any:
         return json.loads(text)
     except json.JSONDecodeError:
         return {"content": content}
+
+
+def _response_with_citations(
+    content: str,
+    citations: tuple[AiCitation, ...],
+) -> Any:
+    value = _response_value(content)
+    if citations and isinstance(value, dict):
+        value.setdefault("citations", [citation.url for citation in citations])
+        research_meta = value.get("researchMeta")
+        if isinstance(research_meta, dict):
+            research_meta.setdefault("sourcesFound", len(citations))
+    return value
 
 
 async def invoke_ai_function(
@@ -132,7 +149,7 @@ async def invoke_ai_function(
             )
         except AiGatewayError as exc:
             raise CompatFunctionError("HRing AI service is unavailable") from exc
-        return _response_value(result.content)
+        return _response_with_citations(result.content, result.citations)
 
     if principal is None:
         return await generate()

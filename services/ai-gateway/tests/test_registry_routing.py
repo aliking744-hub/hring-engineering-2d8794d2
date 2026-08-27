@@ -74,6 +74,13 @@ def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) ->
                     "id": "result-1",
                     "choices": [{"message": {"content": "fallback ok"}}],
                     "usage": {"prompt_tokens": 10, "completion_tokens": 3},
+                    "citations": ["https://example.com/report"],
+                    "search_results": [
+                        {
+                            "url": "https://example.com/report",
+                            "title": "Official report",
+                        }
+                    ],
                 },
             )
 
@@ -131,6 +138,9 @@ def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) ->
     assert result.model == "qwen-fallback-model"
     assert result.content == "fallback ok"
     assert result.usage == {"input_tokens": 10, "output_tokens": 3}
+    assert len(result.citations) == 1
+    assert result.citations[0].url == "https://example.com/report"
+    assert result.citations[0].title == "Official report"
 
 
 def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> None:
@@ -218,4 +228,3 @@ def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> 
     assert result.content == '{"ok":true}'
     assert result.usage == {"input_tokens": 11, "output_tokens": 4}
     assert result.provider_request_id == "anthropic-request"
-

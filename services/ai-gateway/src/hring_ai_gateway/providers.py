@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -9,7 +10,7 @@ from hring_ai_gateway.registry import (
     ProviderConfig,
     fetch_registry_providers,
 )
-from hring_ai_gateway.schemas import GenerateRequest, GenerateResponse
+from hring_ai_gateway.schemas import GatewayCitation, GenerateRequest, GenerateResponse
 
 
 class ProviderUnavailableError(RuntimeError):
@@ -125,6 +126,82 @@ def normalize_usage(body: dict[str, Any]) -> dict[str, int]:
         "search_queries": _nested_int(usage, "num_search_queries"),
     }
     return {key: value for key, value in normalized.items() if value > 0}
+
+
+def _optional_citation_text(value: object, *, limit: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized[:limit] if normalized else None
+
+
+def _safe_citation_url(value: object) -> str | None:
+    url = _optional_citation_text(value, limit=4096)
+    if url is None:
+        return None
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    return url
+
+
+def extract_citations(body: dict[str, Any]) -> list[GatewayCitation]:
+    """Normalize provider search metadata without exposing arbitrary payload fields."""
+
+    rows: list[GatewayCitation] = []
+    by_url: dict[str, int] = {}
+
+    def add(value: object) -> None:
+        if isinstance(value, str):
+            url = _safe_citation_url(value)
+            title = published_at = snippet = None
+        elif isinstance(value, dict):
+            url = _safe_citation_url(value.get("url"))
+            title = _optional_citation_text(value.get("title"), limit=500)
+            published_at = _optional_citation_text(
+                value.get("date") or value.get("published_at"),
+                limit=120,
+            )
+            snippet = _optional_citation_text(
+                value.get("snippet") or value.get("text"),
+                limit=2000,
+            )
+        else:
+            return
+        if url is None:
+            return
+        existing_index = by_url.get(url)
+        citation = GatewayCitation(
+            url=url,
+            title=title,
+            published_at=published_at,
+            snippet=snippet,
+        )
+        if existing_index is None:
+            if len(rows) >= 100:
+                return
+            by_url[url] = len(rows)
+            rows.append(citation)
+            return
+        existing = rows[existing_index]
+        rows[existing_index] = GatewayCitation(
+            url=url,
+            title=existing.title or citation.title,
+            published_at=existing.published_at or citation.published_at,
+            snippet=existing.snippet or citation.snippet,
+        )
+
+    citations = body.get("citations")
+    if isinstance(citations, list):
+        for item in citations:
+            add(item)
+    search_results = body.get("search_results")
+    if isinstance(search_results, list):
+        for item in search_results:
+            add(item)
+    return rows
 
 
 def _extract_content(body: dict[str, Any], adapter: str) -> str:
@@ -268,6 +345,7 @@ async def _generate_once(
         usage=normalize_usage(body),
         provider_request_id=provider_request_id,
         provider_cost_microusd=None,
+        citations=extract_citations(body),
     )
 
 

@@ -11,6 +11,7 @@ from hring_ai_gateway.providers import (
     enabled_provider_names,
     generate_openai_compatible,
 )
+from hring_ai_gateway.registry import fetch_registry_provider_names
 from hring_ai_gateway.schemas import GenerateRequest, GenerateResponse, HealthResponse
 
 
@@ -36,7 +37,9 @@ def require_internal_key(
 
 @app.get("/health", response_model=HealthResponse)
 async def health(settings: GatewaySettings = Depends(get_settings)) -> HealthResponse:
-    return HealthResponse(enabled_providers=enabled_provider_names(settings))
+    configured = set(enabled_provider_names(settings))
+    configured.update(await fetch_registry_provider_names(settings))
+    return HealthResponse(enabled_providers=sorted(configured))
 
 
 @app.get("/metrics", include_in_schema=False)

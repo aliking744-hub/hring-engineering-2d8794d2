@@ -137,3 +137,36 @@ async def fetch_registry_providers(
         for item in payload
         if (config := parse_registry_provider(item)) is not None
     ]
+
+
+async def fetch_registry_provider_names(settings: GatewaySettings) -> list[str]:
+    if not settings.hring_api_base_url:
+        return []
+    url = f"{settings.hring_api_base_url.rstrip('/')}/internal/integrations/ai/providers"
+    try:
+        async with httpx.AsyncClient(
+            timeout=min(settings.provider_registry_timeout_seconds, 1.0),
+            follow_redirects=False,
+        ) as client:
+            response = await client.get(
+                url,
+                headers={
+                    "Authorization": (f"Bearer {settings.internal_api_key.get_secret_value()}")
+                },
+            )
+            response.raise_for_status()
+    except (httpx.HTTPError, ValueError):
+        logger.warning("AI provider registry health lookup failed", exc_info=True)
+        return []
+    payload = response.json()
+    if not isinstance(payload, list):
+        return []
+    return sorted(
+        {
+            name.strip()
+            for item in payload
+            if isinstance(item, dict)
+            if isinstance((name := item.get("provider_key")), str)
+            if name.strip()
+        }
+    )

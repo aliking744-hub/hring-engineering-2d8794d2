@@ -4,6 +4,8 @@ import pytest
 from pydantic import SecretStr
 
 from hring_api.config import Settings
+from hring_api.domains.ai.gateway_client import AiCitation
+from hring_api.domains.compat.functions import _response_with_citations
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
 from hring_api.domains.compat.storage_policy import (
@@ -19,6 +21,21 @@ from hring_api.domains.compat.table_scope import TableScopeError, personal_owner
 def test_compat_query_rejects_invalid_table_names() -> None:
     with pytest.raises(ValueError):
         CompatQueryRequest(table="posts;drop table users", operation="select")
+
+
+def test_compat_ai_response_keeps_provider_citation_urls() -> None:
+    result = _response_with_citations(
+        '{"content":"answer","researchMeta":{}}',
+        (
+            AiCitation(url="https://example.com/one", title="One"),
+            AiCitation(url="https://example.com/two", title="Two"),
+        ),
+    )
+    assert result["citations"] == [
+        "https://example.com/one",
+        "https://example.com/two",
+    ]
+    assert result["researchMeta"]["sourcesFound"] == 2
 
 
 def test_compat_tables_are_deny_by_default() -> None:

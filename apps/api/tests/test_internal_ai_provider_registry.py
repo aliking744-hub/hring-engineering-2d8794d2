@@ -107,11 +107,29 @@ def test_internal_ai_registry_is_authenticated_ordered_and_not_documented() -> N
             assert providers[1]["secret"] is None
             assert providers[1]["default_model"] == "qwen-test"
 
+            inventory = client.get(
+                "/api/v1/internal/integrations/ai/providers",
+                headers={
+                    "Authorization": (
+                        f"Bearer {settings.ai_api_key.get_secret_value()}"
+                    )
+                },
+            )
+            assert inventory.status_code == 200, inventory.text
+            inventory_by_key = {item["provider_key"]: item for item in inventory.json()}
+            assert inventory_by_key[keys[0]] == {
+                "provider_key": keys[0],
+                "adapter": "gemini_openai",
+                "default_model": "gemini-test-model",
+            }
+            assert "secret" not in inventory.text
+
             openapi = client.get("/openapi.json")
             assert openapi.status_code == 200
             assert (
                 "/api/v1/internal/integrations/ai/providers/{alias}"
                 not in openapi.json()["paths"]
             )
+            assert "/api/v1/internal/integrations/ai/providers" not in openapi.json()["paths"]
     finally:
         asyncio.run(_delete_ai_routes(keys))

@@ -23,6 +23,13 @@ class GenerateRequest(BaseModel):
         return value.strip()
 
 
+class GatewayCitation(BaseModel):
+    url: str = Field(min_length=1, max_length=4096)
+    title: str | None = Field(default=None, max_length=500)
+    published_at: str | None = Field(default=None, max_length=120)
+    snippet: str | None = Field(default=None, max_length=2000)
+
+
 class GenerateResponse(BaseModel):
     content: str
     provider: str
@@ -30,6 +37,7 @@ class GenerateResponse(BaseModel):
     usage: dict[str, int]
     provider_request_id: str | None = None
     provider_cost_microusd: int | None = None
+    citations: list[GatewayCitation] = Field(default_factory=list, max_length=100)
 
 
 class HealthResponse(BaseModel):
