@@ -4,7 +4,11 @@ import httpx
 
 from hring_ai_gateway.config import GatewaySettings
 from hring_ai_gateway.providers import generate_openai_compatible
-from hring_ai_gateway.registry import ProviderConfig, parse_registry_provider
+from hring_ai_gateway.registry import (
+    ProviderConfig,
+    fetch_registry_provider_names,
+    parse_registry_provider,
+)
 from hring_ai_gateway.schemas import GenerateRequest
 
 
@@ -45,6 +49,34 @@ def test_registry_payload_supports_native_anthropic_defaults() -> None:
     assert provider is not None
     assert provider.endpoint_path == "/v1/messages"
     assert provider.max_tokens_field == "max_tokens"
+
+
+def test_registry_health_inventory_fails_closed_on_invalid_json(monkeypatch) -> None:
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, _exc_type, _exc, _traceback) -> None:
+            return None
+
+        async def get(self, url: str, *, headers: dict) -> httpx.Response:
+            _ = headers
+            return httpx.Response(
+                200,
+                request=httpx.Request("GET", url),
+                content=b"not-json",
+            )
+
+    monkeypatch.setattr(
+        "hring_ai_gateway.registry.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+    settings = GatewaySettings(hring_api_base_url="http://api:8000/api/v1")
+
+    assert asyncio.run(fetch_registry_provider_names(settings)) == []
 
 
 def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) -> None:

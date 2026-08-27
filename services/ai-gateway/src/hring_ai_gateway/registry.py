@@ -155,10 +155,10 @@ async def fetch_registry_provider_names(settings: GatewaySettings) -> list[str]:
                 },
             )
             response.raise_for_status()
+            payload = response.json()
     except (httpx.HTTPError, ValueError):
         logger.warning("AI provider registry health lookup failed", exc_info=True)
         return []
-    payload = response.json()
     if not isinstance(payload, list):
         return []
     return sorted(
