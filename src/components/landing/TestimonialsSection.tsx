@@ -22,16 +22,23 @@ const TestimonialsSection = () => {
   
   const testimonialsTitle = getSetting('testimonials_title', 'نظرات');
   const testimonialsTitleHighlight = getSetting('testimonials_title_highlight', 'مشتریان');
-  const testimonialsSubtitle = getSetting('testimonials_subtitle', 'ببینید چرا صدها شرکت به HRing اعتماد کرده‌اند');
+  const testimonialsSubtitle = getSetting('testimonials_subtitle', 'بازخورد مشتریان تأییدشده HRing');
   
-  const statCompanies = getSetting('stat_companies', '۵۰۰+');
+  const statCompanies = getSetting('stat_companies', '');
   const statCompaniesLabel = getSetting('stat_companies_label', 'شرکت فعال');
-  const statHiring = getSetting('stat_hiring', '۱۵,۰۰۰+');
+  const statHiring = getSetting('stat_hiring', '');
   const statHiringLabel = getSetting('stat_hiring_label', 'استخدام موفق');
-  const statSatisfaction = getSetting('stat_satisfaction', '۹۸٪');
+  const statSatisfaction = getSetting('stat_satisfaction', '');
   const statSatisfactionLabel = getSetting('stat_satisfaction_label', 'رضایت مشتریان');
-  const statSaving = getSetting('stat_saving', '۷۰٪');
+  const statSaving = getSetting('stat_saving', '');
   const statSavingLabel = getSetting('stat_saving_label', 'صرفه‌جویی زمان');
+
+  const verifiedStats = [
+    { value: statCompanies, label: statCompaniesLabel },
+    { value: statHiring, label: statHiringLabel },
+    { value: statSatisfaction, label: statSatisfactionLabel },
+    { value: statSaving, label: statSavingLabel },
+  ].filter((stat) => stat.value.trim() && stat.label.trim());
 
   const { data: testimonials, isLoading } = useQuery({
     queryKey: ["testimonials"],
@@ -130,7 +137,8 @@ const TestimonialsSection = () => {
         </div>
         )}
 
-        {/* Stats */}
+        {/* Only verified CMS metrics are public. */}
+        {verifiedStats.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -138,12 +146,7 @@ const TestimonialsSection = () => {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto"
         >
-          {[
-            { value: statCompanies, label: statCompaniesLabel },
-            { value: statHiring, label: statHiringLabel },
-            { value: statSatisfaction, label: statSatisfactionLabel },
-            { value: statSaving, label: statSavingLabel },
-          ].map((stat, index) => (
+          {verifiedStats.map((stat, index) => (
             <div
               key={stat.label}
               className="text-center p-4 rounded-xl bg-card/30 border border-border/30"
@@ -155,6 +158,7 @@ const TestimonialsSection = () => {
             </div>
           ))}
         </motion.div>
+        )}
       </div>
     </section>
   );
