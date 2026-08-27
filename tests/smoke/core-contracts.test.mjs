@@ -133,6 +133,21 @@ test('landing pricing uses backend plans and the shared diamond cost catalog', a
   assert.equal(/۲,۵۰۰,۰۰۰|۵,۰۰۰,۰۰۰|۱۲,۰۰۰,۰۰۰/.test(pricing), false);
 });
 
+test('public landing hides unverified metrics and provider endorsements by default', async () => {
+  const testimonials = await read('src/components/landing/TestimonialsSection.tsx');
+  const footer = await read('src/components/landing/Footer.tsx');
+  const shop = await read('src/components/landing/ShopTeaser.tsx');
+
+  assert.equal(/صدها شرکت|۵۰۰\+|۱۵,۰۰۰\+|۹۸٪|۷۰٪/.test(testimonials), false);
+  assert.match(testimonials, /getSetting\('stat_companies', ''\)/);
+  assert.match(testimonials, /verifiedStats\.length > 0/);
+  assert.equal(/getSetting\('footer_ai', 'Gemini'\)/.test(footer), false);
+  assert.match(footer, /footerAi &&/);
+  assert.match(shop, /useDigitalProducts/);
+  assert.match(shop, /product\.download_count\.toLocaleString/);
+  assert.equal(/۲\.۴k|۱\.۸k|۳\.۱k|۲\.۹k/.test(shop), false);
+});
+
 test('product catalogs describe the independent runtime and omit retired claims', async () => {
   const catalog = await read('src/pages/ProductCatalog.tsx');
   const staticCatalog = await read('public/hring-product-catalog.html');

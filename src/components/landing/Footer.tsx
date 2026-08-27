@@ -8,9 +8,9 @@ const Footer = () => {
   const { getSetting } = useSiteSettings();
   const siteName = useSiteName();
   
-  const footerCredit = getSetting('footer_credit', 'Architected by');
+  const footerCredit = getSetting('footer_credit', 'توسعه و معماری');
   const footerAuthor = getSetting('footer_author', 'Ali Dehghani');
-  const footerAi = getSetting('footer_ai', 'Gemini');
+  const footerAi = getSetting('footer_ai', '');
   const footerCopyright = getSetting('footer_copyright', 'تمامی حقوق محفوظ است');
   
   // Use dynamic footer logo or fallback
@@ -58,8 +58,12 @@ const Footer = () => {
           <p className="text-sm text-muted-foreground text-center md:text-right">
             {footerCredit}{" "}
             <span className="text-foreground">{footerAuthor}</span>
-            {" "}&{" "}
-            <span className="gradient-text-primary">{footerAi}</span>
+            {footerAi && (
+              <>
+                {" "}&{" "}
+                <span className="gradient-text-primary">{footerAi}</span>
+              </>
+            )}
           </p>
         </div>
 
