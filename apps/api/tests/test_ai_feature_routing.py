@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from hring_api.db.session import SessionFactory
 from hring_api.domains.access.models import PlatformRoleAssignment
-from hring_api.domains.ai.feature_catalog import AI_FEATURES
+from hring_api.domains.ai.feature_catalog import AI_FEATURES, COMPAT_AI_FUNCTIONS
 from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
 from hring_api.domains.identity.mfa_security import generate_totp_code
 from hring_api.main import app
@@ -141,10 +141,25 @@ def test_ai_feature_map_is_complete_admin_managed_and_runtime_effective() -> Non
         assert {"ai.feature_route.update", "ai.feature_route.reset"}.issubset(actions)
 
 
-def test_unicorn_ai_catalog_is_removed_without_breaking_shared_funding_route() -> None:
+def test_retired_strategy_ai_catalog_and_compat_functions_are_removed() -> None:
+    retired_feature_keys = {
+        "compat.generate-mental-prism",
+        "compat.analyze-competitor",
+        "compat.analyze-competitor-swot",
+        "compat.analyze-global-trends",
+        "compat.analyze-market-position",
+        "compat.analyze-tech-edge",
+        "compat.analyze-value-chain",
+        "compat.defense-builder",
+        "compat.fetch-company-intel",
+        "compat.generate-strategic-recommendations",
+        "compat.search-competitor-news",
+        "compat.track-funding",
+    }
     feature_keys = {feature.feature_key for feature in AI_FEATURES}
-    assert not any("unicorn" in feature_key for feature_key in feature_keys)
-    assert not any("یونیکورن" in feature.category for feature in AI_FEATURES)
-
-    funding = next(feature for feature in AI_FEATURES if feature.feature_key == "compat.track-funding")
-    assert funding.category == "استراتژی"
+    assert feature_keys.isdisjoint(retired_feature_keys)
+    assert not any(feature.category == "استراتژی" for feature in AI_FEATURES)
+    assert "generate-mental-prism" not in COMPAT_AI_FUNCTIONS
+    assert "track-funding" not in COMPAT_AI_FUNCTIONS
+    assert "compat.generate-job-ad" in feature_keys
+    assert "compat.legal-advisor-chat" in feature_keys

@@ -54,7 +54,6 @@ test('dashboard modules expose a visible return to the dashboard home', async ()
     read('src/pages/HRDashboard.tsx'),
     read('src/pages/CostCalculator.tsx'),
     read('src/pages/SmartHeadhunting.tsx'),
-    read('src/pages/StrategicCompass.tsx'),
     read('src/pages/LegalAdvisor.tsx'),
   ]);
 
@@ -222,11 +221,19 @@ test('FAQ reuses the live pricing and credit catalogs', async () => {
   assert.equal(/individual_expert/.test(faq), false);
 });
 
-test('estimated strategic analytics are visibly labelled', async () => {
-  const radar = await read('src/components/strategic-radar/RadarDashboard.tsx');
+test('retired strategy product surfaces are absent', async () => {
+  const app = await read('src/App.tsx');
+  const dashboard = await read('src/pages/Dashboard.tsx');
+  const catalog = await read('apps/api/src/hring_api/domains/ai/feature_catalog.py');
+  const productCatalog = await read('public/hring-product-catalog.html');
 
-  assert.match(radar, /برآورد سناریویی/);
-  assert.equal(/>\s*LIVE\s*</.test(radar), false);
+  for (const source of [app, dashboard, catalog, productCatalog]) {
+    assert.equal(
+      /StrategicCompass|StrategicRadar|strategic-compass|strategic-radar|قطب‌نمای استراتژیک|رادار اطلاعات استراتژیک/.test(source),
+      false,
+    );
+  }
+  assert.equal(/compat\.analyze-competitor|compat\.track-funding|compat\.generate-mental-prism/.test(catalog), false);
 });
 
 test('dashboards do not present invented operational metrics or retired modules', async () => {

@@ -72,7 +72,6 @@ const TIERS = [
     labelEn: "Vision Deck",
     icon: Compass,
     modules: [
-      { id: "strategic-compass", label: "قطب‌نمای استراتژی", desc: "سنجش هوشمند شکاف ذهنی و هم‌سویی مدیرعامل با ارشد مدیران", icon: Compass, path: "/strategic-compass" },
       { id: "legal-advisor", label: "مشاور حقوقی", desc: "دستیار هوشمند حقوقی برای مسائل منابع انسانی", icon: Scale, path: "/legal-advisor" },
       { id: "macro-analytics", label: "گزارش‌های کلان", desc: "شاخص‌های کلیدی سطح هلدینگ (مثل نرخ خروج کل، eNPS)", icon: TrendingUp, path: "#", comingSoon: true },
     ],

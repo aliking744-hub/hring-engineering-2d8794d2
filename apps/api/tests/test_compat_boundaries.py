@@ -59,8 +59,28 @@ def test_personal_scope_does_not_infer_company_sharing() -> None:
     assert scope_for("notifications").scope == "personal"
     assert scope_for("hr_uploads").scope == "personal"
     assert scope_for("learning_path_records").scope == "personal"
-    assert scope_for("strategic_radar_analyses").scope == "personal"
-    assert scope_for("unicorn_analyses").scope == "personal"
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        "strategic_radar_analyses",
+        "unicorn_analyses",
+        "behaviors",
+        "bet_allocations",
+        "decision_journals",
+        "intent_assignments",
+        "scenario_responses",
+        "scenarios",
+        "strategic_achievements",
+        "strategic_bets",
+        "strategic_intents",
+        "compass_user_roles",
+    ],
+)
+def test_retired_strategy_tables_are_not_exposed_by_compat_bridge(table: str) -> None:
+    with pytest.raises(TableScopeError):
+        scope_for(table)
 
 
 def test_dedicated_domains_cannot_fall_through_generic_query_bridge() -> None:
