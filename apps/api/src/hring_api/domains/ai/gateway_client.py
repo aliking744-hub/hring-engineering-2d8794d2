@@ -22,6 +22,12 @@ class AiCitation:
 
 
 @dataclass(frozen=True)
+class AiGeneratedImage:
+    url: str
+    mime_type: str | None = None
+
+
+@dataclass(frozen=True)
 class AiGatewayResult:
     request_id: UUID
     content: str
@@ -30,6 +36,7 @@ class AiGatewayResult:
     usage: dict[str, int]
     provider_cost_microusd: int | None
     citations: tuple[AiCitation, ...] = ()
+    images: tuple[AiGeneratedImage, ...] = ()
 
 
 def _usage_dict(value: object) -> dict[str, int]:
@@ -57,6 +64,25 @@ def _optional_text(value: object, *, limit: int) -> str | None:
         return None
     normalized = value.strip()
     return normalized[:limit] if normalized else None
+
+
+def _images(value: object) -> tuple[AiGeneratedImage, ...]:
+    if not isinstance(value, list):
+        return ()
+    images: list[AiGeneratedImage] = []
+    for item in value[:4]:
+        if not isinstance(item, dict):
+            continue
+        url = _optional_text(item.get("url"), limit=20_000_000)
+        if url is None:
+            continue
+        images.append(
+            AiGeneratedImage(
+                url=url,
+                mime_type=_optional_text(item.get("mime_type"), limit=120),
+            )
+        )
+    return tuple(images)
 
 
 def _citations(value: object) -> tuple[AiCitation, ...]:
@@ -92,6 +118,7 @@ async def generate_with_ai_gateway(
     temperature: float | None = None,
     max_output_tokens: int | None = None,
     response_format: str = "text",
+    modalities: list[str] | None = None,
     metadata_json: dict[str, object] | None = None,
 ) -> AiGatewayResult:
     """Call the internal provider hub and persist billing telemetry.
@@ -114,6 +141,8 @@ async def generate_with_ai_gateway(
         payload["temperature"] = temperature
     if max_output_tokens is not None:
         payload["max_output_tokens"] = max_output_tokens
+    if modalities is not None:
+        payload["modalities"] = modalities
 
     started = monotonic()
     url = f"{settings.ai_base_url.rstrip('/')}/generate"
@@ -137,11 +166,14 @@ async def generate_with_ai_gateway(
         usage = _usage_dict(body.get("usage"))
         provider_cost = _optional_int(body.get("provider_cost_microusd"))
         citations = _citations(body.get("citations"))
+        images = _images(body.get("images"))
         latency_ms = round((monotonic() - started) * 1000)
         gateway_request_id = body.get("provider_request_id")
         metadata: dict[str, object] = dict(metadata_json or {})
         if isinstance(gateway_request_id, str):
             metadata["provider_request_id"] = gateway_request_id[:200]
+        if images:
+            metadata["generated_image_count"] = len(images)
         if citations:
             metadata["citations"] = [
                 {
@@ -176,6 +208,7 @@ async def generate_with_ai_gateway(
             usage=usage,
             provider_cost_microusd=provider_cost,
             citations=citations,
+            images=images,
         )
     except Exception as exc:
         latency_ms = round((monotonic() - started) * 1000)
@@ -204,3 +237,4 @@ async def generate_with_ai_gateway(
         if isinstance(exc, AiGatewayError):
             raise
         raise AiGatewayError("AI Gateway request failed") from exc
+

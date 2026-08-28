@@ -152,6 +152,7 @@ async def generate_with_registered_prompt(
     user_id: UUID | None,
     company_id: UUID | None,
     credits_charged: int = 0,
+    modalities: list[str] | None = None,
 ) -> AiGatewayResult:
     """Resolve the published version and attach immutable prompt provenance.
 
@@ -187,6 +188,7 @@ async def generate_with_registered_prompt(
         temperature=version.temperature,
         max_output_tokens=version.max_output_tokens,
         response_format=version.response_format,
+        modalities=modalities,
         metadata_json={
             "prompt_key": prompt.prompt_key,
             "prompt_version_id": str(version.id),
@@ -214,6 +216,7 @@ async def generate_with_managed_prompt(
     company_id: UUID | None,
     fallback: Callable[[], Awaitable[AiGatewayResult]],
     credits_charged: int = 0,
+    modalities: list[str] | None = None,
 ) -> AiGatewayResult:
     """Use a published registry prompt, or preserve the embedded product prompt.
 
@@ -234,6 +237,7 @@ async def generate_with_managed_prompt(
             user_id=user_id,
             company_id=company_id,
             credits_charged=credits_charged,
+            modalities=modalities,
         )
     except (PromptNotFoundError, PromptConflictError):
         return await fallback()
@@ -808,3 +812,4 @@ async def rollback_prompt(
         ip_address=ip_address,
     )
     return prompt, restored
+

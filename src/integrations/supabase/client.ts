@@ -197,6 +197,15 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
   try {
     const body = (options?.body || {}) as Record<string, any>;
 
+    if (functionName === 'generate-job-ad') {
+      const data = await apiRequest('/job-ads/generate', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
     if (functionName === 'generate-interview-kit') {
       const data = await apiRequest('/interview/kits/generate', {
         method: 'POST',
@@ -430,5 +439,6 @@ export const supabase = {
 
 export type HringCompatibilityClient = typeof supabase;
 export { ApiError };
+
 
 

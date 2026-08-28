@@ -1,0 +1,239 @@
+import asyncio
+from types import SimpleNamespace
+from typing import Any
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+from hring_api.config import Settings
+from hring_api.domains.ai.gateway_client import (
+    AiGeneratedImage,
+    AiGatewayError,
+    AiGatewayResult,
+)
+from hring_api.domains.job_ads.schemas import (
+    SmartAdGenerateRequest,
+    SmartAdResponse,
+)
+from hring_api.domains.job_ads.service import _generate_content
+from hring_api.main import app
+
+
+PASSWORD = "correct horse battery staple"
+
+
+def _register(client: TestClient) -> dict[str, Any]:
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"smart-ad-{uuid4()}@example.com",
+            "password": PASSWORD,
+            "full_name": "Smart Ad Test",
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _payload(*, generate_image: bool = True) -> SmartAdGenerateRequest:
+    return SmartAdGenerateRequest.model_validate(
+        {
+            "jobTitle": "کارشناس منابع انسانی",
+            "companyName": "شرکت آزمایشی",
+            "contactMethod": "hr@example.com",
+            "industry": "فناوری اطلاعات",
+            "platform": "linkedin",
+            "tone": "formal",
+            "generateImage": generate_image,
+            "imageFormat": "16:9",
+            "imageWidth": 1920,
+            "imageHeight": 1080,
+        }
+    )
+
+
+def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
+    captured: list[dict[str, object]] = []
+
+    async def fake_route(**kwargs: object) -> SimpleNamespace:
+        feature_key = str(kwargs["feature_key"])
+        return SimpleNamespace(
+            provider="test",
+            model="image-model" if feature_key.endswith("image") else "text-model",
+            source="test",
+        )
+
+    async def fake_generate(**kwargs: Any) -> AiGatewayResult:
+        captured.append(kwargs)
+        if kwargs.get("modalities"):
+            return AiGatewayResult(
+                request_id=uuid4(),
+                content="",
+                provider="test",
+                model="image-model",
+                usage={},
+                provider_cost_microusd=2,
+                images=(
+                    AiGeneratedImage(
+                        url="data:image/png;base64,aGVsbG8=",
+                        mime_type="image/png",
+                    ),
+                ),
+            )
+        return AiGatewayResult(
+            request_id=uuid4(),
+            content="فرصتی برای ساختن آینده؛ به تیم ما بپیوندید. #استخدام",
+            provider="test",
+            model="text-model",
+            usage={},
+            provider_cost_microusd=1,
+        )
+
+    async def fake_managed(_session: object, **kwargs: Any) -> AiGatewayResult:
+        return await kwargs["fallback"]()
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.resolve_runtime_feature_route",
+        fake_route,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.generate_with_ai_gateway",
+        fake_generate,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.generate_with_managed_prompt",
+        fake_managed,
+    )
+
+    result = asyncio.run(
+        _generate_content(
+            payload=_payload(),
+            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+            text_credits=5,
+            image_credits=20,
+            settings=Settings(),
+            session=SimpleNamespace(),
+        )
+    )
+
+    assert result.generated_text.startswith("فرصتی")
+    assert result.image_url == "data:image/png;base64,aGVsbG8="
+    text_prompt = "\n".join(
+        message["content"]
+        for call in captured
+        if not call.get("modalities")
+        for message in call["messages"]
+    )
+    assert "Start with a compelling hook" in text_prompt
+    assert "Use hashtags at the bottom (3-5 relevant ones)" in text_prompt
+    assert "Formal and professional tone" in text_prompt
+
+    image_call = next(call for call in captured if call.get("modalities"))
+    assert image_call["modalities"] == ["image", "text"]
+    image_prompt = "\n".join(message["content"] for message in image_call["messages"])
+    assert 'عبارت "استخدام می‌کنیم"' in image_prompt
+    assert "ابعاد تصویر: 1920x1080" in image_prompt
+    assert "هیچ لوگویی قرار نده" in image_prompt
+    assert "اسم صنعت را روی تصویر ننویس" in image_prompt
+
+
+def test_image_failure_preserves_generated_text(monkeypatch) -> None:
+    async def fake_route(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(provider="test", model="test-model", source="test")
+
+    async def fake_generate(**kwargs: Any) -> AiGatewayResult:
+        if kwargs.get("modalities"):
+            raise AiGatewayError("image failed")
+        return AiGatewayResult(
+            request_id=uuid4(),
+            content="متن آگهی معتبر",
+            provider="test",
+            model="text-model",
+            usage={},
+            provider_cost_microusd=1,
+        )
+
+    async def fake_managed(_session: object, **kwargs: Any) -> AiGatewayResult:
+        return await kwargs["fallback"]()
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.resolve_runtime_feature_route",
+        fake_route,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.generate_with_ai_gateway",
+        fake_generate,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.generate_with_managed_prompt",
+        fake_managed,
+    )
+
+    result = asyncio.run(
+        _generate_content(
+            payload=_payload(),
+            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+            text_credits=5,
+            image_credits=20,
+            settings=Settings(),
+            session=SimpleNamespace(),
+        )
+    )
+    assert result.generated_text == "متن آگهی معتبر"
+    assert result.image_url is None
+
+
+def test_smart_ad_rejects_dimensions_that_do_not_match_format() -> None:
+    with pytest.raises(ValidationError):
+        SmartAdGenerateRequest.model_validate(
+            {
+                "jobTitle": "مدیر محصول",
+                "companyName": "HRing",
+                "contactMethod": "hr@example.com",
+                "platform": "instagram",
+                "tone": "friendly",
+                "generateImage": True,
+                "imageFormat": "9:16",
+                "imageWidth": 1920,
+                "imageHeight": 1080,
+            }
+        )
+
+
+def test_smart_ad_route_requires_auth_and_returns_ui_aliases(monkeypatch) -> None:
+    async def fake_ad(*_args: object, **_kwargs: object) -> SmartAdResponse:
+        return SmartAdResponse(
+            generated_text="متن آگهی",
+            image_url="data:image/png;base64,aGVsbG8=",
+        )
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.generate_smart_ad",
+        fake_ad,
+    )
+    payload = _payload().model_dump(by_alias=True)
+    with TestClient(app) as client:
+        unauthorized = client.post(
+            "/api/v1/job-ads/generate",
+            json=payload,
+            headers={"X-Idempotency-Key": "smart-ad-test-1"},
+        )
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.post(
+            "/api/v1/job-ads/generate",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {account['tokens']['access_token']}",
+                "X-Idempotency-Key": "smart-ad-test-2",
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "generatedText": "متن آگهی",
+            "imageUrl": "data:image/png;base64,aGVsbG8=",
+        }
+
