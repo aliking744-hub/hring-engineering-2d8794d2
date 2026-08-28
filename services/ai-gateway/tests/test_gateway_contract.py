@@ -2,7 +2,12 @@ from fastapi.testclient import TestClient
 
 from hring_ai_gateway.config import GatewaySettings, get_settings
 from hring_ai_gateway.main import app
-from hring_ai_gateway.providers import extract_citations, normalize_usage, provider_config
+from hring_ai_gateway.providers import (
+    extract_citations,
+    extract_generated_images,
+    normalize_usage,
+    provider_config,
+)
 
 
 def test_gateway_requires_internal_bearer_key() -> None:
@@ -157,3 +162,26 @@ def test_provider_citations_are_normalized_deduplicated_and_safe() -> None:
     ]
     assert citations[0].title == "Official report"
     assert citations[0].published_at == "2026-08-26"
+
+
+def test_generated_images_accept_safe_provider_output_only() -> None:
+    valid = "data:image/png;base64,aGVsbG8="
+    images = extract_generated_images(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": None,
+                        "images": [
+                            {"image_url": {"url": valid}, "mime_type": "image/png"},
+                            {"image_url": {"url": "javascript:alert(1)"}},
+                            {"image_url": {"url": "http://insecure.example/image.png"}},
+                        ],
+                    }
+                }
+            ]
+        }
+    )
+    assert [item.url for item in images] == [valid]
+    assert images[0].mime_type == "image/png"
+

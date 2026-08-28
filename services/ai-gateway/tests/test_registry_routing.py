@@ -260,3 +260,77 @@ def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> 
     assert result.content == '{"ok":true}'
     assert result.usage == {"input_tokens": 11, "output_tokens": 4}
     assert result.provider_request_id == "anthropic-request"
+
+
+def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    image_url = "data:image/png;base64,aGVsbG8="
+
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, _exc_type, _exc, _traceback) -> None:
+            return None
+
+        async def post(self, url: str, *, json: dict, headers: dict) -> httpx.Response:
+            captured.update({"url": url, "json": json, "headers": headers})
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", url),
+                json={
+                    "id": "image-result",
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "",
+                                "images": [{"image_url": {"url": image_url}}],
+                            }
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 20, "completion_tokens": 2},
+                },
+            )
+
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+    request = GenerateRequest.model_validate(
+        {
+            "request_id": "00000000-0000-0000-0000-000000000103",
+            "provider": "gemini",
+            "model": "gemini-image-model",
+            "messages": [{"role": "user", "content": "Create an image"}],
+            "modalities": ["image", "text"],
+        }
+    )
+    route = ProviderConfig(
+        name="avalai.image",
+        adapter="openai_compatible",
+        base_url="https://image.example/v1",
+        api_key="image-secret",
+        auth_scheme="bearer",
+        endpoint_path="/chat/completions",
+        max_tokens_field="max_completion_tokens",
+        default_model="gemini-image-model",
+        timeout_seconds=30,
+        max_retries=0,
+    )
+
+    result = asyncio.run(
+        generate_openai_compatible(
+            settings=GatewaySettings(),
+            request=request,
+            resolved_providers=[route],
+        )
+    )
+    payload = captured["json"]
+    assert isinstance(payload, dict)
+    assert payload["modalities"] == ["image", "text"]
+    assert result.content == ""
+    assert [item.url for item in result.images] == [image_url]
+
