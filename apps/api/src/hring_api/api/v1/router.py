@@ -17,6 +17,7 @@ from hring_api.domains.identity.account_security_routes import router as account
 from hring_api.domains.identity.routes import router as identity_router
 from hring_api.domains.integrations.internal_routes import router as internal_integrations_router
 from hring_api.domains.integrations.routes import router as integrations_router
+from hring_api.domains.job_engineering.routes import router as job_engineering_router
 from hring_api.domains.legal.routes import router as legal_router
 from hring_api.domains.recruiting.ai_routes import router as recruiting_ai_router
 from hring_api.domains.recruiting.routes import router as recruiting_router
@@ -41,5 +42,7 @@ api_router.include_router(internal_integrations_router)
 api_router.include_router(recruiting_router)
 api_router.include_router(recruiting_ai_router)
 api_router.include_router(development_router)
+api_router.include_router(job_engineering_router)
 api_router.include_router(legal_router)
 api_router.include_router(compat_router)
+
