@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     job_profile_ai_model: str = "gemini-2.5-flash-lite"
     interview_ai_provider: str = "gemini"
     interview_ai_model: str = "gemini-2.5-flash"
+    smart_ad_text_ai_provider: str = "gemini"
+    smart_ad_text_ai_model: str = "gemini-2.5-flash"
+    smart_ad_image_ai_provider: str = "gemini"
+    smart_ad_image_ai_model: str = "gemini-3-pro-image-preview"
     recruiting_enrichment_provider: str = "perplexity"
     recruiting_enrichment_model: str = "sonar"
     recruiting_sourcing_webhook_url: SecretStr | None = None
@@ -139,5 +143,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
 
 

@@ -13,7 +13,9 @@ class AiFeatureDefinition:
 AI_FEATURES = (
     AiFeatureDefinition("smart_headhunting.candidate_analysis", "تحلیل و امتیازدهی کاندیداها", "استخدام هوشمند", "تحلیل پنج‌لایه، امتیاز تطابق و پیشنهاد اقدام برای کاندیداها."),
     AiFeatureDefinition("smart_headhunting.web_enrichment", "تکمیل اطلاعات عمومی کاندیدا", "استخدام هوشمند", "جست‌وجوی اطلاعات عمومی حرفه‌ای برای غنی‌سازی تحلیل کاندیدا.", "enrichment"),
-    AiFeatureDefinition("compat.generate-job-ad", "تولید آگهی شغلی", "جذب و استخدام", "ساخت متن آگهی شغلی بر اساس نیاز سازمان."),
+    AiFeatureDefinition("job_ads.smart_ad_text", "متن آگهی هوشمند", "جذب و استخدام", "تولید متن آگهی متناسب با پلتفرم و لحن."),
+    AiFeatureDefinition("job_ads.smart_ad_image", "تصویر آگهی هوشمند", "جذب و استخدام", "تولید تصویر واقعی آگهی با ابعاد و سبک انتخاب‌شده."),
+    AiFeatureDefinition("compat.generate-job-ad", "تولید آگهی شغلی (مسیر قدیمی)", "جذب و استخدام", "ساخت متن آگهی شغلی بر اساس نیاز سازمان."),
     AiFeatureDefinition("compat.generate-smart-ad", "تولید آگهی هوشمند", "جذب و استخدام", "بهینه‌سازی آگهی شغلی برای انتشار و جذب بهتر."),
     AiFeatureDefinition("job_engineering.job_profile", "تولید پروفایل شغلی", "جذب و استخدام", "ساخت سند پنج‌بخشی هویت و مشخصات شغلی با ساختار استاندارد."),
     AiFeatureDefinition("compat.generate-job-profile", "تولید پروفایل شغلی (مسیر قدیمی)", "سازگاری", "مسیر قدیمی تا پایان دورهٔ بازگشت‌پذیری نگه‌داری می‌شود."),
@@ -34,5 +36,6 @@ COMPAT_AI_FUNCTIONS = frozenset(
     for feature in AI_FEATURES
     if feature.feature_key.startswith("compat.")
 ) | frozenset({"generate-onboarding-plan", "generate-learning-path"})
+
 
 
