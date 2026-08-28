@@ -5,6 +5,10 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 
+def _default_modalities() -> list[Literal["text", "image"]]:
+    return ["text"]
+
+
 class GatewayMessage(BaseModel):
     role: str = Field(pattern=r"^(system|developer|user|assistant)$")
     content: str = Field(min_length=1, max_length=500_000)
@@ -19,7 +23,7 @@ class GenerateRequest(BaseModel):
     max_output_tokens: int | None = Field(default=None, ge=1, le=200_000)
     response_format: str = Field(default="text", pattern=r"^(text|json_object)$")
     modalities: list[Literal["text", "image"]] = Field(
-        default_factory=lambda: ["text"],
+        default_factory=_default_modalities,
         min_length=1,
         max_length=2,
     )
@@ -87,4 +91,3 @@ class GenerateResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     enabled_providers: list[str]
-
