@@ -10,7 +10,12 @@ from hring_ai_gateway.registry import (
     ProviderConfig,
     fetch_registry_providers,
 )
-from hring_ai_gateway.schemas import GatewayCitation, GenerateRequest, GenerateResponse
+from hring_ai_gateway.schemas import (
+    GatewayCitation,
+    GatewayImage,
+    GenerateRequest,
+    GenerateResponse,
+)
 
 
 class ProviderUnavailableError(RuntimeError):
@@ -204,7 +209,25 @@ def extract_citations(body: dict[str, Any]) -> list[GatewayCitation]:
     return rows
 
 
-def _extract_content(body: dict[str, Any], adapter: str) -> str:
+def _choice_message(body: dict[str, Any]) -> dict[str, Any]:
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ProviderResponseError("Provider returned no choices")
+    first = choices[0]
+    if not isinstance(first, dict):
+        raise ProviderResponseError("Provider returned malformed choice")
+    message = first.get("message")
+    if not isinstance(message, dict):
+        raise ProviderResponseError("Provider returned no message")
+    return cast(dict[str, Any], message)
+
+
+def _extract_content(
+    body: dict[str, Any],
+    adapter: str,
+    *,
+    allow_empty: bool = False,
+) -> str:
     if adapter == "anthropic":
         blocks = body.get("content")
         if not isinstance(blocks, list):
@@ -216,23 +239,84 @@ def _extract_content(body: dict[str, Any], adapter: str) -> str:
             and block.get("type") == "text"
             and isinstance(block.get("text"), str)
         )
-        if text:
+        if text or allow_empty:
             return text
         raise ProviderResponseError("Anthropic returned no text content")
 
-    choices = body.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise ProviderResponseError("Provider returned no choices")
-    first = choices[0]
-    if not isinstance(first, dict):
-        raise ProviderResponseError("Provider returned malformed choice")
-    message = first.get("message")
-    if not isinstance(message, dict):
-        raise ProviderResponseError("Provider returned no message")
+    message = _choice_message(body)
     content = message.get("content")
     if isinstance(content, str):
         return content
+    if isinstance(content, list):
+        text = "".join(
+            block.get("text", "")
+            for block in content
+            if isinstance(block, dict)
+            and block.get("type") in {"text", "output_text"}
+            and isinstance(block.get("text"), str)
+        )
+        if text or allow_empty:
+            return text
+    if allow_empty and content is None:
+        return ""
     raise ProviderResponseError("Provider returned unsupported content")
+
+
+def _safe_generated_image_url(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    try:
+        return GatewayImage(url=normalized).url
+    except ValueError:
+        return None
+
+
+def extract_generated_images(body: dict[str, Any]) -> list[GatewayImage]:
+    """Normalize OpenAI-compatible image output without leaking arbitrary fields."""
+
+    try:
+        message = _choice_message(body)
+    except ProviderResponseError:
+        return []
+
+    rows: list[GatewayImage] = []
+    seen: set[str] = set()
+
+    def add(value: object, mime_type: object = None) -> None:
+        if isinstance(value, dict):
+            raw_url = value.get("url")
+        else:
+            raw_url = value
+        url = _safe_generated_image_url(raw_url)
+        if url is None or url in seen or len(rows) >= 4:
+            return
+        normalized_mime = (
+            mime_type.strip()[:120]
+            if isinstance(mime_type, str) and mime_type.strip()
+            else None
+        )
+        seen.add(url)
+        rows.append(GatewayImage(url=url, mime_type=normalized_mime))
+
+    images = message.get("images")
+    if isinstance(images, list):
+        for item in images:
+            if not isinstance(item, dict):
+                continue
+            add(item.get("image_url"), item.get("mime_type"))
+
+    content = message.get("content")
+    if isinstance(content, list):
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") in {"image_url", "output_image"}:
+                add(
+                    block.get("image_url") or block.get("url"),
+                    block.get("mime_type"),
+                )
+    return rows
 
 
 def _provider_headers(provider: ProviderConfig, request: GenerateRequest) -> dict[str, str]:
@@ -259,6 +343,8 @@ def _provider_headers(provider: ProviderConfig, request: GenerateRequest) -> dic
 
 
 def _anthropic_payload(request: GenerateRequest, model: str) -> dict[str, object]:
+    if "image" in request.modalities:
+        raise ProviderUnavailableError("Anthropic image output is not supported")
     if request.temperature is not None and request.temperature > 1:
         raise ProviderUnavailableError("Anthropic temperature must be between 0 and 1")
 
@@ -303,6 +389,8 @@ async def _generate_once(
             "messages": [message.model_dump() for message in request.messages],
             "stream": False,
         }
+        if request.modalities != ["text"]:
+            payload["modalities"] = request.modalities
         if request.temperature is not None:
             payload["temperature"] = request.temperature
         if request.max_output_tokens is not None:
@@ -338,14 +426,23 @@ async def _generate_once(
         body_id = body.get("id")
         provider_request_id = body_id if isinstance(body_id, str) else None
 
+    images = extract_generated_images(body)
+    if "image" in request.modalities and not images:
+        raise ProviderResponseError("Provider returned no generated image")
+
     return GenerateResponse(
-        content=_extract_content(body, provider.adapter),
+        content=_extract_content(
+            body,
+            provider.adapter,
+            allow_empty="image" in request.modalities,
+        ),
         provider=provider.name,
         model=model,
         usage=normalize_usage(body),
         provider_request_id=provider_request_id,
         provider_cost_microusd=None,
         citations=extract_citations(body),
+        images=images,
     )
 
 
@@ -387,3 +484,4 @@ async def generate_openai_compatible(
     if last_error is not None:
         raise last_error
     raise ProviderUnavailableError("No AI provider route is available")
+
