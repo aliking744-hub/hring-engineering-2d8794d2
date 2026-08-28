@@ -197,6 +197,15 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
   try {
     const body = (options?.body || {}) as Record<string, any>;
 
+    if (functionName === 'generate-job-profile') {
+      const data = await apiRequest('/job-engineering/job-profiles/generate', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
     if (functionName === 'auto-headhunt') {
       const campaignId = body.campaignId;
       if (typeof campaignId !== 'string' || !campaignId) throw new Error('campaignId is required');
@@ -412,3 +421,4 @@ export const supabase = {
 
 export type HringCompatibilityClient = typeof supabase;
 export { ApiError };
+
