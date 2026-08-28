@@ -54,12 +54,13 @@ class SmartAdGenerateRequest(BaseModel):
 
 
 class SmartAdResponse(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    generated_text: str = Field(alias="generatedText", min_length=1, max_length=40_000)
+    generated_text: str = Field(
+        serialization_alias="generatedText",
+        min_length=1,
+        max_length=40_000,
+    )
     image_url: str | None = Field(
         default=None,
-        alias="imageUrl",
+        serialization_alias="imageUrl",
         max_length=20_000_000,
     )
-
