@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     smart_ad_text_ai_model: str = "gemini-2.5-flash"
     smart_ad_image_ai_provider: str = "gemini"
     smart_ad_image_ai_model: str = "gemini-3-pro-image-preview"
+    legal_advisor_ai_provider: str = "gemini"
+    legal_advisor_ai_model: str = "gemini-2.5-flash"
     recruiting_enrichment_provider: str = "perplexity"
     recruiting_enrichment_model: str = "sonar"
     recruiting_sourcing_webhook_url: SecretStr | None = None
@@ -93,6 +95,7 @@ class Settings(BaseSettings):
     rate_limit_sms_request_per_minute: int = 5
     rate_limit_recovery_per_minute: int = 6
     rate_limit_mfa_per_minute: int = 10
+    rate_limit_legal_advisor_per_minute: int = 5
 
     @model_validator(mode="after")
     def reject_unsafe_production_configuration(self) -> "Settings":
