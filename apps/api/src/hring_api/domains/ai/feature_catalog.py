@@ -25,7 +25,8 @@ AI_FEATURES = (
     AiFeatureDefinition("development.onboarding_plan", "برنامه ورود و آنبوردینگ", "توسعه کارکنان", "ساخت برنامه ورود و شروع به کار نیروی جدید."),
     AiFeatureDefinition("development.learning_path", "مسیر یادگیری", "توسعه کارکنان", "ساخت مسیر توسعه مهارت و یادگیری شخصی‌سازی‌شده."),
     AiFeatureDefinition("compat.labor-complaint-assistant", "دستیار شکایت کار", "حقوقی", "راهنمای ساختاریافته برای موضوعات شکایت کار."),
-    AiFeatureDefinition("compat.legal-advisor-chat", "مشاور حقوقی", "حقوقی", "دستیار گفت‌وگویی برای راهنمایی حقوقی عمومی."),
+    AiFeatureDefinition("legal.advisor_chat", "مشاور حقوقی", "حقوقی", "پاسخ مستند بر پایهٔ پایگاه قوانین کار، سوابق مکالمه و پیوست‌های کاربر."),
+    AiFeatureDefinition("compat.legal-advisor-chat", "مشاور حقوقی (مسیر قدیمی)", "حقوقی", "مسیر سازگاری قدیمی؛ رابط کاربری اکنون از سرویس بومی حقوقی استفاده می‌کند."),
     AiFeatureDefinition("compat.search-legal-docs", "جست‌وجوی اسناد حقوقی", "حقوقی", "جست‌وجو و پاسخ بر پایه اسناد حقوقی."),
     AiFeatureDefinition("compat.hring-support", "دستیار پشتیبانی HRing", "پشتیبانی", "پاسخ‌گویی دستیار عمومی پشتیبانی HRing."),
 )

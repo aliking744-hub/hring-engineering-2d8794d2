@@ -224,6 +224,13 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
       notifyCreditsChanged();
       return { data, error: null };
     }
+    if (functionName === 'legal-advisor-chat') {
+      const data = await apiRequest('/legal/advisor/chat', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      return { data, error: null };
+    }
     if (functionName === 'auto-headhunt') {
       const campaignId = body.campaignId;
       if (typeof campaignId !== 'string' || !campaignId) throw new Error('campaignId is required');

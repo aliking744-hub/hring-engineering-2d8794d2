@@ -126,6 +126,51 @@ class LegalSearchResult(BaseModel):
     published_at: date | None
 
 
+class LegalConversationMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("content")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        return value.strip()
+
+
+class LegalAdvisorRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    query: str = Field(min_length=2, max_length=20_000)
+    images: list[str] = Field(default_factory=list, max_length=5)
+    pdfs: list[str] = Field(default_factory=list, max_length=5)
+    conversation_history: list[LegalConversationMessage] = Field(
+        default_factory=list,
+        alias="conversationHistory",
+        max_length=6,
+    )
+
+    @field_validator("query")
+    @classmethod
+    def normalize_advisor_query(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("Legal question is required")
+        return normalized
+
+
+class LegalAdvisorSource(BaseModel):
+    article_number: str | None = Field(serialization_alias="articleNumber")
+    category: str
+    similarity: float
+    title: str
+    source_url: str | None = Field(default=None, serialization_alias="sourceUrl")
+
+
+class LegalAdvisorResponse(BaseModel):
+    success: bool = True
+    answer: str = Field(min_length=1, max_length=40_000)
+    sources: list[LegalAdvisorSource] = Field(default_factory=list, max_length=3)
+
+
 class LegalStatsCategory(BaseModel):
     category: str
     sources: int

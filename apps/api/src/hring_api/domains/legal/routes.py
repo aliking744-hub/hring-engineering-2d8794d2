@@ -18,9 +18,17 @@ from fastapi import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
 from hring_api.domains.access.policy import PlatformPrincipal, require_platform_permission
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
+from hring_api.domains.legal.advisor import (
+    LegalAdvisorError,
+    LegalAdvisorInputError,
+    LegalAdvisorRateLimitError,
+    enforce_legal_advisor_rate_limit,
+    generate_legal_advice,
+)
 from hring_api.domains.legal.ingestion import (
     MAX_DOCUMENT_BYTES,
     LegalIngestionError,
@@ -28,6 +36,8 @@ from hring_api.domains.legal.ingestion import (
 )
 from hring_api.domains.legal.schemas import (
     Category,
+    LegalAdvisorRequest,
+    LegalAdvisorResponse,
     LegalHtmlImportRequest,
     LegalImportResponse,
     LegalKnowledgeStats,
@@ -106,6 +116,42 @@ async def search_legal_sources(
     db: AsyncSession = Depends(get_db_session),
 ) -> list[LegalSearchResult]:
     return await search_legal_knowledge(db, payload=payload)
+
+
+@router.post("/advisor/chat", response_model=LegalAdvisorResponse)
+async def legal_advisor_chat(
+    payload: LegalAdvisorRequest,
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> LegalAdvisorResponse:
+    try:
+        await enforce_legal_advisor_rate_limit(
+            user_id=principal.user_id,
+            settings=settings,
+        )
+        return await generate_legal_advice(
+            db,
+            payload=payload,
+            principal=principal,
+            settings=settings,
+        )
+    except LegalAdvisorRateLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(exc),
+            headers={"Retry-After": "60"},
+        ) from exc
+    except LegalAdvisorInputError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except LegalAdvisorError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/admin/stats", response_model=LegalKnowledgeStats)
