@@ -77,7 +77,7 @@ def _candidate_for_provider(candidate: CandidateAnalysisInput, source_index: int
     row = candidate.model_dump(
         by_alias=True,
         exclude_none=True,
-        exclude={"raw_data"},
+        exclude={"raw_data", "email", "phone", "linkedin"},
     )
     row["sourceIndex"] = source_index
     return row
