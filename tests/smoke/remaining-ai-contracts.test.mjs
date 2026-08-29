@@ -173,3 +173,12 @@ test('HR dashboard preserves the distinction between private uploads and truthfu
   assert.match(schemas, /max_length=2000/);
   assert.match(schemas, /5_000_000/);
 });
+
+
+test('standalone runtime fails fast without tenant provider encryption', async () => {
+  const compose = await read('compose.yaml');
+  const envExample = await read('.env.standalone.example');
+
+  assert.match(compose, /INTEGRATION_SECRET_ENCRYPTION_KEY:\s*\$\{INTEGRATION_SECRET_ENCRYPTION_KEY:\?set INTEGRATION_SECRET_ENCRYPTION_KEY\}/);
+  assert.match(envExample, /INTEGRATION_SECRET_ENCRYPTION_KEY=CHANGE_ME_FERNET_KEY_FOR_TENANT_PROVIDER_SECRETS/);
+});
