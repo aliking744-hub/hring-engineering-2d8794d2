@@ -182,3 +182,15 @@ test('standalone runtime fails fast without tenant provider encryption', async (
   assert.match(compose, /INTEGRATION_SECRET_ENCRYPTION_KEY:\s*\$\{INTEGRATION_SECRET_ENCRYPTION_KEY:\?set INTEGRATION_SECRET_ENCRYPTION_KEY\}/);
   assert.match(envExample, /INTEGRATION_SECRET_ENCRYPTION_KEY=CHANGE_ME_FERNET_KEY_FOR_TENANT_PROVIDER_SECRETS/);
 });
+
+
+test('PR66 includes a secret-safe staging transfer preflight', async () => {
+  const preflight = await read('scripts/pr66-staging-preflight.sh');
+  const uat = await read('docs/operations/PR744_PR66_STAGING_UAT_FA.md');
+
+  assert.match(preflight, /INTEGRATION_SECRET_ENCRYPTION_KEY/);
+  assert.match(preflight, /CHANGE_ME/);
+  assert.match(preflight, /docker compose --env-file/);
+  assert.match(preflight, /pr66-migration-roundtrip\.sh/);
+  assert.match(uat, /pr66-staging-preflight\.sh/);
+});
