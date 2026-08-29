@@ -24,6 +24,7 @@ export default function HRDashboard() {
   const [data, setData] = useState<Employee[] | null>(null);
   const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [dataSource, setDataSource] = useState<'upload' | 'demo'>('upload');
   const [restoring, setRestoring] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
     gender: [],
@@ -74,14 +75,20 @@ export default function HRDashboard() {
     return row?.id ?? null;
   }, [user]);
 
-  const handleDataLoaded = useCallback(async (employees: Employee[], name: string) => {
+  const handleDataLoaded = useCallback(async (employees: Employee[], name: string, source: 'upload' | 'demo') => {
     setData(employees);
+    setDataSource(source);
+    if (source === 'demo') {
+      setCurrentUploadId(null);
+      return;
+    }
     const id = await persistUpload(employees, name);
     setCurrentUploadId(id);
   }, [persistUpload]);
 
   const handleLoadFromHistory = useCallback((employees: Employee[], id: string) => {
     setData(employees);
+    setDataSource('upload');
     setCurrentUploadId(id);
   }, []);
 
@@ -171,6 +178,8 @@ export default function HRDashboard() {
             </Button>
           </div>
         </div>
+
+        {dataSource === 'demo' && <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">دادهٔ نمایشی است و در تاریخچهٔ سازمان ذخیره نشده.</div>}
 
         {/* Filter Bar */}
         <FilterBar filters={filters} onFilterChange={handleFilterChange} options={filterOptions} />
