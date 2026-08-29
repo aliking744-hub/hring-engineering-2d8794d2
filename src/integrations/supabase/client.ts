@@ -231,6 +231,13 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
       });
       return { data, error: null };
     }
+    if (functionName === 'defense-builder') {
+      const data = await apiRequest('/legal/defense/analyze', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      return { data, error: null };
+    }
     if (functionName === 'auto-headhunt') {
       const campaignId = body.campaignId;
       if (typeof campaignId !== 'string' || !campaignId) throw new Error('campaignId is required');

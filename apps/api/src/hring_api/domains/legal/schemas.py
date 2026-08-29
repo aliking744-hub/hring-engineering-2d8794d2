@@ -171,6 +171,104 @@ class LegalAdvisorResponse(BaseModel):
     sources: list[LegalAdvisorSource] = Field(default_factory=list, max_length=3)
 
 
+class LegalDefenseEvidenceInput(BaseModel):
+    name: str = Field(min_length=1, max_length=500)
+    type: Literal["pdf", "image"]
+    content: str = Field(min_length=16, max_length=20_000_000)
+
+
+class LegalDefenseRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    complaint: str | None = Field(default=None, max_length=20_000_000)
+    evidence: list[LegalDefenseEvidenceInput] = Field(default_factory=list, max_length=10)
+    additional_info: str = Field(default="", alias="additionalInfo", max_length=20_000)
+    conversation_history: list[LegalConversationMessage] = Field(
+        default_factory=list,
+        alias="conversationHistory",
+        max_length=6,
+    )
+
+    @model_validator(mode="after")
+    def require_case_context(self) -> "LegalDefenseRequest":
+        if not self.complaint and not self.conversation_history:
+            raise ValueError("Complaint document or conversation history is required")
+        self.additional_info = self.additional_info.strip()
+        return self
+
+
+class LegalDefenseClaim(BaseModel):
+    claim_type: str = Field(min_length=1, max_length=500)
+    description: str = Field(min_length=1, max_length=4_000)
+    amount_claimed: str | None = Field(default=None, max_length=500)
+
+
+class LegalDefenseRelevantLaw(BaseModel):
+    claim_type: str
+    article_number: str | None
+    category: str
+    content: str
+    similarity: float = Field(ge=0, le=1)
+
+
+class LegalDefenseEvidenceAnalysis(BaseModel):
+    claim_type: str
+    required_evidence: list[str] = Field(default_factory=list)
+    provided_evidence: list[str] = Field(default_factory=list)
+    missing_evidence: list[str] = Field(default_factory=list)
+    legal_basis: str = ""
+
+
+class LegalDefenseFollowUpQuestion(BaseModel):
+    question: str
+    reason: str
+    related_article: str = ""
+
+
+class LegalDefenseGapAnalysis(BaseModel):
+    evidence_analysis: list[LegalDefenseEvidenceAnalysis] = Field(
+        default_factory=list,
+        serialization_alias="evidenceAnalysis",
+    )
+    follow_up_questions: list[LegalDefenseFollowUpQuestion] = Field(
+        default_factory=list,
+        serialization_alias="followUpQuestions",
+    )
+    can_proceed: bool = Field(serialization_alias="canProceed")
+
+
+class LegalDefenseVerdict(BaseModel):
+    risk_score: float = Field(ge=0, le=100, serialization_alias="riskScore")
+    risk_level: Literal["low", "medium", "high", "critical"] = Field(
+        serialization_alias="riskLevel"
+    )
+    recommendation: Literal["fight", "settle", "needs_more_info"]
+    reasoning: str = Field(min_length=1, max_length=20_000)
+    key_strengths: list[str] = Field(
+        default_factory=list,
+        serialization_alias="keyStrengths",
+    )
+    key_weaknesses: list[str] = Field(
+        default_factory=list,
+        serialization_alias="keyWeaknesses",
+    )
+    defense_bill: str | None = Field(default=None, serialization_alias="defenseBill")
+    settlement_advice: str | None = Field(
+        default=None,
+        serialization_alias="settlementAdvice",
+    )
+
+
+class LegalDefenseResponse(BaseModel):
+    success: bool = True
+    claims: list[LegalDefenseClaim]
+    relevant_laws: list[LegalDefenseRelevantLaw] = Field(
+        serialization_alias="relevantLaws"
+    )
+    gap_analysis: LegalDefenseGapAnalysis = Field(serialization_alias="gapAnalysis")
+    verdict: LegalDefenseVerdict
+
+
 class LegalStatsCategory(BaseModel):
     category: str
     sources: int
