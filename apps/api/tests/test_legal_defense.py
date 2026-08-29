@@ -140,7 +140,7 @@ def test_legal_defense_preserves_three_phase_lovable_contract(monkeypatch) -> No
     )
 
     assert [call["prompt_key"] for call in calls] == [
-        "legal.defense_claims",
+        "legal.defense_builder",
         "legal.defense_gap",
         "legal.defense_verdict",
     ]

@@ -24,7 +24,7 @@ SEED_NAMESPACE = UUID("f6c12fc1-2075-41d5-a4a8-30d76d8835bc")
 
 PROMPTS: tuple[dict[str, object], ...] = (
     {
-        "key": "legal.defense_claims",
+        "key": "legal.defense_builder",
         "name": "دفاع کارفرما — استخراج ادعاها",
         "description": "استخراج ساختاریافته ادعاهای کارگر از متن واقعی دادخواست.",
         "system": """شما یک تحلیلگر حقوقی متخصص قانون کار ایران هستید.

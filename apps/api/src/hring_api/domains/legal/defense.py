@@ -44,7 +44,7 @@ from hring_api.domains.legal.service import search_legal_knowledge
 
 
 LEGAL_DEFENSE_FEATURE_KEY = "legal.defense_builder"
-CLAIMS_PROMPT_KEY = "legal.defense_claims"
+CLAIMS_PROMPT_KEY = LEGAL_DEFENSE_FEATURE_KEY
 GAP_PROMPT_KEY = "legal.defense_gap"
 VERDICT_PROMPT_KEY = "legal.defense_verdict"
 

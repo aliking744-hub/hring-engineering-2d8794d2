@@ -14,7 +14,7 @@ test("defense builder UI uses the dedicated independent endpoint", () => {
 
 test("native defense builder preserves the three-phase Lovable contract", () => {
   const defense = read("apps/api/src/hring_api/domains/legal/defense.py");
-  assert.match(defense, /legal\.defense_claims/);
+  assert.match(defense, /legal\.defense_builder/);
   assert.match(defense, /legal\.defense_gap/);
   assert.match(defense, /legal\.defense_verdict/);
   assert.match(defense, /match_count=3/);
