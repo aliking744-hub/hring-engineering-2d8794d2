@@ -1,12 +1,16 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+
+from hring_api.config import Settings, get_settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.db.session import get_db_session
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.recruiting.schemas import (
     AddCandidatesRequest,
+    AnalyzeCandidatesRequest,
+    AnalyzeCandidatesResponse,
     CampaignDetailResponse,
     CampaignResponse,
     CandidateResponse,
@@ -14,6 +18,7 @@ from hring_api.domains.recruiting.schemas import (
     UpdateCampaignRequest,
     UpdateCandidateStatusRequest,
 )
+from hring_api.domains.recruiting.ai_service import RecruitingAiError, analyze_candidates
 from hring_api.domains.recruiting.service import (
     CampaignNotFoundError,
     add_owner_candidates,
