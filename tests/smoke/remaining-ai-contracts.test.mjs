@@ -89,3 +89,17 @@ test('company AI connection control plane keeps secrets tenant-scoped and headhu
   assert.match(routes, /company\.integrations\.manage/);
   assert.match(migration, /down_revision: str \| None = "20260829_0027"/);
 });
+
+
+test('development and compatibility AI honor healthy company BYOK before managed billing', async () => {
+  const development = await read('apps/api/src/hring_api/domains/development/service.py');
+  const compatibility = await read('apps/api/src/hring_api/domains/compat/functions.py');
+
+  assert.match(development, /from hring_api\.domains\.company_ai\.service import uses_company_byok/);
+  assert.match(development, /capability_key=ONBOARDING_FEATURE_KEY/);
+  assert.match(development, /capability_key=LEARNING_PATH_FEATURE_KEY/);
+  assert.match(development, /if managed_cost == 0:/);
+  assert.match(compatibility, /capability_key=feature_key/);
+  assert.match(compatibility, /credits_charged=managed_cost/);
+  assert.match(compatibility, /if managed_cost <= 0:/);
+});
