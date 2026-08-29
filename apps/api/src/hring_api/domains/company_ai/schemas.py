@@ -72,3 +72,11 @@ class CompanyAiConnectionTestResponse(BaseModel):
     latency_ms: int | None
     message: str
     tested_at: datetime
+
+
+class CompanyAiCapabilityResponse(BaseModel):
+    feature_key: str
+    display_name: str
+    category: str
+    description: str
+    connection: CompanyAiConnectionResponse | None = None
