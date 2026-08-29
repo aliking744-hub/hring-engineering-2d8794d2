@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
 from uuid import UUID
 
@@ -20,21 +20,29 @@ from hring_api.domains.development.ai_service import (
     generate_onboarding_content,
 )
 from hring_api.domains.development.email import deliver_learning_path_email
-from hring_api.domains.development.models import LearningPath, OnboardingPlan
+from hring_api.domains.development.models import LearningPath, OnboardingPlan, OnboardingTask
 from hring_api.domains.development.repository import (
     create_learning_path,
     create_onboarding_plan,
+    create_onboarding_task,
     delete_learning_path,
     delete_onboarding_plan,
     get_learning_path,
     get_learning_path_by_idempotency,
     get_onboarding_plan_by_idempotency,
+    get_onboarding_task,
     list_learning_paths,
     list_onboarding_plans,
+    list_onboarding_tasks,
+    update_onboarding_task,
 )
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
     OnboardingGenerateRequest,
+    OnboardingPlanResponse,
+    OnboardingTaskCreateRequest,
+    OnboardingTaskResponse,
+    OnboardingTaskUpdateRequest,
 )
 from hring_api.domains.identity.dependencies import Principal
 
@@ -64,7 +72,10 @@ def _key_hash(raw_key: str) -> str:
 
 def _onboarding_matches(row: OnboardingPlan, payload: OnboardingGenerateRequest) -> bool:
     return (
-        row.job_title == payload.job_title
+        row.employee_name == payload.employee_name
+        and row.employee_email == payload.employee_email
+        and row.starts_on == payload.starts_on
+        and row.job_title == payload.job_title
         and row.seniority == payload.seniority
         and row.expectation == payload.expectation
         and row.mentor_role == payload.mentor_role
@@ -83,6 +94,111 @@ def _learning_path_matches(row: LearningPath, payload: LearningPathGenerateReque
         and row.experience_years == payload.experience_years
         and row.training_months == payload.training_months
     )
+
+
+async def _seed_onboarding_tasks(
+    session: AsyncSession,
+    *,
+    plan: OnboardingPlan,
+    actor_user_id: UUID,
+) -> None:
+    start = plan.starts_on or date.today()
+    owner = plan.mentor_role or "مدیر مستقیم"
+    seeds = [
+        (
+            "روز اول: خوش‌آمدگویی، معرفی تیم و دسترسی‌ها",
+            "تجهیزات، حساب‌ها و مسیر ارتباط با تیم را تأیید کنید.",
+            1,
+        ),
+        (
+            "هفتهٔ اول: مرور نقش، اهداف و مستندات",
+            "جلسهٔ هم‌راستاسازی با مدیر و مرور مستندات کلیدی نقش.",
+            7,
+        ),
+        (
+            "پایان ماه اول: بازخورد و تثبیت برنامه",
+            "بازخورد ساختاریافته بگیرید و اهداف ماه دوم را قطعی کنید.",
+            30,
+        ),
+        (
+            "پایان ماه دوم: بررسی مشارکت و موانع",
+            "پیشرفت عملی، موانع و نیازهای آموزشی را با مدیر مرور کنید.",
+            60,
+        ),
+        (
+            "پایان ماه سوم: ارزیابی ۹۰ روزه",
+            "جمع‌بندی اهداف، نتیجهٔ دوره و گام‌های بعدی توسعه.",
+            90,
+        ),
+    ]
+    for order, (title, details, offset) in enumerate(seeds):
+        await create_onboarding_task(
+            session,
+            plan=plan,
+            actor_user_id=actor_user_id,
+            values={
+                "title": title,
+                "details": details,
+                "assignee_label": owner,
+                "due_on": start + timedelta(days=offset),
+                "status": "todo",
+                "sort_order": order,
+            },
+            event_summary="تسک آغازین برنامهٔ ۹۰ روزه ساخته شد",
+        )
+
+
+def _task_response(task: OnboardingTask, events: list[object]) -> OnboardingTaskResponse:
+    response = OnboardingTaskResponse.model_validate(task)
+    return response.model_copy(
+        update={
+            "events": [
+                {
+                    "id": event.id,
+                    "event_type": event.event_type,
+                    "summary": event.summary,
+                    "actor_user_id": event.actor_user_id,
+                    "created_at": event.created_at,
+                }
+                for event in events
+            ]
+        }
+    )
+
+
+async def onboarding_workflow_response(
+    session: AsyncSession,
+    *,
+    plan: OnboardingPlan,
+) -> OnboardingPlanResponse:
+    task_map, event_map = await list_onboarding_tasks(session, plan_ids=[plan.id])
+    tasks = [
+        _task_response(task, event_map.get(task.id, []))
+        for task in task_map.get(plan.id, [])
+    ]
+    response = OnboardingPlanResponse.model_validate(plan)
+    return response.model_copy(update={"tasks": tasks})
+
+
+async def list_onboarding_workflows(
+    session: AsyncSession,
+    *,
+    owner_user_id: UUID,
+    limit: int,
+) -> list[OnboardingPlanResponse]:
+    plans = await list_onboarding_plans(session, owner_user_id=owner_user_id, limit=limit)
+    task_map, event_map = await list_onboarding_tasks(session, plan_ids=[plan.id for plan in plans])
+    return [
+        OnboardingPlanResponse.model_validate(plan).model_copy(
+            update={
+                "tasks": [
+                    _task_response(task, event_map.get(task.id, []))
+                    for task in task_map.get(plan.id, [])
+                ]
+            }
+        )
+        for plan in plans
+    ]
 
 
 async def generate_onboarding_plan(
@@ -133,12 +249,15 @@ async def generate_onboarding_plan(
             settings=settings,
             session=session,
         )
-        return await create_onboarding_plan(
+        row = await create_onboarding_plan(
             session,
             owner_user_id=principal.user_id,
             company_id=company_id,
             idempotency_key=key_hash,
             values={
+                "employee_name": payload.employee_name,
+                "employee_email": payload.employee_email,
+                "starts_on": payload.starts_on or date.today(),
                 "job_title": payload.job_title,
                 "seniority": payload.seniority,
                 "expectation": payload.expectation,
@@ -147,6 +266,8 @@ async def generate_onboarding_plan(
                 "welcome_email": welcome_email,
             },
         )
+        await _seed_onboarding_tasks(session, plan=row, actor_user_id=principal.user_id)
+        return row
 
     if managed_cost == 0:
         return await run_with_ai_execution_guard(
@@ -169,6 +290,79 @@ async def generate_onboarding_plan(
         request_id=request_id,
         operation=operation,
     )
+
+
+async def create_onboarding_workflow_task(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    payload: OnboardingTaskCreateRequest,
+    principal: Principal,
+) -> OnboardingTaskResponse:
+    plan = await get_onboarding_plan(session, plan_id=plan_id, owner_user_id=principal.user_id)
+    if plan is None:
+        raise DevelopmentNotFoundError("Onboarding plan was not found")
+    task = await create_onboarding_task(
+        session,
+        plan=plan,
+        actor_user_id=principal.user_id,
+        values=payload.model_dump(),
+        event_summary="تسک جدید به برنامه اضافه شد",
+    )
+    return await _single_task_response(session, task)
+
+
+async def update_onboarding_workflow_task(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    task_id: UUID,
+    payload: OnboardingTaskUpdateRequest,
+    principal: Principal,
+) -> OnboardingTaskResponse:
+    task = await get_onboarding_task(
+        session,
+        plan_id=plan_id,
+        task_id=task_id,
+        owner_user_id=principal.user_id,
+    )
+    if task is None:
+        raise DevelopmentNotFoundError("Onboarding task was not found")
+    values = payload.model_dump(exclude_unset=True)
+    if not values:
+        raise DevelopmentConflictError("At least one task field must be provided")
+
+    old_status = task.status
+    new_status = values.get("status", old_status)
+    if new_status == "completed" and old_status != "completed":
+        values["completed_at"] = datetime.now(UTC)
+        event_type = "completed"
+        event_summary = "تسک تکمیل شد"
+    elif old_status == "completed" and new_status != "completed":
+        values["completed_at"] = None
+        event_type = "reopened"
+        event_summary = "تسک دوباره باز شد"
+    else:
+        event_type = "updated"
+        event_summary = "جزئیات تسک به‌روزرسانی شد"
+
+    updated = await update_onboarding_task(
+        session,
+        task=task,
+        actor_user_id=principal.user_id,
+        values=values,
+        event_type=event_type,
+        event_summary=event_summary,
+    )
+    return await _single_task_response(session, updated)
+
+
+async def _single_task_response(
+    session: AsyncSession,
+    task: OnboardingTask,
+) -> OnboardingTaskResponse:
+    _, event_map = await list_onboarding_tasks(session, plan_ids=[task.plan_id])
+    return _task_response(task, event_map.get(task.id, []))
 
 
 async def generate_learning_path(
@@ -317,14 +511,3 @@ async def remove_onboarding_plan(
     )
     if not deleted:
         raise DevelopmentNotFoundError("Onboarding plan was not found")
-
-
-__all__ = [
-    "deliver_learning_path",
-    "generate_learning_path",
-    "generate_onboarding_plan",
-    "list_learning_paths",
-    "list_onboarding_plans",
-    "remove_learning_path",
-    "remove_onboarding_plan",
-]
