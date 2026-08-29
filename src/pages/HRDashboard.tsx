@@ -43,8 +43,11 @@ export default function HRDashboard() {
     }
     let cancelled = false;
     (async () => {
-      const rows = await apiRequest<Array<{ id: string; data?: Employee[] }>>('/hr-dashboard/uploads');
-      const row = rows[0];
+      const rows = await apiRequest<Array<{ id: string }>>('/hr-dashboard/uploads');
+      const latest = rows[0];
+      const row = latest
+        ? await apiRequest<{ id: string; data: Employee[] }>(`/hr-dashboard/uploads/${latest.id}`)
+        : null;
       if (cancelled) return;
       if (row) {
         setData((row.data as unknown as Employee[]) || []);
