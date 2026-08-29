@@ -13,12 +13,6 @@ from uuid import UUID, uuid5
 import sqlalchemy as sa
 from alembic import op
 
-from hring_api.domains.compat.labor_complaint import (
-    LABOR_SYSTEM_TEMPLATE,
-    LABOR_USER_TEMPLATE,
-)
-
-
 revision: str = "20260829_0025"
 down_revision: str | None = "20260829_0024"
 branch_labels: str | Sequence[str] | None = None
@@ -28,6 +22,28 @@ PROMPT_KEY = "legal.labor_complaint"
 SEED_NAMESPACE = UUID("a291059d-9ec7-49e4-9e23-1ba2562096ca")
 PROMPT_ID = str(uuid5(SEED_NAMESPACE, f"prompt:{PROMPT_KEY}"))
 VERSION_ID = str(uuid5(SEED_NAMESPACE, f"published-v1:{PROMPT_KEY}"))
+
+LABOR_SYSTEM_TEMPLATE = """شما یک وکیل متخصص حقوق کار ایران هستید. وظیفه شما تحلیل پرونده شکایت کارگر و ارزیابی شانس موفقیت است.
+
+قوانین مرتبط:
+{legal_context}
+
+بر اساس مدارک و قانون، احتمال موفقیت را از 0 تا 100 تخمین بزنید، نقاط قوت و ضعف و مدارک ناقص را مشخص کنید و توصیه عملی بدهید. اگر شانس موفقیت بالای 50% است، متن دادخواست رسمی تنظیم کنید.
+
+دادخواست باید با «ریاست محترم هیات تشخیص اداره کار...» شروع شود، به مواد مرتبط استناد کند، فرمت سامانه جامع روابط کار را رعایت کند و با «با احترام» و جای امضا پایان یابد.
+
+پاسخ فقط JSON معتبر با فیلدهای winProbability، riskLevel، strongPoints، weakPoints، missingEvidence، recommendation، complaintText و relevantArticles باشد."""
+
+LABOR_USER_TEMPLATE = """موضوع شکایت: {claim_label}
+
+وضعیت مدارک کارگر:
+{evidence_summary}
+
+مدارک ضروری که ندارد: {missing_required}
+
+تعداد فایل‌های اضافی: {additional_files_count}
+
+پرونده را تحلیل کنید و نتیجه را فقط در فرمت JSON قراردادشده بدهید."""
 
 VARIABLES = [
     "legal_context",
