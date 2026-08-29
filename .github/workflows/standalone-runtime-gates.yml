@@ -13,12 +13,15 @@ on:
       - "apps/api/**"
       - "services/ai-gateway/**"
       - "index.html"
+      - "src/**"
       - "public/**"
+      - "tests/**"
       - "scripts/generate-sitemap.ts"
+      - "scripts/pr66-*.sh"
       - "vite.config.ts"
       - "package.json"
       - "package-lock.json"
-      - ".github/workflows/standalone-runtime-gates.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
