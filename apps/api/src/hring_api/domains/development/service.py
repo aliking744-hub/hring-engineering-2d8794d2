@@ -11,6 +11,7 @@ from hring_api.domains.billing.credit_service import (
     feature_credit_cost,
     run_with_credit_reservation,
 )
+from hring_api.domains.company_ai.service import uses_company_byok
 from hring_api.domains.development.ai_service import (
     LEARNING_PATH_FEATURE_KEY,
     ONBOARDING_FEATURE_KEY,
@@ -109,6 +110,15 @@ async def generate_onboarding_plan(
         feature_key=ONBOARDING_FEATURE_KEY,
         default_cost=ONBOARDING_DEFAULT_CREDIT_COST,
     )
+    managed_cost = (
+        0
+        if await uses_company_byok(
+            session,
+            company_id=company_id,
+            capability_key=ONBOARDING_FEATURE_KEY,
+        )
+        else cost
+    )
 
     async def operation() -> OnboardingPlan:
         plan, welcome_email = await generate_onboarding_content(
@@ -118,7 +128,7 @@ async def generate_onboarding_plan(
             mentor_role=payload.mentor_role,
             user_id=principal.user_id,
             company_id=company_id,
-            credits_charged=cost,
+            credits_charged=managed_cost,
             settings=settings,
             session=session,
         )
@@ -137,10 +147,13 @@ async def generate_onboarding_plan(
             },
         )
 
+    if managed_cost == 0:
+        return await operation()
+
     return await run_with_credit_reservation(
         session,
         principal=principal,
-        amount=cost,
+        amount=managed_cost,
         idempotency_key=f"{ONBOARDING_FEATURE_KEY}:{key_hash}",
         feature_key=ONBOARDING_FEATURE_KEY,
         description="Generate native onboarding plan",
@@ -175,13 +188,22 @@ async def generate_learning_path(
         feature_key=LEARNING_PATH_FEATURE_KEY,
         default_cost=LEARNING_PATH_DEFAULT_CREDIT_COST,
     )
+    managed_cost = (
+        0
+        if await uses_company_byok(
+            session,
+            company_id=company_id,
+            capability_key=LEARNING_PATH_FEATURE_KEY,
+        )
+        else cost
+    )
 
     async def operation() -> LearningPath:
         result = await generate_learning_path_content(
             payload=payload,
             user_id=principal.user_id,
             company_id=company_id,
-            credits_charged=cost,
+            credits_charged=managed_cost,
             settings=settings,
             session=session,
         )
@@ -204,10 +226,13 @@ async def generate_learning_path(
             },
         )
 
+    if managed_cost == 0:
+        return await operation()
+
     return await run_with_credit_reservation(
         session,
         principal=principal,
-        amount=cost,
+        amount=managed_cost,
         idempotency_key=f"{LEARNING_PATH_FEATURE_KEY}:{key_hash}",
         feature_key=LEARNING_PATH_FEATURE_KEY,
         description="Generate native learning path",
