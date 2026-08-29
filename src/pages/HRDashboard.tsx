@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, LayoutDashboard, Cake, Banknote, MapPin, User, Clock, RefreshCw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AuroraBackground from '@/components/AuroraBackground';
-import { supabase } from '@/integrations/supabase/client';
+import { apiRequest } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 
@@ -43,12 +43,8 @@ export default function HRDashboard() {
     }
     let cancelled = false;
     (async () => {
-      const { data: row } = await supabase
-        .from('hr_uploads')
-        .select('id, data')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const rows = await apiRequest<Array<{ id: string; data?: Employee[] }>>('/hr-dashboard/uploads');
+      const row = rows[0];
       if (cancelled) return;
       if (row) {
         setData((row.data as unknown as Employee[]) || []);
@@ -61,17 +57,13 @@ export default function HRDashboard() {
 
   const persistUpload = useCallback(async (employees: Employee[], name: string) => {
     if (!user) return null;
-    const { data: row, error } = await supabase
-      .from('hr_uploads')
-      .insert([{
-        user_id: user.id,
-        name,
-        employee_count: employees.length,
-        data: employees as never,
-      }])
-      .select('id')
-      .single();
-    if (error) {
+    let row: { id: string };
+    try {
+      row = await apiRequest<{ id: string }>('/hr-dashboard/uploads', {
+        method: 'POST',
+        body: JSON.stringify({ name, data: employees }),
+      });
+    } catch {
       toast({ title: 'ذخیره نشد', description: 'بارگذاری در تاریخچه ذخیره نشد', variant: 'destructive' });
       return null;
     }
