@@ -3,7 +3,7 @@ import { History, FileSpreadsheet, Trash2, Loader2, Clock } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
+import { apiRequest } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Employee } from '@/types/employee';
@@ -32,17 +32,14 @@ export function UploadHistorySheet({ onLoad, currentUploadId, trigger, refreshKe
   const fetchList = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('hr_uploads')
-      .select('id, name, employee_count, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    setLoading(false);
-    if (error) {
+    try {
+      const data = await apiRequest<HrUpload[]>('/hr-dashboard/uploads');
+      setItems(data || []);
+    } catch {
       toast({ title: 'خطا', description: 'بارگذاری تاریخچه ناموفق بود', variant: 'destructive' });
-      return;
+    } finally {
+      setLoading(false);
     }
-    setItems(data || []);
   }, [user]);
 
   useEffect(() => {
@@ -51,17 +48,15 @@ export function UploadHistorySheet({ onLoad, currentUploadId, trigger, refreshKe
 
   const handleLoad = async (id: string) => {
     setLoadingId(id);
-    const { data, error } = await supabase
-      .from('hr_uploads')
-      .select('data')
-      .eq('id', id)
-      .maybeSingle();
-    setLoadingId(null);
-    if (error || !data) {
+    try {
+      const data = await apiRequest<{ data: Employee[] }>(`/hr-dashboard/uploads/${id}`);
+      onLoad(data.data || [], id);
+    } catch {
       toast({ title: 'خطا', description: 'بارگذاری داده ناموفق بود', variant: 'destructive' });
       return;
+    } finally {
+      setLoadingId(null);
     }
-    onLoad((data.data as unknown as Employee[]) || [], id);
     setOpen(false);
     toast({ title: 'بارگذاری شد', description: 'اطلاعات قبلی بازیابی شد' });
   };
@@ -69,8 +64,9 @@ export function UploadHistorySheet({ onLoad, currentUploadId, trigger, refreshKe
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('این بارگذاری حذف شود؟')) return;
-    const { error } = await supabase.from('hr_uploads').delete().eq('id', id);
-    if (error) {
+    try {
+      await apiRequest<void>(`/hr-dashboard/uploads/${id}`, { method: 'DELETE' });
+    } catch {
       toast({ title: 'خطا', description: 'حذف ناموفق بود', variant: 'destructive' });
       return;
     }
