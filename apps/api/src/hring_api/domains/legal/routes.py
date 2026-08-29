@@ -29,6 +29,13 @@ from hring_api.domains.legal.advisor import (
     enforce_legal_advisor_rate_limit,
     generate_legal_advice,
 )
+from hring_api.domains.legal.defense import (
+    LegalDefenseError,
+    LegalDefenseInputError,
+    LegalDefenseRateLimitError,
+    enforce_legal_defense_rate_limit,
+    generate_legal_defense,
+)
 from hring_api.domains.legal.ingestion import (
     MAX_DOCUMENT_BYTES,
     LegalIngestionError,
@@ -38,6 +45,8 @@ from hring_api.domains.legal.schemas import (
     Category,
     LegalAdvisorRequest,
     LegalAdvisorResponse,
+    LegalDefenseRequest,
+    LegalDefenseResponse,
     LegalHtmlImportRequest,
     LegalImportResponse,
     LegalKnowledgeStats,
@@ -148,6 +157,42 @@ async def legal_advisor_chat(
             detail=str(exc),
         ) from exc
     except LegalAdvisorError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/defense/analyze", response_model=LegalDefenseResponse)
+async def analyze_legal_defense(
+    payload: LegalDefenseRequest,
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> LegalDefenseResponse:
+    try:
+        await enforce_legal_defense_rate_limit(
+            user_id=principal.user_id,
+            settings=settings,
+        )
+        return await generate_legal_defense(
+            db,
+            payload=payload,
+            principal=principal,
+            settings=settings,
+        )
+    except LegalDefenseRateLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(exc),
+            headers={"Retry-After": "60"},
+        ) from exc
+    except LegalDefenseInputError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except LegalDefenseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),

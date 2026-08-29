@@ -26,6 +26,7 @@ AI_FEATURES = (
     AiFeatureDefinition("development.learning_path", "مسیر یادگیری", "توسعه کارکنان", "ساخت مسیر توسعه مهارت و یادگیری شخصی‌سازی‌شده."),
     AiFeatureDefinition("compat.labor-complaint-assistant", "دستیار شکایت کار", "حقوقی", "راهنمای ساختاریافته برای موضوعات شکایت کار."),
     AiFeatureDefinition("legal.advisor_chat", "مشاور حقوقی", "حقوقی", "پاسخ مستند بر پایهٔ پایگاه قوانین کار، سوابق مکالمه و پیوست‌های کاربر."),
+    AiFeatureDefinition("legal.defense_builder", "دفاع کارفرما", "حقوقی", "استخراج ادعا، تحلیل کسری مدارک، ارزیابی ریسک و تولید راهبرد یا لایحه دفاعیه."),
     AiFeatureDefinition("compat.legal-advisor-chat", "مشاور حقوقی (مسیر قدیمی)", "حقوقی", "مسیر سازگاری قدیمی؛ رابط کاربری اکنون از سرویس بومی حقوقی استفاده می‌کند."),
     AiFeatureDefinition("compat.search-legal-docs", "جست‌وجوی اسناد حقوقی", "حقوقی", "جست‌وجو و پاسخ بر پایه اسناد حقوقی."),
     AiFeatureDefinition("compat.hring-support", "دستیار پشتیبانی HRing", "پشتیبانی", "پاسخ‌گویی دستیار عمومی پشتیبانی HRing."),
@@ -37,6 +38,5 @@ COMPAT_AI_FUNCTIONS = frozenset(
     for feature in AI_FEATURES
     if feature.feature_key.startswith("compat.")
 ) | frozenset({"generate-onboarding-plan", "generate-learning-path"})
-
 
 
