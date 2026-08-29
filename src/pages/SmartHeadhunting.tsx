@@ -54,6 +54,7 @@ const SmartHeadhunting = () => {
   
   const [showNewCampaignForm, setShowNewCampaignForm] = useState(false);
   const [autoHeadhunting, setAutoHeadhunting] = useState(false);
+  const [enableWebEnrichment, setEnableWebEnrichment] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
@@ -471,7 +472,7 @@ const SmartHeadhunting = () => {
             },
             // Web enrichment is intentionally opt-in; imported private contact data
             // is not sent to the AI provider by the HRing API.
-            enableWebSearch: false,
+            enableWebSearch: enableWebEnrichment,
           }),
         });
 
@@ -752,8 +753,7 @@ const SmartHeadhunting = () => {
                           هدهانتینگ خودکار با هوش مصنوعی
                         </label>
                         <p className="text-sm text-slate-400 mt-1">
-                          سیستم با استفاده از Perplexity AI در اینترنت برای کاندیداهای مناسب جستجو می‌کند.
-                          برای نتایج بهتر، فایل اکسل آپلود کنید تا AI تحلیل عمیق‌تری انجام دهد.
+                          منبع‌یابی خودکار پس از اتصال امن sourcing انجام می‌شود. برای تحلیل فوری، فایل اکسل آپلود کنید.
                         </p>
                         {autoHeadhunting && (
                           <div className="mt-2 p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
@@ -836,6 +836,24 @@ const SmartHeadhunting = () => {
                           {pdfFiles.length} فایل آپلود شد
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-slate-700/50 bg-slate-800/50 p-4">
+                    <Checkbox
+                      id="webEnrichment"
+                      checked={enableWebEnrichment}
+                      onCheckedChange={(checked) => setEnableWebEnrichment(checked === true)}
+                      disabled={autoHeadhunting}
+                      className="mt-1"
+                    />
+                    <div>
+                      <label htmlFor="webEnrichment" className="cursor-pointer text-sm font-medium text-white">
+                        جست‌وجوی اطلاعات عمومی حرفه‌ای
+                      </label>
+                      <p className="mt-1 text-xs text-slate-400">
+                        اختیاری است؛ فقط نام، آخرین شرکت و صنعت هدف برای جست‌وجو ارسال می‌شود. ایمیل، تلفن و فایل رزومه ارسال نمی‌شود.
+                      </p>
                     </div>
                   </div>
 
