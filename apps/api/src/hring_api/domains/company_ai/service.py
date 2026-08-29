@@ -64,6 +64,31 @@ def _safe_base_url(value: str, settings: Settings) -> str:
     return normalized
 
 
+async def uses_company_byok(
+    session: AsyncSession,
+    *,
+    company_id: UUID | None,
+    capability_key: str,
+) -> bool:
+    """Whether this request is eligible for the customer's own provider bill.
+
+    A stale or unhealthy BYOK route is deliberately not considered billable;
+    Gateway will fail closed and any managed reservation is released.
+    """
+
+    if company_id is None or capability_key not in COMPANY_CONFIGURABLE_FEATURE_KEYS:
+        return False
+    connection = await get_company_ai_connection(
+        session, company_id=company_id, capability_key=capability_key
+    )
+    return bool(
+        connection is not None
+        and connection.mode == "byok"
+        and connection.is_active
+        and connection.status == "healthy"
+    )
+
+
 def connection_response(connection: CompanyAiConnection) -> CompanyAiConnectionResponse:
     return CompanyAiConnectionResponse(
         id=connection.id,
