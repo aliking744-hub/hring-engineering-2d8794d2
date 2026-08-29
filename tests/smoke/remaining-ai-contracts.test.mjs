@@ -84,6 +84,7 @@ test('company AI connection control plane keeps secrets tenant-scoped and headhu
   assert.match(service, /ProviderSecretCipher/);
   assert.match(service, /assert_provider_host_is_safe/);
   assert.match(service, /COMPANY_CONFIGURABLE_FEATURE_KEYS/);
+  assert.match(service, /existing\.secret_ciphertext is None/);
   assert.equal(/smart_headhunting\.candidate_analysis/.test(service), false);
   assert.match(routes, /company\.integrations\.read/);
   assert.match(routes, /company\.integrations\.manage/);
