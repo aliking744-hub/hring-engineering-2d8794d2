@@ -74,7 +74,7 @@ def _onboarding_matches(row: OnboardingPlan, payload: OnboardingGenerateRequest)
     return (
         row.employee_name == payload.employee_name
         and row.employee_email == payload.employee_email
-        and row.starts_on == payload.starts_on
+        and row.starts_on == (payload.starts_on or date.today())
         and row.job_title == payload.job_title
         and row.seniority == payload.seniority
         and row.expectation == payload.expectation
