@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import quote
 
@@ -224,7 +225,7 @@ async def public_support(
             detail="Support assistant returned no content",
         )
 
-    async def event_stream():
+    async def event_stream() -> AsyncIterator[str]:
         chunk = {
             "choices": [{"delta": {"content": answer}}],
         }
