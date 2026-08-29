@@ -30,7 +30,8 @@ AI_FEATURES = (
     AiFeatureDefinition("legal.defense_builder", "دفاع کارفرما", "حقوقی", "استخراج ادعا، تحلیل کسری مدارک، ارزیابی ریسک و تولید راهبرد یا لایحه دفاعیه."),
     AiFeatureDefinition("compat.legal-advisor-chat", "مشاور حقوقی (مسیر قدیمی)", "حقوقی", "مسیر سازگاری قدیمی؛ رابط کاربری اکنون از سرویس بومی حقوقی استفاده می‌کند."),
     AiFeatureDefinition("compat.search-legal-docs", "جست‌وجوی اسناد حقوقی", "حقوقی", "جست‌وجو و پاسخ بر پایه اسناد حقوقی."),
-    AiFeatureDefinition("compat.hring-support", "دستیار پشتیبانی HRing", "پشتیبانی", "پاسخ‌گویی دستیار عمومی پشتیبانی HRing."),
+    AiFeatureDefinition("support.hring", "دستیار پشتیبانی HRing", "پشتیبانی", "پاسخ‌گویی فارسی با دانش زنده قابلیت‌ها، مسیرها و تنظیمات پشتیبانی."),
+    AiFeatureDefinition("compat.hring-support", "دستیار پشتیبانی HRing (نام قدیمی)", "پشتیبانی", "نام سازگار رابط کاربری که به جریان بومی پشتیبانی هدایت می‌شود."),
 )
 
 AI_FEATURE_BY_KEY = {feature.feature_key: feature for feature in AI_FEATURES}
