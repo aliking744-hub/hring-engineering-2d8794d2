@@ -12,6 +12,7 @@ from hring_api.domains.recruiting.schemas import (
     CandidateResponse,
     CreateCampaignRequest,
     UpdateCampaignRequest,
+    UpdateCandidateStatusRequest,
 )
 from hring_api.domains.recruiting.service import (
     CampaignNotFoundError,
@@ -19,8 +20,10 @@ from hring_api.domains.recruiting.service import (
     create_owner_campaign,
     delete_owner_campaign,
     get_owner_campaign_detail,
+    get_owner_candidate,
     list_owner_campaigns,
     update_owner_campaign,
+    update_owner_candidate_status,
 )
 
 
@@ -152,3 +155,43 @@ async def add_candidates(
     for candidate in candidates:
         await db.refresh(candidate)
     return [CandidateResponse.model_validate(item) for item in candidates]
+
+
+@router.get("/campaigns/{campaign_id}/candidates/{candidate_id}", response_model=CandidateResponse)
+async def candidate_detail(
+    campaign_id: UUID,
+    candidate_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> CandidateResponse:
+    try:
+        candidate = await get_owner_candidate(
+            db, campaign_id=campaign_id, candidate_id=candidate_id, owner_user_id=principal.user_id
+        )
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return CandidateResponse.model_validate(candidate)
+
+
+@router.patch("/campaigns/{campaign_id}/candidates/{candidate_id}", response_model=CandidateResponse)
+async def update_candidate_status(
+    campaign_id: UUID,
+    candidate_id: UUID,
+    payload: UpdateCandidateStatusRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> CandidateResponse:
+    try:
+        candidate = await update_owner_candidate_status(
+            db,
+            campaign_id=campaign_id,
+            candidate_id=candidate_id,
+            owner_user_id=principal.user_id,
+            status=payload.status,
+        )
+    except CampaignNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await db.commit()
+    await db.refresh(candidate)
+    return CandidateResponse.model_validate(candidate)
