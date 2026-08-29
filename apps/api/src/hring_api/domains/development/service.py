@@ -20,7 +20,12 @@ from hring_api.domains.development.ai_service import (
     generate_onboarding_content,
 )
 from hring_api.domains.development.email import deliver_learning_path_email
-from hring_api.domains.development.models import (\n    LearningPath,\n    OnboardingPlan,\n    OnboardingTask,\n    OnboardingTaskEvent,\n)
+from hring_api.domains.development.models import (
+    LearningPath,
+    OnboardingPlan,
+    OnboardingTask,
+    OnboardingTaskEvent,
+)
 from hring_api.domains.development.repository import (
     create_learning_path,
     create_onboarding_plan,
@@ -148,7 +153,10 @@ async def _seed_onboarding_tasks(
         )
 
 
-def _task_response(\n    task: OnboardingTask,\n    events: list[OnboardingTaskEvent],\n) -> OnboardingTaskResponse:
+def _task_response(
+    task: OnboardingTask,
+    events: list[OnboardingTaskEvent],
+) -> OnboardingTaskResponse:
     response = OnboardingTaskResponse.model_validate(task)
     return response.model_copy(
         update={
