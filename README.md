@@ -1,57 +1,72 @@
 # HRing Engineering
 
-Subject: Re-Architect App to "Linear-Style" Website (Landing + Dashboard)
+مخزن مستقل HRing شامل وب‌اپ React، API مبتنی بر FastAPI، AI Gateway، Worker، PostgreSQL، Redis و Object Storage خصوصی MinIO است. اجرای عملیاتی سامانه به Lovable، Supabase Auth/Database/Storage/Edge Functions یا Lovable AI Gateway وابسته نیست.
 
-I need to restructure the project into a High-End SaaS Website inspired by the **Linear.app** design aesthetic.
-**Be strict with quality.** Do not use cheap effects.
+## اجزای اصلی
 
-**1. Architecture Update:**
-* **Home (`/`):** Premium Landing Page (Public).
-* **Dashboard (`/dashboard`):** Move the current app/modules here (Protected).
-* **Shop (`/shop`):** HR Document Marketplace.
-* **Auth (`/auth`):** Login/Signup.
+- `src/`: رابط کاربری React/Vite و سازگارساز API قدیمی.
+- `apps/api/`: هویت، Tenant/RBAC، Billing/Credit، قابلیت‌های محصول، Storage و Admin API.
+- `services/ai-gateway/`: Registry و مسیریابی Provider/Model/Prompt با کلیدهای server-side.
+- `apps/worker/`: کارهای پس‌زمینه و صف‌های AI/Notification/Maintenance.
+- `compose.yaml`: PostgreSQL، Redis، MinIO، API، Web، Worker و Observability.
+- `infra/`: تنظیمات استقرار، پایش و عملیات.
 
-**2. Design Language (The "Linear" Vibe):**
-* **Theme:** Deep Dark Blue/Black background (matching our brand).
-* **Background Effect:** NOT water. Use a **"Slow Moving Aurora Gradient"** (Mesh Gradient) in the background. It must feel "floating" and subtle, not distracting.
-* **Typography:** Clean, Sans-serif, High contrast text.
-* **Interactions:** Use `framer-motion` for everything.
-    * **Scroll Reveal:** Elements should fade up + scale up slightly as the user scrolls.
-    * **Mouse Spotlight:** On the Feature Cards, add a "Spotlight Effect" where a subtle glow follows the mouse cursor inside the card borders.
+نام `src/integrations/supabase` فقط یک facade سازگاری برای کد UI قدیمی است و از SDK یا Runtime سوپابیس استفاده نمی‌کند.
 
-**3. Landing Page Sections (`/`):**
-* **Hero:** Centered, Large Typography. "hring: سیستم مدیریت منابع انسانی نسل جدید". Subtext: "قدرت گرفته از هوش مصنوعی". CTA: "شروع کنید" (Glowing Button).
-* **Bento Grid Features:** Display our 4 modules (Job, Ad, Interview, Onboarding) in a "Bento Grid" layout. Glassmorphic cards with the spotlight effect.
-* **Interactive Preview:** A tilted 3D-style screenshot of the dashboard (Mockup) that floats slightly.
-* **Shop Teaser:** A horizontal scroll section showing contract templates.
-* **Footer:** Minimalist, containing the "Architected by Ali Dehghani & Gemini" credit.
+## اجرای مستقل
 
-**4. Responsiveness:**
-* Must be flawless on mobile.
-* The Background Gradient should be optimized for mobile performance.
-* Navbar transforms into a smooth animated drawer on mobile.
-
-**Action:** Refactor the app structure and build this premium landing page now.
-
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://hring-engineering.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d680f6d4-60b9-4876-a097-5cdb1c5f57d8).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+```bash
+cp .env.standalone.example .env.standalone
+# تمام CHANGE_MEها را با secretهای واقعی جایگزین کنید.
+docker compose --env-file .env.standalone up -d --build
+docker compose --env-file .env.standalone ps
+curl -fsS http://127.0.0.1:8080/api/v1/health
 ```
+
+Providerهای SMS، Email، Payment و AI تا زمانی که credential واقعی تنظیم نشود fail-closed یا disabled می‌مانند. Secretها نباید در Git، خروجی تست یا history شل ثبت شوند.
+
+## کنترل کیفیت
+
+```bash
+npm ci
+npm run check
+
+cd apps/api
+ruff check src tests
+mypy src
+pytest -q
+
+cd ../../services/ai-gateway
+ruff check src tests
+mypy src
+pytest -q
+```
+
+برای بسته نهایی PR66:
+
+```bash
+bash scripts/pr66-static-audit.sh
+bash scripts/pr66-offline-preflight.sh
+PR66_ENV_FILE=.env.standalone bash scripts/pr66-migration-roundtrip.sh
+```
+
+تست بار پذیرش با k6، به‌صورت پیش‌فرض ۱۰۰ کاربر وب و ۵ کار AI همزمان اجرا می‌کند:
+
+```bash
+k6 run \
+  -e BASE_URL=https://staging.hring.ir \
+  -e AI_TEST_URL=https://staging.hring.ir/api/v1/REPLACE_WITH_ACCEPTED_AI_ENDPOINT \
+  -e AI_AUTH_TOKEN=REPLACE_AT_RUNTIME \
+  -e AI_PAYLOAD='{"replace":"with accepted payload"}' \
+  tests/load/pr66-acceptance.js
+```
+
+## قواعد انتشار
+
+- تغییرات از شاخه نام‌دار و Pull Request وارد `main` می‌شوند.
+- Migrationهای schema فقط با Alembic انجام می‌شوند.
+- قبل از Merge باید Quality Gate، تست Migration و بازبینی امنیتی سبز باشند.
+- ابتدا یک Deploy یکپارچه روی Staging و UAT انجام می‌شود.
+- Production فقط با اجازه صریح مالک پروژه Deploy می‌شود.
+
+وضعیت و ترتیب اجرای بسته نهایی در `docs/engineering/PR66_EXECUTION_MATRIX_FA.md` نگهداری می‌شود.
