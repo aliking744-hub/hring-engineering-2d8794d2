@@ -9,7 +9,7 @@ import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
 
 interface UploadPageProps {
-  onDataLoaded: (data: Employee[], name: string) => void;
+  onDataLoaded: (data: Employee[], name: string, source: 'upload' | 'demo') => void;
   historySlot?: React.ReactNode;
 }
 
@@ -43,7 +43,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
         description: `${employees.length} رکورد با موفقیت بارگذاری شد`,
       });
 
-      onDataLoaded(employees, file.name);
+      onDataLoaded(employees, file.name, 'upload');
     } catch (error) {
       toast({
         title: 'خطا',
@@ -82,7 +82,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
       title: 'داده نمونه',
       description: '78 رکورد نمونه بارگذاری شد',
     });
-    onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
+    onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`, 'demo');
   }, [onDataLoaded]);
 
   const handleDownloadTemplate = useCallback(() => {
