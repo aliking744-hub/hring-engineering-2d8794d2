@@ -161,7 +161,7 @@ export default function HRDashboard() {
               <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">داشبورد منابع انسانی</h1>
               <p className="text-muted-foreground text-xs md:text-sm mt-1 hidden sm:block">تحلیل و گزارش‌گیری اطلاعات پرسنلی</p>
               {dataOrigin === 'demo' && (
-                <p className="mt-1 text-xs font-medium text-amber-400">حالت دمو — نمودارها با ۷۸ رکورد ساختگی نمایش داده می‌شوند.</p>
+                <p className="mt-1 text-xs font-medium text-amber-400">حالت دمو — نمودارها با {data.length.toLocaleString('fa-IR')} رکورد ساختگی نمایش داده می‌شوند.</p>
               )}
             </div>
           </div>
