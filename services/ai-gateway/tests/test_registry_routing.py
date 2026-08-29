@@ -3,7 +3,7 @@ import asyncio
 import httpx
 
 from hring_ai_gateway.config import GatewaySettings
-from hring_ai_gateway.providers import generate_openai_compatible
+from hring_ai_gateway.providers import ProviderUnavailableError, generate_openai_compatible
 from hring_ai_gateway.registry import (
     ProviderConfig,
     fetch_registry_provider_names,
@@ -406,3 +406,38 @@ def test_gateway_prefers_healthy_company_byok_route(monkeypatch) -> None:
     }
     assert result.provider == "company.openai"
     assert result.model == "company-model"
+
+
+def test_gateway_never_falls_back_to_platform_when_company_byok_route_is_invalid(monkeypatch) -> None:
+    async def invalid_company_route(_settings, *, company_id, feature_key):
+        _ = company_id, feature_key
+        raise CompanyAiRouteError("Company BYOK connection is unavailable")
+
+    async def platform_routes_should_not_run(*_args, **_kwargs):
+        raise AssertionError("platform provider fallback must not run for a failed company BYOK route")
+
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.fetch_company_ai_provider",
+        invalid_company_route,
+    )
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.provider_configs",
+        platform_routes_should_not_run,
+    )
+    request = GenerateRequest.model_validate(
+        {
+            "request_id": "00000000-0000-0000-0000-000000000709",
+            "company_id": "00000000-0000-0000-0000-000000000707",
+            "feature_key": "development.learning_path",
+            "provider": "gemini",
+            "model": "platform-model",
+            "messages": [{"role": "user", "content": "Create learning path"}],
+        }
+    )
+
+    try:
+        asyncio.run(generate_openai_compatible(settings=GatewaySettings(), request=request))
+    except ProviderUnavailableError as exc:
+        assert "Company BYOK connection is unavailable" in str(exc)
+    else:
+        raise AssertionError("company BYOK route failure must be fail-closed")
