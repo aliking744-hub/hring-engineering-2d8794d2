@@ -132,6 +132,8 @@ async def generate_with_ai_gateway(
     request_id = uuid4()
     payload: dict[str, object] = {
         "request_id": str(request_id),
+        "feature_key": feature_key,
+        "company_id": str(company_id) if company_id is not None else None,
         "provider": provider,
         "model": model,
         "messages": messages,
