@@ -70,6 +70,13 @@ jobs:
           alembic upgrade head
           pytest -q tests/test_legal_domain.py
 
+      - name: Validate PR66 transfer automation syntax
+        run: |
+          bash -n scripts/pr66-offline-preflight.sh
+          bash -n scripts/pr66-migration-roundtrip.sh
+          bash -n scripts/pr66-staging-preflight.sh
+          bash -n scripts/pr66-staging-smoke.sh
+
       - name: Validate Compose configuration
         run: |
           docker compose --env-file .env.standalone.example config --quiet
