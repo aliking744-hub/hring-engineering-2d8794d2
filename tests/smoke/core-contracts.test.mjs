@@ -226,8 +226,10 @@ test('retired strategy product surfaces are absent', async () => {
   const dashboard = await read('src/pages/Dashboard.tsx');
   const catalog = await read('apps/api/src/hring_api/domains/ai/feature_catalog.py');
   const productCatalog = await read('public/hring-product-catalog.html');
+  const individual = await read('src/components/dashboard/IndividualDashboard.tsx');
+  const corporate = await read('src/components/dashboard/CorporateDashboard.tsx');
 
-  for (const source of [app, dashboard, catalog, productCatalog]) {
+  for (const source of [app, dashboard, individual, corporate, catalog, productCatalog]) {
     assert.equal(
       /StrategicCompass|StrategicRadar|strategic-compass|strategic-radar|قطب‌نمای استراتژیک|رادار اطلاعات استراتژیک/.test(source),
       false,
@@ -246,7 +248,7 @@ test('dashboards do not present invented operational metrics or retired modules'
   assert.equal(/سارا احمدی|const hiringHealth = 95|\/unicorn-lab/.test(individual), false);
 
   assert.match(corporate, /members\.length/);
-  assert.match(corporate, /این داشبورد عدد نمونه نشان نمی‌دهد/);
+  assert.match(corporate, /دادهٔ نمونه را آگاهانه فعال کنید/);
   assert.equal(/پروژه‌های فعال|جلسات این هفته|\/unicorn-lab/.test(corporate), false);
 
   assert.equal(/planMaxCredits|allocatedCredits|creditPercentage/.test(dashboard), false);
