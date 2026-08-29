@@ -54,6 +54,16 @@
 4. هیچ تغییر این شاخه قبل از سبز شدن تست‌ها و بازبینی consolidated merge نمی‌شود.
 5. Production بدون اجازه صریح علی تغییر نمی‌کند.
 
+## خروجی‌های آماده‌شده تا این نقطه
+
+- `scripts/pr66-offline-preflight.sh`: گیت یکپارچه frontend/backend/gateway/Compose.
+- `scripts/pr66-static-audit.sh`: اسکن استقلال Runtime و موجودی Demo/Hardcode/Financial access.
+- `scripts/pr66-migration-roundtrip.sh`: Upgrade/Downgrade/Upgrade روی دیتابیس موقت و پاک‌سازی‌شونده.
+- `scripts/pr66-staging-smoke.sh`: Smoke غیرمخرب health/web/auth و ذخیره Evidence.
+- `tests/load/pr66-acceptance.js`: سناریوی ۱۰۰ کاربر وب و ۵ AI job همزمان.
+- `docs/engineering/PR66_LIVE_INPUTS_FA.md`: ورودی‌های زنده و مدرک موردنیاز هر گیت.
+- سخت‌سازی Marketplace و Credit Ledger: خرید و تراکنش اعتبار از مرورگر self-grant نمی‌شوند.
+
 ## ترتیب بارگذاری پس از فعال‌شدن Actions
 
 1. Sync شاخه با آخرین `main` و حل تعارض‌ها.
