@@ -17,7 +17,15 @@
 4. فایل‌ها با checksum و تنها پس از وجود owner/reference مقصد.
 5. داده‌های قابلیت‌ها؛ هر رکورد ناموفق به quarantine report می‌رود، نه حذف خاموش.
 
-## فایل Evidence اجباری
+## داده‌های داشبورد منابع انسانی
+
+داده‌های legacy جدول `hr_uploads` شخصی و بالقوه حاوی اطلاعات پرسنلی‌اند؛ به‌صورت خودکار از مرورگر یا هنگام deploy خوانده نمی‌شوند. در export read-only باید برای هر ردیف، `id`، `user_id`، `name`، `employee_count`، `data` و `created_at` گرفته شود. پس از تطبیق `user_id` با کاربر مقصد، هر ردیف معتبر به `hr_data_uploads` وارد می‌شود.
+
+- دادهٔ واقعی حتی اگر قدیمی باشد حفظ می‌شود.
+- فقط داده‌ای که صریحاً نمونه است (`name` با «داده نمونه» آغاز می‌شود) با `is_demo=true` علامت می‌خورد؛ حذف نمی‌شود.
+- ردیف بدون owner معتبر یا با آرایهٔ دادهٔ نامعتبر به quarantine report می‌رود.
+- count و checksum payloadهای HR جدا از سایر data-capabilityها reconcile می‌شود.
+\n## فایل Evidence اجباری
 
 برای هر entity: `source_count`، `imported_count`، `skipped_count`، `failed_count`، `relation_count`، `checksum` و مسیر rollback ثبت می‌شود. اختلاف count یا checksum مانع Cutover است.
 
