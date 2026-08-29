@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Briefcase, Users, Megaphone,
-  FileDown, Gem, Target, Radar
+  FileDown, Gem, Radar, BookOpen
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { Button } from '@/components/ui/button';
@@ -334,10 +334,10 @@ const IndividualDashboard = () => {
             <Button 
               variant="outline" 
               className="border-border bg-secondary/50 h-12"
-              onClick={() => navigate('/strategic-compass')}
+              onClick={() => navigate('/hr-dashboard')}
             >
-              <Target className="w-4 h-4 ml-2" />
-              قطب‌نمای استراتژی
+              <Users className="w-4 h-4 ml-2" />
+              داشبورد منابع انسانی
             </Button>
             <Button 
               variant="outline" 
@@ -350,10 +350,10 @@ const IndividualDashboard = () => {
             <Button 
               variant="outline" 
               className="border-cyan-500/50 bg-cyan-950/30 h-12 hover:bg-cyan-900/50 text-cyan-300"
-              onClick={() => navigate('/strategic-radar')}
+              onClick={() => navigate('/learning-path')}
             >
-              <Radar className="w-4 h-4 ml-2" />
-              رادار استراتژیک
+              <BookOpen className="w-4 h-4 ml-2" />
+              مسیر یادگیری
             </Button>
           </div>
         </motion.div>
