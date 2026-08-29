@@ -321,3 +321,17 @@ test('HR dashboard visibly distinguishes explicitly loaded demo data from upload
   assert.match(dashboard, /داده نمونه/);
   assert.match(history, /uploadId: string, name: string/);
 });
+
+
+test('HR dashboard history uses the native API and not a browser Supabase client', async () => {
+  const dashboard = await read('src/pages/HRDashboard.tsx');
+  const history = await read('src/components/hr-dashboard/UploadHistorySheet.tsx');
+
+  for (const source of [dashboard, history]) {
+    assert.equal(/integrations\/supabase|from\('hr_uploads'\)/.test(source), false);
+  }
+  assert.match(dashboard, /\/hr-data\/uploads\/latest/);
+  assert.match(dashboard, /\/hr-data\/uploads/);
+  assert.match(history, /\/hr-data\/uploads\?limit=50/);
+  assert.match(history, /\/hr-data\/uploads\/\$\{id\}/);
+});
