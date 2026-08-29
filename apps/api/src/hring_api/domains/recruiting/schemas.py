@@ -55,6 +55,10 @@ class AddCandidatesRequest(BaseModel):
     candidates: list[CandidateCreate] = Field(min_length=1, max_length=500)
 
 
+class UpdateCandidateStatusRequest(BaseModel):
+    status: str = Field(pattern=r"^(pending|approved|rejected|waiting)$")
+
+
 class CandidateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
