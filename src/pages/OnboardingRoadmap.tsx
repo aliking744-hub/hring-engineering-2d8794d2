@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -78,7 +78,7 @@ const OnboardingRoadmap = () => {
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [newTaskDueOn, setNewTaskDueOn] = useState("");
 
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
       const response = await apiRequest<OnboardingPlan[]>("/development/onboarding-plans");
