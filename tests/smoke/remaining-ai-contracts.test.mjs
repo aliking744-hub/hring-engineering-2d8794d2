@@ -69,3 +69,23 @@ test('new migrations are linear and headhunting remains out of scope', async () 
   assert.match(support, /down_revision: str \| None = "20260829_0025"/);
   assert.equal(/headhunt/i.test(labor + support), false);
 });
+
+
+test('company AI connection control plane keeps secrets tenant-scoped and headhunting deferred', async () => {
+  const model = await read('apps/api/src/hring_api/domains/company_ai/models.py');
+  const service = await read('apps/api/src/hring_api/domains/company_ai/service.py');
+  const routes = await read('apps/api/src/hring_api/domains/company_ai/routes.py');
+  const migration = await read(
+    'apps/api/alembic/versions/20260829_0028_company_ai_connections.py',
+  );
+
+  assert.match(model, /secret_ciphertext/);
+  assert.match(model, /uq_company_ai_connections_capability/);
+  assert.match(service, /ProviderSecretCipher/);
+  assert.match(service, /assert_provider_host_is_safe/);
+  assert.match(service, /COMPANY_CONFIGURABLE_FEATURE_KEYS/);
+  assert.equal(/smart_headhunting\.candidate_analysis/.test(service), false);
+  assert.match(routes, /company\.integrations\.read/);
+  assert.match(routes, /company\.integrations\.manage/);
+  assert.match(migration, /down_revision: str \| None = "20260829_0027"/);
+});
