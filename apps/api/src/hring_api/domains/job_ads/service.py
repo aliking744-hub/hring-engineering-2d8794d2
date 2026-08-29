@@ -16,6 +16,7 @@ from hring_api.domains.ai.prompt_service import (
     PromptRegistryError,
     generate_with_managed_prompt,
 )
+from hring_api.domains.company_ai.service import uses_company_byok
 from hring_api.domains.billing.credit_service import (
     feature_credit_cost,
     run_with_credit_reservation,
@@ -368,22 +369,33 @@ async def generate_smart_ad(
         feature_key=SMART_AD_TEXT_FEATURE_KEY,
         default_cost=SMART_AD_TEXT_DEFAULT_CREDIT_COST,
     )
-    billing_feature_key = (
-        SMART_AD_IMAGE_FEATURE_KEY
-        if payload.generate_image
-        else SMART_AD_TEXT_FEATURE_KEY
-    )
-    total_cost = (
+    image_cost = (
         await feature_credit_cost(
             session,
             feature_key=SMART_AD_IMAGE_FEATURE_KEY,
             default_cost=SMART_AD_IMAGE_DEFAULT_CREDIT_COST,
         )
         if payload.generate_image
-        else text_cost
+        else 0
     )
-    text_credits = min(text_cost, total_cost)
-    image_credits = max(0, total_cost - text_credits)
+    text_byok = await uses_company_byok(
+        session,
+        company_id=_company_id(principal),
+        capability_key=SMART_AD_TEXT_FEATURE_KEY,
+    )
+    image_byok = payload.generate_image and await uses_company_byok(
+        session,
+        company_id=_company_id(principal),
+        capability_key=SMART_AD_IMAGE_FEATURE_KEY,
+    )
+    text_credits = 0 if text_byok else text_cost
+    image_credits = 0 if image_byok else image_cost
+    billing_feature_key = (
+        SMART_AD_IMAGE_FEATURE_KEY
+        if image_credits > 0
+        else SMART_AD_TEXT_FEATURE_KEY
+    )
+    total_cost = text_credits + image_credits
     key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
 
     async def operation() -> SmartAdResponse:
@@ -395,6 +407,9 @@ async def generate_smart_ad(
             settings=settings,
             session=session,
         )
+
+    if total_cost == 0:
+        return await operation()
 
     return await run_with_credit_reservation(
         session,
