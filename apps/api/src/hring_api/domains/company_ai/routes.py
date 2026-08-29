@@ -8,6 +8,7 @@ from hring_api.db.session import get_db_session
 from hring_api.domains.access.policy import require_company_permission
 from hring_api.domains.company_ai.repository import list_company_ai_connections
 from hring_api.domains.company_ai.schemas import (
+    CompanyAiCapabilityResponse,
     CompanyAiConnectionResponse,
     CompanyAiConnectionTestResponse,
     CompanyAiConnectionUpsertRequest,
@@ -15,6 +16,7 @@ from hring_api.domains.company_ai.schemas import (
 from hring_api.domains.company_ai.service import (
     CompanyAiConnectionError,
     CompanyAiConnectionNotFoundError,
+    company_ai_capability_catalog,
     connection_response,
     delete_company_ai_connection,
     test_company_ai_connection,
@@ -65,6 +67,20 @@ async def company_ai_connection_list(
         db=db, principal=principal, company_id=company_id, permission_key="company.integrations.read"
     )
     return [connection_response(item) for item in await list_company_ai_connections(db, company_id=company_id)]
+
+
+@router.get("/catalog", response_model=list[CompanyAiCapabilityResponse])
+async def company_ai_capability_list(
+    company_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[CompanyAiCapabilityResponse]:
+    await _authorize_company(
+        db=db, principal=principal, company_id=company_id, permission_key="company.integrations.read"
+    )
+    return company_ai_capability_catalog(
+        await list_company_ai_connections(db, company_id=company_id)
+    )
 
 
 @router.put("/{capability_key}", response_model=CompanyAiConnectionResponse)
