@@ -388,12 +388,26 @@ async def generate_smart_ad(
         company_id=_company_id(principal),
         capability_key=SMART_AD_IMAGE_FEATURE_KEY,
     )
-    text_credits = 0 if text_byok else text_cost
-    image_credits = 0 if image_byok else image_cost
+    # The historical image price is a combined text+image package.  Preserve
+    # that price for managed execution, while billing only the managed part
+    # if the company independently supplies the other capability.
+    if not payload.generate_image:
+        text_credits = 0 if text_byok else text_cost
+        image_credits = 0
+    elif text_byok and image_byok:
+        text_credits = 0
+        image_credits = 0
+    elif image_byok:
+        text_credits = text_cost
+        image_credits = 0
+    elif text_byok:
+        text_credits = 0
+        image_credits = image_cost
+    else:
+        text_credits = min(text_cost, image_cost)
+        image_credits = max(0, image_cost - text_credits)
     billing_feature_key = (
-        SMART_AD_IMAGE_FEATURE_KEY
-        if image_credits > 0
-        else SMART_AD_TEXT_FEATURE_KEY
+        SMART_AD_IMAGE_FEATURE_KEY if image_credits > 0 else SMART_AD_TEXT_FEATURE_KEY
     )
     total_cost = text_credits + image_credits
     key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
