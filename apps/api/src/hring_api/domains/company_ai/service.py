@@ -13,6 +13,7 @@ from hring_api.domains.ai.feature_catalog import AI_FEATURE_BY_KEY
 from hring_api.domains.company_ai.models import CompanyAiConnection
 from hring_api.domains.company_ai.repository import get_company_ai_connection
 from hring_api.domains.company_ai.schemas import (
+    CompanyAiCapabilityResponse,
     CompanyAiConnectionResponse,
     CompanyAiConnectionTestResponse,
     CompanyAiConnectionUpsertRequest,
@@ -84,6 +85,27 @@ def connection_response(connection: CompanyAiConnection) -> CompanyAiConnectionR
         created_at=connection.created_at,
         updated_at=connection.updated_at,
     )
+
+
+def company_ai_capability_catalog(
+    connections: list[CompanyAiConnection],
+) -> list[CompanyAiCapabilityResponse]:
+    by_key = {item.capability_key: item for item in connections}
+    return [
+        CompanyAiCapabilityResponse(
+            feature_key=feature.feature_key,
+            display_name=feature.display_name,
+            category=feature.category,
+            description=feature.description,
+            connection=(
+                connection_response(by_key[feature.feature_key])
+                if feature.feature_key in by_key
+                else None
+            ),
+        )
+        for feature in AI_FEATURE_BY_KEY.values()
+        if feature.feature_key in COMPANY_CONFIGURABLE_FEATURE_KEYS
+    ]
 
 
 async def upsert_company_ai_connection(
