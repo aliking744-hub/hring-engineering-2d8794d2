@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from uuid import UUID
 from dataclasses import dataclass
 from urllib.parse import quote
 
@@ -11,6 +12,10 @@ from hring_ai_gateway.config import GatewaySettings
 
 
 logger = logging.getLogger(__name__)
+
+
+class CompanyAiRouteError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -137,6 +142,59 @@ async def fetch_registry_providers(
         for item in payload
         if (config := parse_registry_provider(item)) is not None
     ]
+
+
+async def fetch_company_ai_provider(
+    settings: GatewaySettings,
+    *,
+    company_id: UUID,
+    feature_key: str,
+) -> ProviderConfig | None:
+    """Fetch one tenant BYOK route over the authenticated internal channel.
+
+    The provider secret stays within server-to-server traffic.  A routing
+    outage deliberately fails closed so a BYOK request cannot become a
+    chargeable platform request.
+    """
+
+    if not settings.hring_api_base_url:
+        raise CompanyAiRouteError("Tenant AI routing is unavailable")
+    url = (
+        f"{settings.hring_api_base_url.rstrip('/')}/internal/companies/"
+        f"{quote(str(company_id), safe='')}/ai-connections/"
+        f"{quote(feature_key, safe='')}"
+    )
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.provider_registry_timeout_seconds,
+            follow_redirects=False,
+        ) as client:
+            response = await client.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {settings.internal_api_key.get_secret_value()}",
+                    "Accept": "application/json",
+                },
+            )
+            if response.status_code == 409:
+                raise CompanyAiRouteError("Company BYOK connection is not ready")
+            response.raise_for_status()
+            payload = response.json()
+    except CompanyAiRouteError:
+        raise
+    except (httpx.HTTPError, ValueError) as exc:
+        raise CompanyAiRouteError("Tenant AI routing is unavailable") from exc
+
+    if not isinstance(payload, dict):
+        raise CompanyAiRouteError("Tenant AI route is invalid")
+    if payload.get("mode") == "hring_managed":
+        return None
+    if payload.get("mode") != "byok":
+        raise CompanyAiRouteError("Tenant AI route is invalid")
+    config = parse_registry_provider(payload)
+    if config is None:
+        raise CompanyAiRouteError("Company BYOK connection is not ready")
+    return config
 
 
 async def fetch_registry_provider_names(settings: GatewaySettings) -> list[str]:
