@@ -145,7 +145,7 @@ class AnalyzeCandidatesRequest(BaseModel):
 
     candidates: list[CandidateAnalysisInput] = Field(min_length=1, max_length=100)
     job_requirements: JobRequirements = Field(alias="jobRequirements")
-    enable_web_search: bool = Field(default=True, alias="enableWebSearch")
+    enable_web_search: bool = Field(default=False, alias="enableWebSearch")
 
 
 class AutoSourceRequest(BaseModel):
