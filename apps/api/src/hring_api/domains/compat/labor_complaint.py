@@ -197,6 +197,7 @@ def fallback_result(context: LaborComplaintContext) -> dict[str, object]:
 def normalize_result(value: Any, context: LaborComplaintContext) -> dict[str, object]:
     if not isinstance(value, dict):
         return fallback_result(context)
+    result: dict[str, object] = {str(key): item for key, item in value.items()}
     required = {
         "winProbability",
         "riskLevel",
@@ -205,8 +206,8 @@ def normalize_result(value: Any, context: LaborComplaintContext) -> dict[str, ob
         "missingEvidence",
         "recommendation",
     }
-    if not required.issubset(value):
+    if not required.issubset(result):
         return fallback_result(context)
-    if not value.get("relevantArticles"):
-        value["relevantArticles"] = context.relevant_articles
-    return value
+    if not result.get("relevantArticles"):
+        result["relevantArticles"] = context.relevant_articles
+    return result
