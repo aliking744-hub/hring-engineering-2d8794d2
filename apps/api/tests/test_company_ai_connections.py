@@ -88,6 +88,16 @@ def test_company_byok_is_tenant_private_and_never_returns_secret() -> None:
         assert listed.json()[0]["capability_key"] == "job_ads.smart_ad_text"
         assert secret not in listed.text
 
+        catalog = client.get(
+            f"/api/v1/companies/{company_id}/ai-connections/catalog", headers=_auth(ceo)
+        )
+        assert catalog.status_code == 200, catalog.text
+        assert all(
+            not item["feature_key"].startswith("smart_headhunting.")
+            for item in catalog.json()
+        )
+        assert secret not in catalog.text
+
         assert client.get(
             f"/api/v1/companies/{company_id}/ai-connections", headers=_auth(outsider)
         ).status_code == 403
