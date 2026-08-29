@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -8,10 +8,20 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class OnboardingGenerateRequest(BaseModel):
+    employee_name: str | None = Field(default=None, max_length=240)
+    employee_email: str | None = Field(default=None, max_length=320)
+    starts_on: date | None = None
     job_title: str = Field(min_length=2, max_length=240)
     seniority: Literal["junior", "mid", "senior", "lead"]
     expectation: Literal["quick_delivery", "learning", "leadership", "innovation"]
     mentor_role: str | None = Field(default=None, max_length=240)
+
+    @field_validator("employee_name", "mentor_role")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
 
     @field_validator("job_title")
     @classmethod
@@ -21,18 +31,102 @@ class OnboardingGenerateRequest(BaseModel):
             raise ValueError("Job title is required")
         return normalized
 
-    @field_validator("mentor_role")
+    @field_validator("employee_email")
     @classmethod
-    def normalize_optional_text(cls, value: str | None) -> str | None:
+    def validate_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        local, separator, domain = normalized.rpartition("@")
+        if not separator or not local or "." not in domain or any(char.isspace() for char in normalized):
+            raise ValueError("Employee email is invalid")
+        return normalized
+
+
+class OnboardingTaskCreateRequest(BaseModel):
+    title: str = Field(min_length=2, max_length=500)
+    details: str | None = Field(default=None, max_length=4_000)
+    assignee_label: str | None = Field(default=None, max_length=240)
+    due_on: date | None = None
+    status: Literal["todo", "in_progress", "completed", "blocked"] = "todo"
+    sort_order: int = Field(default=0, ge=0, le=10_000)
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("Task title is required")
+        return normalized
+
+    @field_validator("details", "assignee_label")
+    @classmethod
+    def normalize_task_optional_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return value.strip() or None
+
+
+class OnboardingTaskUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=500)
+    details: str | None = Field(default=None, max_length=4_000)
+    assignee_label: str | None = Field(default=None, max_length=240)
+    due_on: date | None = None
+    status: Literal["todo", "in_progress", "completed", "blocked"] | None = None
+    sort_order: int | None = Field(default=None, ge=0, le=10_000)
+
+    @field_validator("title")
+    @classmethod
+    def normalize_optional_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("Task title is required")
+        return normalized
+
+    @field_validator("details", "assignee_label")
+    @classmethod
+    def normalize_update_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+class OnboardingTaskEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    event_type: str
+    summary: str
+    actor_user_id: UUID | None
+    created_at: datetime
+
+
+class OnboardingTaskResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    plan_id: UUID
+    title: str
+    details: str | None
+    assignee_label: str | None
+    due_on: date | None
+    status: str
+    sort_order: int
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    events: list[OnboardingTaskEventResponse] = Field(default_factory=list)
 
 
 class OnboardingPlanResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
+    employee_name: str | None
+    employee_email: str | None
+    starts_on: date | None
     job_title: str
     seniority: str
     expectation: str
@@ -40,6 +134,7 @@ class OnboardingPlanResponse(BaseModel):
     plan: str
     welcome_email: str = Field(serialization_alias="welcomeEmail")
     created_at: datetime
+    tasks: list[OnboardingTaskResponse] = Field(default_factory=list)
 
 
 class SkillRecommendation(BaseModel):
@@ -108,7 +203,7 @@ class LearningPathGenerateRequest(BaseModel):
 
     @field_validator("employee_email")
     @classmethod
-    def validate_email(cls, value: str | None) -> str | None:
+    def validate_learning_email(cls, value: str | None) -> str | None:
         if value is None:
             return None
         local, separator, domain = value.rpartition("@")
