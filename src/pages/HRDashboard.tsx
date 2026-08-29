@@ -8,15 +8,15 @@ import { MapTab } from '@/components/hr-dashboard/MapTab';
 import { ProfileTab } from '@/components/hr-dashboard/ProfileTab';
 import { OvertimeTab } from '@/components/hr-dashboard/OvertimeTab';
 import { UploadPage } from '@/components/hr-dashboard/UploadPage';
-import { UploadHistorySheet } from '@/components/hr-dashboard/UploadHistorySheet';
+import { UploadHistorySheet, HrUploadRecord } from '@/components/hr-dashboard/UploadHistorySheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, LayoutDashboard, Cake, Banknote, MapPin, User, Clock, RefreshCw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AuroraBackground from '@/components/AuroraBackground';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export default function HRDashboard() {
   });
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  // Restore most recent upload on login
+  // Restore the owner's most recent native HR upload after login.
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -43,42 +43,38 @@ export default function HRDashboard() {
       return;
     }
     let cancelled = false;
-    (async () => {
-      const { data: row } = await supabase
-        .from('hr_uploads')
-.select('id, name, data')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      if (row) {
-        setData((row.data as unknown as Employee[]) || []);
-        setDataOrigin(row.name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
+    void (async () => {
+      try {
+        const row = await apiRequest<HrUploadRecord | null>('/hr-data/uploads/latest');
+        if (cancelled || row === null) return;
+        setData(row.records);
+        setDataOrigin(row.is_demo ? 'demo' : 'uploaded');
         setCurrentUploadId(row.id);
+      } catch {
+        if (!cancelled) {
+          toast({ title: 'بازیابی نشد', description: 'آخرین بارگذاری HR در دسترس نیست', variant: 'destructive' });
+        }
+      } finally {
+        if (!cancelled) setRestoring(false);
       }
-      setRestoring(false);
     })();
     return () => { cancelled = true; };
   }, [user, authLoading]);
 
   const persistUpload = useCallback(async (employees: Employee[], name: string) => {
     if (!user) return null;
-    const { data: row, error } = await supabase
-      .from('hr_uploads')
-      .insert([{
-        user_id: user.id,
-        name,
-        employee_count: employees.length,
-        data: employees as never,
-      }])
-      .select('id')
-      .single();
-    if (error) {
+    const isDemo = name.startsWith('داده نمونه');
+    try {
+      const row = await apiRequest<HrUploadRecord>('/hr-data/uploads', {
+        method: 'POST',
+        body: JSON.stringify({ name, records: employees, is_demo: isDemo }),
+      });
+      setHistoryRefresh(k => k + 1);
+      return row.id;
+    } catch {
       toast({ title: 'ذخیره نشد', description: 'بارگذاری در تاریخچه ذخیره نشد', variant: 'destructive' });
       return null;
     }
-    setHistoryRefresh(k => k + 1);
-    return row?.id ?? null;
   }, [user]);
 
   const handleDataLoaded = useCallback(async (employees: Employee[], name: string) => {
@@ -88,9 +84,9 @@ export default function HRDashboard() {
     setCurrentUploadId(id);
   }, [persistUpload]);
 
-  const handleLoadFromHistory = useCallback((employees: Employee[], id: string, name: string) => {
+  const handleLoadFromHistory = useCallback((employees: Employee[], id: string, _name: string, isDemo: boolean) => {
     setData(employees);
-    setDataOrigin(name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
+    setDataOrigin(isDemo ? 'demo' : 'uploaded');
     setCurrentUploadId(id);
   }, []);
 
