@@ -310,3 +310,14 @@ test('marketplace purchases cannot be self-granted from the browser', async () =
   assert.equal(/from\(['\"]user_purchases['\"]\)[\s\S]{0,300}\.insert/.test(products), false);
   assert.match(products, /download-product/);
 });
+
+
+test('HR dashboard visibly distinguishes explicitly loaded demo data from uploaded records', async () => {
+  const dashboard = await read('src/pages/HRDashboard.tsx');
+  const history = await read('src/components/hr-dashboard/UploadHistorySheet.tsx');
+
+  assert.match(dashboard, /dataOrigin/);
+  assert.match(dashboard, /حالت دمو/);
+  assert.match(dashboard, /داده نمونه/);
+  assert.match(history, /uploadId: string, name: string/);
+});
