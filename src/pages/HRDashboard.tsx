@@ -22,6 +22,7 @@ export default function HRDashboard() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<Employee[] | null>(null);
+  const [dataOrigin, setDataOrigin] = useState<'demo' | 'uploaded' | null>(null);
   const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [restoring, setRestoring] = useState(true);
@@ -45,13 +46,14 @@ export default function HRDashboard() {
     (async () => {
       const { data: row } = await supabase
         .from('hr_uploads')
-        .select('id, data')
+.select('id, name, data')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (cancelled) return;
       if (row) {
         setData((row.data as unknown as Employee[]) || []);
+        setDataOrigin(row.name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
         setCurrentUploadId(row.id);
       }
       setRestoring(false);
@@ -81,12 +83,14 @@ export default function HRDashboard() {
 
   const handleDataLoaded = useCallback(async (employees: Employee[], name: string) => {
     setData(employees);
+    setDataOrigin(name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
     const id = await persistUpload(employees, name);
     setCurrentUploadId(id);
   }, [persistUpload]);
 
-  const handleLoadFromHistory = useCallback((employees: Employee[], id: string) => {
+  const handleLoadFromHistory = useCallback((employees: Employee[], id: string, name: string) => {
     setData(employees);
+    setDataOrigin(name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
     setCurrentUploadId(id);
   }, []);
 
@@ -160,6 +164,9 @@ export default function HRDashboard() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">داشبورد منابع انسانی</h1>
               <p className="text-muted-foreground text-xs md:text-sm mt-1 hidden sm:block">تحلیل و گزارش‌گیری اطلاعات پرسنلی</p>
+              {dataOrigin === 'demo' && (
+                <p className="mt-1 text-xs font-medium text-amber-400">حالت دمو — نمودارها با ۷۸ رکورد ساختگی نمایش داده می‌شوند.</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -170,7 +177,7 @@ export default function HRDashboard() {
                 refreshKey={historyRefresh}
               />
             )}
-            <Button variant="outline" size="sm" onClick={() => setData(null)} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setData(null); setDataOrigin(null); }} className="gap-2">
               <RefreshCw className="w-4 h-4" />
               <span>بارگذاری مجدد</span>
             </Button>
