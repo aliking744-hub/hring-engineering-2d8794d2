@@ -42,6 +42,7 @@ HRing دو مسیر هم‌زمان و شفاف برای مصرف قابلیت�
 2. در `byok`، secret بازگشایی‌شده فقط در حافظهٔ همان درخواست برای Adapter استفاده می‌شود؛ ledger HRing دست‌نخورده می‌ماند.
 3. در `hring_managed`، Credit Service با idempotency key درخواست، اعتبار را reserve می‌کند؛ پس از پاسخ موفق consume و در خطا/timeout release می‌کند.
 4. usage record شامل `billing_mode`، Provider/مدل انتخاب‌شده، token/latency و وضعیت است؛ نه secret و نه متن حساس.
+5. اجرای BYOK که اعتبار HRing ندارد نیز با lease پایدار idempotency قفل می‌شود؛ retry هم‌زمان نباید Provider شرکت را دوباره فراخوانی کند.
 5. قیمت managed تنها از catalog سمت سرور می‌آید. مرورگر مقدار هزینه یا mode تحمیل نمی‌کند.
 
 ## UI مورد انتظار
@@ -63,7 +64,7 @@ UI تنظیم اتصال در «تنظیمات شرکت» نیز آماده اس
 
 - [ ] Company A نمی‌تواند Connection شرکت B را بخواند، تست کند یا تغییر دهد.
 - [ ] secret در GET، audit، Exception و UI دیده نمی‌شود.
-- [ ] BYOK موفق، credit ledger را تغییر نمی‌دهد.
+- [ ] BYOK موفق، credit ledger را تغییر نمی‌دهد و retry هم‌زمان Provider را دوباره صدا نمی‌زند.
 - [ ] Managed موفق reserve→consume و خطا reserve→release را با idempotency تکراری دقیقاً یک‌بار انجام می‌دهد.
 - [ ] انتخاب BYOK نامعتبر هرگز پنهانی به Managed fall back نمی‌کند.
 - [ ] حذف/rotate کلید فوراً اجرای BYOK را متوقف و audit ایجاد می‌کند.
