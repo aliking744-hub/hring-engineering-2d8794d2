@@ -33,6 +33,12 @@ from hring_api.domains.compat.labor_complaint import (
     normalize_result,
     required_evidence,
 )
+from hring_api.domains.compat.support import (
+    SupportContext,
+    SupportInputError,
+    build_support_context,
+    support_text,
+)
 from hring_api.domains.identity.dependencies import Principal
 
 
@@ -128,6 +134,7 @@ async def invoke_ai_function(
 
     serialized = json.dumps(body, ensure_ascii=False, default=str)
     labor_context: LaborComplaintContext | None = None
+    support_context: SupportContext | None = None
     if name == "labor-complaint-assistant":
         if session is None:
             raise CompatFunctionError("Labor complaint analysis requires a database session")
@@ -139,6 +146,17 @@ async def invoke_ai_function(
         system_prompt = LABOR_SYSTEM_TEMPLATE.format_map(prompt_variables)
         user_prompt = LABOR_USER_TEMPLATE.format_map(prompt_variables)
         feature_key = "legal.labor_complaint"
+    elif name == "hring-support":
+        if session is None:
+            raise CompatFunctionError("HRing support requires a database session")
+        try:
+            support_context = await build_support_context(session, body)
+        except SupportInputError as exc:
+            raise CompatFunctionError(str(exc)) from exc
+        prompt_variables = support_context.prompt_variables()
+        system_prompt = support_context.system_prompt
+        user_prompt = support_context.conversation_json
+        feature_key = "support.hring"
     else:
         system_prompt = (
             "You are the HRing compatibility execution layer. Execute the named HR product capability "
@@ -207,6 +225,11 @@ async def invoke_ai_function(
         value = _response_with_citations(result.content, result.citations)
         if labor_context is not None:
             return normalize_result(value, labor_context)
+        if support_context is not None:
+            try:
+                return {"content": support_text(value)}
+            except SupportInputError as exc:
+                raise CompatFunctionError(str(exc)) from exc
         return value
 
     if principal is None:
