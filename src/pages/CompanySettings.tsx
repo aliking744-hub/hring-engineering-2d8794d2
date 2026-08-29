@@ -280,7 +280,7 @@ const CompanySettings = () => {
       );
       setAiDraft((current) => ({ ...current, secret: '' }));
       await loadAiCatalog();
-      toast.success('تنظیم اتصال AI ذخیره شد؛ برای فعال شدن ابتدا تست کنید');
+      toast.success(aiDraft.mode === 'byok' ? 'تنظیم اتصال AI ذخیره شد؛ برای فعال شدن ابتدا تست کنید' : 'مسیر مدیریت‌شدهٔ HRing ذخیره شد');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ذخیره اتصال AI انجام نشد');
     } finally {
@@ -404,9 +404,9 @@ const CompanySettings = () => {
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-medium">{capability.display_name}</span>
-                            {connection?.status === 'healthy' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                            {connection?.mode === 'hring_managed' || connection?.status === 'healthy' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">{connection?.mode === 'byok' ? 'کلید اختصاصی شرکت' : 'سرویس HRing'} · {connection?.status === 'healthy' ? 'تست‌شده' : 'نیازمند تست'}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{connection?.mode === 'byok' ? `کلید اختصاصی شرکت · ${connection.status === 'healthy' ? 'تست‌شده' : 'نیازمند تست'}` : 'سرویس مدیریت‌شدهٔ HRing'}</div>
                         </button>
                       );
                     })}
@@ -415,7 +415,7 @@ const CompanySettings = () => {
                     <div className="rounded-xl border p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div><div className="font-semibold">{selectedAiCapability.display_name}</div><div className="mt-1 text-sm text-muted-foreground">{selectedAiCapability.description}</div></div>
-                        <Badge variant={selectedAiCapability.connection?.status === 'healthy' ? 'default' : 'outline'}>{selectedAiCapability.connection?.status === 'healthy' ? 'تست موفق' : 'فعال‌سازی پس از تست'}</Badge>
+                        <Badge variant={selectedAiCapability.connection?.mode === 'hring_managed' || selectedAiCapability.connection?.status === 'healthy' ? 'default' : 'outline'}>{selectedAiCapability.connection?.mode === 'hring_managed' ? 'مدیریت‌شده' : selectedAiCapability.connection?.status === 'healthy' ? 'تست موفق' : 'فعال‌سازی پس از تست'}</Badge>
                       </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
