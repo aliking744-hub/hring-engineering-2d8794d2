@@ -84,3 +84,25 @@ async def add_candidates(
 async def delete_campaign(session: AsyncSession, *, campaign_id: UUID) -> None:
     await session.execute(delete(RecruitingCampaign).where(RecruitingCampaign.id == campaign_id))
     await session.flush()
+
+async def get_candidate_for_owner(
+    session: AsyncSession,
+    *,
+    campaign_id: UUID,
+    candidate_id: UUID,
+    owner_user_id: UUID,
+    for_update: bool = False,
+) -> RecruitingCandidate | None:
+    statement = (
+        select(RecruitingCandidate)
+        .join(RecruitingCampaign, RecruitingCampaign.id == RecruitingCandidate.campaign_id)
+        .where(
+            RecruitingCandidate.id == candidate_id,
+            RecruitingCandidate.campaign_id == campaign_id,
+            RecruitingCampaign.owner_user_id == owner_user_id,
+        )
+    )
+    if for_update:
+        statement = statement.with_for_update()
+    result = await session.execute(statement)
+    return result.scalar_one_or_none()
