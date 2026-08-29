@@ -233,6 +233,33 @@ def test_valid_legacy_public_assets_remain_supported() -> None:
     )
 
 
+def test_public_uploads_reject_spoofed_mime_and_magic_bytes() -> None:
+    with pytest.raises(StoragePolicyError):
+        validate_storage_upload(
+            logical_bucket="avatars",
+            object_path=f"{uuid4()}/avatar.jpg",
+            content_type="image/jpeg",
+            size_bytes=100,
+            header_bytes=b"<html>not really a jpeg</html>",
+        )
+    with pytest.raises(StoragePolicyError):
+        validate_storage_upload(
+            logical_bucket="products",
+            object_path="catalog.xlsx",
+            content_type="text/plain",
+            size_bytes=100,
+            header_bytes=b"PK\x03\x04fake-office-archive",
+        )
+    with pytest.raises(StoragePolicyError):
+        validate_storage_upload(
+            logical_bucket="products",
+            object_path="document.pdf",
+            content_type="application/pdf",
+            size_bytes=100,
+            header_bytes=b"not-a-pdf",
+        )
+
+
 def test_production_settings_still_require_real_independent_secrets() -> None:
     with pytest.raises(ValueError):
         Settings(
