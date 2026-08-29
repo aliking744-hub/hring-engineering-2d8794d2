@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hring_api.config import Settings
 from hring_api.domains.billing.credit_service import (
     feature_credit_cost,
+    run_with_ai_execution_guard,
     run_with_credit_reservation,
 )
 from hring_api.domains.company_ai.service import uses_company_byok
@@ -148,7 +149,15 @@ async def generate_onboarding_plan(
         )
 
     if managed_cost == 0:
-        return await operation()
+        return await run_with_ai_execution_guard(
+            session,
+            principal=principal,
+            company_id=company_id,
+            feature_key=ONBOARDING_FEATURE_KEY,
+            idempotency_key=f"{ONBOARDING_FEATURE_KEY}:{key_hash}",
+            request_id=request_id,
+            operation=operation,
+        )
 
     return await run_with_credit_reservation(
         session,
@@ -227,7 +236,15 @@ async def generate_learning_path(
         )
 
     if managed_cost == 0:
-        return await operation()
+        return await run_with_ai_execution_guard(
+            session,
+            principal=principal,
+            company_id=company_id,
+            feature_key=LEARNING_PATH_FEATURE_KEY,
+            idempotency_key=f"{LEARNING_PATH_FEATURE_KEY}:{key_hash}",
+            request_id=request_id,
+            operation=operation,
+        )
 
     return await run_with_credit_reservation(
         session,
