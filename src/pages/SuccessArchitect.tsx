@@ -32,6 +32,9 @@ interface OnboardingPlanResponse {
 }
 
 const SuccessArchitect = () => {
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeEmail, setEmployeeEmail] = useState("");
+  const [startsOn, setStartsOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [jobTitle, setJobTitle] = useState("");
   const [seniority, setSeniority] = useState("");
   const [expectation, setExpectation] = useState("");
@@ -44,10 +47,10 @@ const SuccessArchitect = () => {
   const { toast } = useToast();
 
   const handleGenerate = async () => {
-    if (!jobTitle || !seniority || !expectation) {
+    if (!employeeName.trim() || !jobTitle || !seniority || !expectation) {
       toast({
         title: "خطا",
-        description: "لطفاً تمام فیلدهای ضروری را پر کنید",
+        description: "نام کارمند و تمام فیلدهای ضروری را پر کنید",
         variant: "destructive",
       });
       return;
@@ -66,6 +69,9 @@ const SuccessArchitect = () => {
           method: "POST",
           headers: { "X-Idempotency-Key": requestKey },
           body: JSON.stringify({
+            employee_name: employeeName.trim(),
+            employee_email: employeeEmail.trim() || null,
+            starts_on: startsOn || null,
             job_title: jobTitle,
             seniority,
             expectation,
@@ -173,6 +179,22 @@ const SuccessArchitect = () => {
           <CardContent className="space-y-6">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label htmlFor="employeeName">نام کارمند *</Label>
+                <Input
+                  id="employeeName"
+                  placeholder="مثال: سارا احمدی"
+                  value={employeeName}
+                  onChange={(e) => setEmployeeName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="startsOn">تاریخ شروع</Label>
+                <Input id="startsOn" type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="jobTitle">عنوان شغل *</Label>
                 <Input
                   id="jobTitle"
@@ -199,6 +221,17 @@ const SuccessArchitect = () => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="employeeEmail">ایمیل کارمند (اختیاری)</Label>
+                <Input
+                  id="employeeEmail"
+                  type="email"
+                  dir="ltr"
+                  placeholder="employee@company.com"
+                  value={employeeEmail}
+                  onChange={(e) => setEmployeeEmail(e.target.value)}
+                />
+              </div>
               <div className="space-y-2">
                 <Label>انتظار اصلی *</Label>
                 <Select value={expectation} onValueChange={setExpectation}>
@@ -266,6 +299,7 @@ const SuccessArchitect = () => {
                     کپی
                   </Button>
                 </CardTitle>
+                <CardDescription>تسک‌های قابل پیگیری برنامه در «نقشه راه ۹۰ روزه» در دسترس‌اند.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="prose prose-sm max-w-none dark:prose-invert text-right">
