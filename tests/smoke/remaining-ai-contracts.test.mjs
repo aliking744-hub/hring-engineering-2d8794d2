@@ -136,3 +136,25 @@ test('BYOK zero-credit executions keep a durable idempotency guard', async () =>
     assert.match(source, /run_with_ai_execution_guard/);
   }
 });
+
+
+test('onboarding roadmap is a persisted workflow, not a static template', async () => {
+  const models = await read('apps/api/src/hring_api/domains/development/models.py');
+  const schemas = await read('apps/api/src/hring_api/domains/development/schemas.py');
+  const routes = await read('apps/api/src/hring_api/domains/development/routes.py');
+  const service = await read('apps/api/src/hring_api/domains/development/service.py');
+  const roadmap = await read('src/pages/OnboardingRoadmap.tsx');
+  const migration = await read('apps/api/alembic/versions/20260829_0030_operational_onboarding.py');
+
+  assert.match(models, /class OnboardingTask/);
+  assert.match(models, /class OnboardingTaskEvent/);
+  assert.match(schemas, /OnboardingTaskCreateRequest/);
+  assert.match(schemas, /OnboardingTaskUpdateRequest/);
+  assert.match(routes, /onboarding-plans\/{plan_id}\/tasks/);
+  assert.match(service, /_seed_onboarding_tasks/);
+  assert.match(service, /event_type = "completed"/);
+  assert.match(roadmap, /\/development\/onboarding-plans/);
+  assert.match(roadmap, /گردش‌کار واقعی/);
+  assert.equal(/roadmapPhases/.test(roadmap), false);
+  assert.match(migration, /down_revision: str \| None = "20260829_0029"/);
+});
