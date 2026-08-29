@@ -153,8 +153,10 @@ async def upsert_company_ai_connection(
         assert payload.adapter is not None and payload.base_url is not None
         _validate_adapter(payload.adapter)
         base_url = _safe_base_url(payload.base_url, settings)
-        if existing is None and not secret:
-            raise CompanyAiConnectionError("BYOK requires a provider secret when it is first configured")
+        if (existing is None or existing.secret_ciphertext is None) and not secret:
+            raise CompanyAiConnectionError(
+                "BYOK requires a provider secret when it is first configured or switched from managed mode"
+            )
         cipher = ProviderSecretCipher(settings)
         changes = {
             "mode": "byok",
