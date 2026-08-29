@@ -118,3 +118,21 @@ test('company settings exposes a permission-gated AI connection panel without re
   assert.equal(/secret_ciphertext/.test(settings), false);
   assert.equal(/smart_headhunting/.test(settings), false);
 });
+
+
+test('BYOK zero-credit executions keep a durable idempotency guard', async () => {
+  const billing = await read('apps/api/src/hring_api/domains/billing/credit_service.py');
+  const leases = await read('apps/api/src/hring_api/domains/billing/models.py');
+  const migration = await read('apps/api/alembic/versions/20260829_0029_ai_execution_leases.py');
+  const jobProfile = await read('apps/api/src/hring_api/domains/job_engineering/service.py');
+  const interview = await read('apps/api/src/hring_api/domains/interview/service.py');
+  const development = await read('apps/api/src/hring_api/domains/development/service.py');
+  const smartAd = await read('apps/api/src/hring_api/domains/job_ads/service.py');
+
+  assert.match(billing, /async def run_with_ai_execution_guard/);
+  assert.match(leases, /class AiExecutionLease/);
+  assert.match(migration, /down_revision: str \| None = "20260829_0028"/);
+  for (const source of [jobProfile, interview, development, smartAd]) {
+    assert.match(source, /run_with_ai_execution_guard/);
+  }
+});
