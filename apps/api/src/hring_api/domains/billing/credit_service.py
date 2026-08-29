@@ -7,6 +7,7 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.admin.repository import add_audit_log
@@ -902,9 +903,15 @@ async def run_with_ai_execution_guard(
     session.add(lease)
     try:
         await session.flush()
+        lease_id = lease.id
         # Commit before reaching the external provider so another worker sees
         # the active lease instead of issuing a second paid customer request.
         await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise CreditConflictError(
+            "Request with this idempotency key is already in progress or completed"
+        ) from exc
     except Exception:
         await session.rollback()
         raise
@@ -918,7 +925,7 @@ async def run_with_ai_execution_guard(
         return result
     except Exception as exc:
         await session.rollback()
-        persisted = await session.get(AiExecutionLease, lease.id)
+        persisted = await session.get(AiExecutionLease, lease_id)
         if persisted is not None and persisted.status == "active":
             persisted.status = "failed"
             persisted.error_code = type(exc).__name__[:120]
