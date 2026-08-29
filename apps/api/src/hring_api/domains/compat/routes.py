@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from urllib.parse import quote
 
@@ -200,12 +201,12 @@ async def execute_compat_rpc(
     return CompatQueryResponse(data=data, count=1)
 
 
-@router.post("/public-functions/hring-support", response_model=CompatQueryResponse)
+@router.post("/public-functions/hring-support")
 async def public_support(
     payload: CompatFunctionRequest,
     settings: Settings = Depends(get_settings),
     db: AsyncSession = Depends(get_db_session),
-) -> CompatQueryResponse:
+) -> StreamingResponse:
     try:
         data = await invoke_ai_function(
             name="hring-support",
@@ -216,7 +217,25 @@ async def public_support(
         )
     except CompatFunctionError as exc:
         raise _compat_http_error(exc) from exc
-    return CompatQueryResponse(data=data, count=1)
+    answer = data.get("content") if isinstance(data, dict) else None
+    if not isinstance(answer, str) or not answer.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Support assistant returned no content",
+        )
+
+    async def event_stream():
+        chunk = {
+            "choices": [{"delta": {"content": answer}}],
+        }
+        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/files/extract-document-text")
