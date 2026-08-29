@@ -21,6 +21,7 @@ from hring_api.domains.ai.prompt_service import (
 from hring_api.domains.company_ai.service import uses_company_byok
 from hring_api.domains.billing.credit_service import (
     feature_credit_cost,
+    run_with_ai_execution_guard,
     run_with_credit_reservation,
 )
 from hring_api.domains.identity.dependencies import Principal
@@ -221,7 +222,15 @@ async def generate_interview_kit(
         )
 
     if managed_cost == 0:
-        return await operation()
+        return await run_with_ai_execution_guard(
+            session,
+            principal=principal,
+            company_id=_company_id(principal),
+            feature_key=INTERVIEW_FEATURE_KEY,
+            idempotency_key=f"{INTERVIEW_FEATURE_KEY}:{key_hash}",
+            request_id=request_id,
+            operation=operation,
+        )
 
     return await run_with_credit_reservation(
         session,
