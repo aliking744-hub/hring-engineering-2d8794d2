@@ -24,6 +24,7 @@ from hring_api.domains.billing.credit_service import (
     compatibility_credit_cost,
     run_with_credit_reservation,
 )
+from hring_api.domains.company_ai.service import uses_company_byok
 from hring_api.domains.compat.labor_complaint import (
     LABOR_SYSTEM_TEMPLATE,
     LABOR_USER_TEMPLATE,
@@ -182,6 +183,18 @@ async def invoke_ai_function(
         if principal is not None and session is not None
         else 0
     )
+    company_id = _company_id(principal)
+    managed_cost = (
+        0
+        if principal is not None
+        and session is not None
+        and await uses_company_byok(
+            session,
+            company_id=company_id,
+            capability_key=feature_key,
+        )
+        else cost
+    )
 
     async def fallback() -> AiGatewayResult:
         route = await resolve_runtime_feature_route(
@@ -192,14 +205,14 @@ async def invoke_ai_function(
         return await generate_with_ai_gateway(
             feature_key=feature_key,
             user_id=principal.user_id if principal is not None else None,
-            company_id=_company_id(principal),
+            company_id=company_id,
             provider=route.provider,
             model=route.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            credits_charged=cost,
+            credits_charged=managed_cost,
             max_output_tokens=4_000 if labor_context is not None else 12_000,
             response_format="json_object" if labor_context is not None else "text",
             metadata_json={
@@ -216,9 +229,9 @@ async def invoke_ai_function(
                 prompt_key=feature_key,
                 variables=prompt_variables,
                 user_id=principal.user_id if principal is not None else None,
-                company_id=_company_id(principal),
+                company_id=company_id,
                 fallback=fallback,
-                credits_charged=cost,
+                credits_charged=managed_cost,
             )
         except (AiGatewayError, PromptRegistryError) as exc:
             raise CompatFunctionError("HRing AI service is unavailable") from exc
@@ -234,7 +247,7 @@ async def invoke_ai_function(
 
     if principal is None:
         return await generate()
-    if cost <= 0:
+    if managed_cost <= 0:
         return await generate()
     assert session is not None
     raw_key = (idempotency_key or "").strip()
@@ -244,7 +257,7 @@ async def invoke_ai_function(
     return await run_with_credit_reservation(
         session,
         principal=principal,
-        amount=cost,
+        amount=managed_cost,
         idempotency_key=operation_key,
         feature_key=feature_key,
         description=f"Compatibility AI execution: {name}",
