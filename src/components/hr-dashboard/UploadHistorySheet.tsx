@@ -16,7 +16,7 @@ interface HrUpload {
 }
 
 interface UploadHistorySheetProps {
-  onLoad: (employees: Employee[], uploadId: string) => void;
+  onLoad: (employees: Employee[], uploadId: string, name: string) => void;
   currentUploadId?: string | null;
   trigger?: React.ReactNode;
   refreshKey?: number;
@@ -49,7 +49,8 @@ export function UploadHistorySheet({ onLoad, currentUploadId, trigger, refreshKe
     if (open) fetchList();
   }, [open, fetchList, refreshKey]);
 
-  const handleLoad = async (id: string) => {
+  const handleLoad = async (item: HrUpload) => {
+    const { id, name } = item;
     setLoadingId(id);
     const { data, error } = await supabase
       .from('hr_uploads')
@@ -61,7 +62,7 @@ export function UploadHistorySheet({ onLoad, currentUploadId, trigger, refreshKe
       toast({ title: 'خطا', description: 'بارگذاری داده ناموفق بود', variant: 'destructive' });
       return;
     }
-    onLoad((data.data as unknown as Employee[]) || [], id);
+    onLoad((data.data as unknown as Employee[]) || [], id, name);
     setOpen(false);
     toast({ title: 'بارگذاری شد', description: 'اطلاعات قبلی بازیابی شد' });
   };
@@ -125,7 +126,7 @@ export function UploadHistorySheet({ onLoad, currentUploadId, trigger, refreshKe
                 return (
                   <button
                     key={item.id}
-                    onClick={() => handleLoad(item.id)}
+                    onClick={() => handleLoad(item)}
                     disabled={loadingId === item.id}
                     className={`w-full text-right rounded-xl border p-3 transition-all hover:border-primary/60 hover:bg-primary/5 ${
                       isActive ? 'border-primary bg-primary/10' : 'border-border bg-card/50'
