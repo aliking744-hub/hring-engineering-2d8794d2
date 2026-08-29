@@ -66,6 +66,10 @@ def test_user_cannot_self_grant_a_marketplace_purchase() -> None:
     assert PERSONAL_OPERATION_RULES["user_purchases"] == frozenset({"select"})
 
 
+def test_user_cannot_append_to_the_credit_ledger() -> None:
+    assert PERSONAL_OPERATION_RULES["credit_transactions"] == frozenset({"select"})
+
+
 @pytest.mark.parametrize(
     "table",
     [
