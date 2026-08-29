@@ -28,3 +28,17 @@ test("candidate analysis preserves privacy and five-layer contract", () => {
   assert.match(schemas, /enable_web_search: bool = Field\(default=False/);
   assert.match(routes, /@router\.post\("\/analyze-candidates"/);
 });
+
+
+test("sourcing connector has a durable callback hand-off contract", () => {
+  const model = read("apps/api/src/hring_api/domains/recruiting/models.py");
+  const migration = read("apps/api/alembic/versions/20260830_0027_recruiting_source_runs.py");
+  const contract = read("docs/operations/SMART_HEADHUNTING_SOURCING_CONNECTOR_FA.md");
+
+  assert.match(model, /class RecruitingSourceRun/);
+  assert.match(model, /callback_key_hash/);
+  assert.match(model, /idempotency_key/);
+  assert.match(migration, /recruiting_source_runs/);
+  assert.match(contract, /callbackToken/);
+  assert.match(contract, /202 Accepted/);
+});
