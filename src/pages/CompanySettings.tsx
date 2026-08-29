@@ -76,6 +76,8 @@ interface CompanyAiConnection {
   last_tested_at: string | null;
   last_success_at: string | null;
   last_error: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface CompanyAiCapability {
