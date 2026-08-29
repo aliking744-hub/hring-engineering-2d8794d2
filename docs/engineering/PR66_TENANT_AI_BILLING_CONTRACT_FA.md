@@ -53,9 +53,11 @@ HRing دو مسیر هم‌زمان و شفاف برای مصرف قابلیت�
 
 ## وضعیت واقعی checkpoint فعلی
 
-این checkpoint فقط **control plane امن** را پیاده‌سازی می‌کند: جدول و migration مستقل، رمزگذاری Fernet، ماسک‌کردن secret، مجوز CEO/override، audit، مالکیت tenant، و test اتصال BYOK با محافظت SSRF. Headhunting عمداً در catalog قابل‌تنظیم شرکت قرار نگرفته است.
+این checkpoint، **control plane امن** را پیاده‌سازی می‌کند: جدول و migration مستقل، رمزگذاری Fernet، ماسک‌کردن secret، مجوز CEO/override، audit، مالکیت tenant، test اتصال BYOK با محافظت SSRF و کاتالوگ محدود قابلیت‌ها. Headhunting عمداً در catalog قابل‌تنظیم شرکت قرار نگرفته است.
 
-مسیر اجرای gateway و شاخهٔ credit هنوز به این Connection متصل نشده‌اند؛ بنابراین تا تکمیل resolver اجرایی و UAT، UI نباید آن را «فعال برای تولید» اعلام کند. این تفکیک عمدی است تا با ذخیره‌شدن یک کلید، برداشت نادرست از فعال‌شدن runtime یا fallback پنهان ایجاد نشود.
+همچنین Gateway از کانال داخلی authenticated، route همان شرکت و همان قابلیت را می‌خواند و BYOK سالم را بدون fallback پنهان اجرا می‌کند. اگر registry یا اتصال BYOK در دسترس/سالم نباشد، اجرا fail-closed می‌شود. Credit branch برای «تولید آگهی هوشمند»، «پروفایل شغلی» و «کیت مصاحبه» به‌صورت واقعی به mode متصل شده است: BYOK سالم اعتبار HRing کم نمی‌کند و Managed همان reserve→consume/release قبلی را نگه می‌دارد.
+
+UI تنظیم اتصال و اتصال کامل mode به همهٔ قابلیت‌های باقیمانده، هنوز UAT و تکمیل می‌خواهد؛ تا آن زمان در UI نباید گزینه‌ای «فعال برای تولید» نمایش داده شود مگر اینکه تست اتصال سبز و route اجرایی فعال باشد.
 
 ## Acceptance برای پیاده‌سازی پس از فعال‌شدن CI
 
