@@ -103,3 +103,17 @@ test('development and compatibility AI honor healthy company BYOK before managed
   assert.match(compatibility, /credits_charged=managed_cost/);
   assert.match(compatibility, /if managed_cost <= 0:/);
 });
+
+
+test('company settings exposes a permission-gated AI connection panel without rendering secrets', async () => {
+  const settings = await read('src/pages/CompanySettings.tsx');
+
+  assert.match(settings, /company\.integrations\.read/);
+  assert.match(settings, /company\.integrations\.manage/);
+  assert.match(settings, /ai-connections\/catalog/);
+  assert.match(settings, /\/test/);
+  assert.match(settings, /secret_configured/);
+  assert.match(settings, /type="password"/);
+  assert.equal(/secret_ciphertext/.test(settings), false);
+  assert.equal(/smart_headhunting/.test(settings), false);
+});
