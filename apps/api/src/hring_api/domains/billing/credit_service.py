@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.admin.repository import add_audit_log
 from hring_api.domains.billing.models import (
+    AiExecutionLease,
     CreditAccount,
     CreditLedgerEntry,
     CreditReservation,
@@ -858,6 +859,72 @@ async def replace_available_credits_for_plan(
     account.available_credits = target_credits
     await _sync_legacy_projection(account, owner)
     return account
+
+
+async def run_with_ai_execution_guard(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    company_id: UUID | None,
+    feature_key: str,
+    idempotency_key: str,
+    request_id: str | None,
+    operation: Callable[[], Awaitable[T]],
+) -> T:
+    """Serialize a no-credit AI execution without manufacturing a credit ledger event.
+
+    BYOK requests deliberately do not touch HRing credits.  They still need a
+    durable guard so browser retries cannot invoke the customer's provider twice.
+    Like the credit reservation path, a completed idempotency key is not replayed
+    because the generated response itself is owned by the feature endpoint.
+    """
+
+    existing = await session.scalar(
+        select(AiExecutionLease).where(
+            AiExecutionLease.user_id == principal.user_id,
+            AiExecutionLease.feature_key == feature_key,
+            AiExecutionLease.idempotency_key == idempotency_key,
+        )
+    )
+    if existing is not None:
+        if existing.status == "active":
+            raise CreditConflictError("Request with this idempotency key is already in progress")
+        raise CreditConflictError("Request with this idempotency key was already completed")
+
+    lease = AiExecutionLease(
+        user_id=principal.user_id,
+        company_id=company_id,
+        feature_key=feature_key,
+        idempotency_key=idempotency_key,
+        request_id=request_id,
+        status="active",
+    )
+    session.add(lease)
+    try:
+        await session.flush()
+        # Commit before reaching the external provider so another worker sees
+        # the active lease instead of issuing a second paid customer request.
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+
+    try:
+        result = await operation()
+        lease.status = "completed"
+        lease.finalized_at = datetime.now(UTC)
+        await session.flush()
+        await session.commit()
+        return result
+    except Exception as exc:
+        await session.rollback()
+        persisted = await session.get(AiExecutionLease, lease.id)
+        if persisted is not None and persisted.status == "active":
+            persisted.status = "failed"
+            persisted.error_code = type(exc).__name__[:120]
+            persisted.finalized_at = datetime.now(UTC)
+            await session.commit()
+        raise
 
 
 async def run_with_credit_reservation(
