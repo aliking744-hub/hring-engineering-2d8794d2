@@ -229,3 +229,45 @@ class CreditLedgerEntry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
+
+
+class AiExecutionLease(Base):
+    """Durable idempotency guard for AI calls that do not reserve HRing credits."""
+
+    __tablename__ = "ai_execution_leases"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active','completed','failed')",
+            name="ai_execution_leases_status",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "feature_key",
+            "idempotency_key",
+            name="uq_ai_execution_leases_user_feature_key",
+        ),
+        Index("ix_ai_execution_leases_company_created", "company_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    company_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("companies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    feature_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    request_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
+    error_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
