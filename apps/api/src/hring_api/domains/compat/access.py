@@ -27,7 +27,7 @@ PERSONAL_OPERATION_RULES: dict[str, frozenset[str]] = {
     "user_credits": frozenset({"select"}),
     "user_purchases": frozenset({"select"}),
     "user_roles": frozenset({"select"}),
-    "credit_transactions": frozenset({"select", "insert"}),
+    "credit_transactions": frozenset({"select"}),
 }
 
 
