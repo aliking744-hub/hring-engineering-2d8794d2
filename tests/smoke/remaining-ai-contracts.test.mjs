@@ -158,3 +158,18 @@ test('onboarding roadmap is a persisted workflow, not a static template', async 
   assert.equal(/roadmapPhases/.test(roadmap), false);
   assert.match(migration, /down_revision: str \| None = "20260829_0029"/);
 });
+
+
+test('HR dashboard preserves the distinction between private uploads and truthful demo data', async () => {
+  const dashboard = await read('src/pages/HRDashboard.tsx');
+  const routes = await read('apps/api/src/hring_api/domains/hr_data/routes.py');
+  const schemas = await read('apps/api/src/hring_api/domains/hr_data/schemas.py');
+
+  assert.match(dashboard, /hr-data\/uploads\/latest/);
+  assert.match(dashboard, /dataOrigin === 'demo'/);
+  assert.match(dashboard, /data\.length\.toLocaleString\('fa-IR'\)/);
+  assert.equal(/۷۸ رکورد ساختگی/.test(dashboard), false);
+  assert.match(routes, /owner_user_id=principal\.user_id/);
+  assert.match(schemas, /max_length=2000/);
+  assert.match(schemas, /5_000_000/);
+});
