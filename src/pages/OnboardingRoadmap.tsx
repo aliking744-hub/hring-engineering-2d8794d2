@@ -92,11 +92,11 @@ const OnboardingRoadmap = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     void loadPlans();
-  }, []);
+  }, [loadPlans]);
 
   const selectedPlan = plans.find((plan) => plan.id === selectedPlanId) ?? null;
   const completedCount = selectedPlan?.tasks.filter((task) => task.status === "completed").length ?? 0;
