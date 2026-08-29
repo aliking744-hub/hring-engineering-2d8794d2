@@ -41,8 +41,24 @@ if [[ "$anonymous_credit_status" != "401" && "$anonymous_credit_status" != "403"
   exit 1
 fi
 
+headers_report="$report_dir/headers-$timestamp.txt"
 curl --silent --show-error --head --connect-timeout 10 --max-time 30 \
-  "$base_url/" >"$report_dir/headers-$timestamp.txt"
+  "$base_url/" >"$headers_report"
+
+require_header() {
+  local header_name="$1"
+  if ! rg -i "^${header_name}:" "$headers_report" >/dev/null; then
+    printf 'Required security header %s is missing.\n' "$header_name" >&2
+    exit 1
+  fi
+}
+
+require_header 'x-content-type-options'
+require_header 'x-frame-options'
+require_header 'content-security-policy'
+if [[ "${PR66_REQUIRE_HSTS:-true}" == "true" ]]; then
+  require_header 'strict-transport-security'
+fi
 
 if [[ -n "${PR66_AUTH_TOKEN:-}" ]]; then
   authenticated_credit_status="$(request_status /api/v1/billing/credits/me \
