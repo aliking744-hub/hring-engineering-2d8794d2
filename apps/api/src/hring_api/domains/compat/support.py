@@ -50,7 +50,10 @@ async def build_support_context(session: AsyncSession, body: Any) -> SupportCont
             SiteSetting.key.in_(["support_system_prompt", "support_phone"])
         )
     )
-    settings = {row.key: row.value for row in rows.all() if row.value}
+    settings: dict[str, str] = {}
+    for row in rows.all():
+        if row.value:
+            settings[row.key] = row.value
     phone = settings.get("support_phone", DEFAULT_PHONE)
     feature_lines = "\n".join(
         f"- {feature.display_name}: {feature.description}"
