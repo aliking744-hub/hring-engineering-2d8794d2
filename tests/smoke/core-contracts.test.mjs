@@ -299,3 +299,12 @@ test('smart ad displays structured independent AI responses and rejects empty su
   assert.match(page, /if \(!responseText && !responseImage\)/);
   assert.match(page, /سرویس پاسخ قابل نمایش برنگرداند/);
 });
+
+
+test('marketplace purchases cannot be self-granted from the browser', async () => {
+  const products = await read('src/hooks/useDigitalProducts.tsx');
+
+  assert.equal(/recordPurchase/.test(products), false);
+  assert.equal(/from\(['\"]user_purchases['\"]\)[\s\S]{0,300}\.insert/.test(products), false);
+  assert.match(products, /download-product/);
+});

@@ -5,6 +5,7 @@ from pydantic import SecretStr
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiCitation
+from hring_api.domains.compat.access import PERSONAL_OPERATION_RULES
 from hring_api.domains.compat.functions import _response_with_citations
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
@@ -59,6 +60,10 @@ def test_personal_scope_does_not_infer_company_sharing() -> None:
     assert scope_for("notifications").scope == "personal"
     assert scope_for("hr_uploads").scope == "personal"
     assert scope_for("learning_path_records").scope == "personal"
+
+
+def test_user_cannot_self_grant_a_marketplace_purchase() -> None:
+    assert PERSONAL_OPERATION_RULES["user_purchases"] == frozenset({"select"})
 
 
 @pytest.mark.parametrize(
