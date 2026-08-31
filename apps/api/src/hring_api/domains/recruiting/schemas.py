@@ -55,6 +55,10 @@ class AddCandidatesRequest(BaseModel):
     candidates: list[CandidateCreate] = Field(min_length=1, max_length=500)
 
 
+class UpdateCandidateStatusRequest(BaseModel):
+    status: str = Field(pattern=r"^(pending|approved|rejected|waiting)$")
+
+
 class CandidateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -141,7 +145,7 @@ class AnalyzeCandidatesRequest(BaseModel):
 
     candidates: list[CandidateAnalysisInput] = Field(min_length=1, max_length=100)
     job_requirements: JobRequirements = Field(alias="jobRequirements")
-    enable_web_search: bool = Field(default=True, alias="enableWebSearch")
+    enable_web_search: bool = Field(default=False, alias="enableWebSearch")
 
 
 class AutoSourceRequest(BaseModel):
