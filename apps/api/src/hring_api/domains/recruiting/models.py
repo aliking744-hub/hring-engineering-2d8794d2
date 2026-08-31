@@ -80,3 +80,40 @@ class RecruitingCandidate(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+class RecruitingSourceRun(Base):
+    """Durable, idempotent hand-off to an authorized candidate sourcing connector."""
+
+    __tablename__ = "recruiting_source_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('requested','accepted','received','failed')",
+            name="ck_recruiting_source_runs_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    campaign_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("recruiting_campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    owner_user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source: Mapped[str] = mapped_column(String(80), nullable=False, default="webhook")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="requested", index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    callback_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    received_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
