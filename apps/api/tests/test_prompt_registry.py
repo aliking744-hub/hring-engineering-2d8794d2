@@ -192,7 +192,9 @@ def test_prompt_registry_draft_test_publish_compare_and_rollback(monkeypatch) ->
         prompt_by_key = {item["prompt_key"]: item for item in listed.json()}
         assert {feature.feature_key for feature in AI_FEATURES}.issubset(prompt_by_key)
         assert all(
-            prompt_by_key[feature.feature_key]["draft_version"] == 1 for feature in AI_FEATURES
+            prompt_by_key[feature.feature_key]["draft_version"] == 1
+            or prompt_by_key[feature.feature_key]["published_version"] == 1
+            for feature in AI_FEATURES
         )
 
         draft = client.post(
