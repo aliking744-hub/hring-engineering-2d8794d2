@@ -91,6 +91,7 @@ def _skills_from_source(value: str | list[str] | None) -> list[str]:
     return []
 
 
+# sourceIndex is the integrity key that binds provider output to the original candidate.
 def _analysis_for_source(
     rows: list[dict[str, Any]],
     *,
