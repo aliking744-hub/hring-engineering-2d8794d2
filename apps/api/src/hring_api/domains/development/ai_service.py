@@ -207,15 +207,6 @@ async def generate_learning_path_content(
             "Generate 4-6 months of realistic milestones."
         )
 
-    provider_input = {
-        "jobTitle": payload.job_title,
-        "industry": payload.industry,
-        "seniorityLevel": payload.seniority_level,
-        "educationLevel": payload.education_level,
-        "fieldOfStudy": payload.field_of_study or "Not specified",
-        "experienceYears": payload.experience_years,
-        "trainingMonths": payload.training_months,
-    }
     system_prompt = f"""You are an expert HR and L&D (Learning and Development) strategist with a deep understanding of realistic capacity planning. Based on the user's current profile, generate a highly personalized, practical learning and development roadmap.
 
 CRITICAL REALISM RULE: {training_rule}
