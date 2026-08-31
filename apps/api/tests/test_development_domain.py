@@ -55,6 +55,21 @@ def _learning_result() -> LearningPathResult:
                     "month": "ماه اول",
                     "focus": "پایه‌ها",
                     "actionItems": ["تکمیل دوره", "اجرای پروژه"],
+                },
+                {
+                    "month": "ماه دوم",
+                    "focus": "داده",
+                    "actionItems": ["تمرین SQL", "مرور پروژه"],
+                },
+                {
+                    "month": "ماه سوم",
+                    "focus": "سرویس",
+                    "actionItems": ["ساخت API", "بازبینی کد"],
+                },
+                {
+                    "month": "ماه چهارم",
+                    "focus": "پایداری",
+                    "actionItems": ["تست‌نویسی", "مستندسازی"],
                 }
             ],
             "trainingNote": "هفته‌ای چهار ساعت",
