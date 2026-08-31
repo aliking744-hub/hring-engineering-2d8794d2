@@ -13,6 +13,7 @@ test('operations shell scripts are syntactically valid', async () => {
     'scripts/operations/backup.sh',
     'scripts/operations/verify-backup.sh',
     'scripts/operations/restore-drill.sh',
+    'scripts/operations/offsite-backup.sh',
   ]) {
     await execFileAsync('bash', ['-n', script]);
   }
@@ -59,4 +60,15 @@ test('daily backup timer verifies each completed artifact', async () => {
   assert.match(service, /BACKUP_ROOT=\/var\/backups\/hring/);
   assert.match(timer, /OnCalendar=\*-\*-\* 02:15:00/);
   assert.match(timer, /Persistent=true/);
+});
+
+
+test('offsite backup is explicitly configured, immutable, and checks its copied artifact', async () => {
+  const offsite = await read('scripts/operations/offsite-backup.sh');
+
+  assert.match(offsite, /OFFSITE_REMOTE/);
+  assert.match(offsite, /rclone copy --immutable --checksum/);
+  assert.match(offsite, /rclone check --one-way --checksum/);
+  assert.match(offsite, /Invalid backup identifier/);
+  assert.doesNotMatch(offsite, /rclone sync/);
 });

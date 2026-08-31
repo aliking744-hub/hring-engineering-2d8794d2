@@ -1,26 +1,34 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+
+from hring_api.config import Settings, get_settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.db.session import get_db_session
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.recruiting.schemas import (
     AddCandidatesRequest,
+    AnalyzeCandidatesRequest,
+    AnalyzeCandidatesResponse,
     CampaignDetailResponse,
     CampaignResponse,
     CandidateResponse,
     CreateCampaignRequest,
     UpdateCampaignRequest,
+    UpdateCandidateStatusRequest,
 )
+from hring_api.domains.recruiting.ai_service import RecruitingAiError, analyze_candidates
 from hring_api.domains.recruiting.service import (
     CampaignNotFoundError,
     add_owner_candidates,
     create_owner_campaign,
     delete_owner_campaign,
     get_owner_campaign_detail,
+    get_owner_candidate,
     list_owner_campaigns,
     update_owner_campaign,
+    update_owner_candidate_status,
 )
 
 
@@ -152,3 +160,68 @@ async def add_candidates(
     for candidate in candidates:
         await db.refresh(candidate)
     return [CandidateResponse.model_validate(item) for item in candidates]
+
+
+@router.get("/campaigns/{campaign_id}/candidates/{candidate_id}", response_model=CandidateResponse)
+async def candidate_detail(
+    campaign_id: UUID,
+    candidate_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> CandidateResponse:
+    try:
+        candidate = await get_owner_candidate(
+            db, campaign_id=campaign_id, candidate_id=candidate_id, owner_user_id=principal.user_id
+        )
+    except CampaignNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return CandidateResponse.model_validate(candidate)
+
+
+@router.patch("/campaigns/{campaign_id}/candidates/{candidate_id}", response_model=CandidateResponse)
+async def update_candidate_status(
+    campaign_id: UUID,
+    candidate_id: UUID,
+    payload: UpdateCandidateStatusRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> CandidateResponse:
+    try:
+        candidate = await update_owner_candidate_status(
+            db,
+            campaign_id=campaign_id,
+            candidate_id=candidate_id,
+            owner_user_id=principal.user_id,
+            status=payload.status,
+        )
+    except CampaignNotFoundError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await db.commit()
+    await db.refresh(candidate)
+    return CandidateResponse.model_validate(candidate)
+
+
+@router.post("/analyze-candidates", response_model=AnalyzeCandidatesResponse)
+async def analyze_recruiting_candidates(
+    payload: AnalyzeCandidatesRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> AnalyzeCandidatesResponse:
+    """Analyze imported candidates without passing private contact fields to the AI provider."""
+    try:
+        return await analyze_candidates(
+            candidates=payload.candidates,
+            job=payload.job_requirements,
+            enable_web_search=payload.enable_web_search,
+            user_id=principal.user_id,
+            company_id=_primary_company_id(principal),
+            settings=settings,
+            session=db,
+        )
+    except RecruitingAiError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="سرویس تحلیل کاندیداها موقتاً در دسترس نیست",
+        ) from exc

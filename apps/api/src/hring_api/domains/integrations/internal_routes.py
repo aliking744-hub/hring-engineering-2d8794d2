@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from hmac import compare_digest
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Response, status
 from pydantic import BaseModel
@@ -8,6 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
+from hring_api.domains.company_ai.repository import get_company_ai_connection
+from hring_api.domains.integrations.security import (
+    IntegrationSecurityError,
+    ProviderSecretCipher,
+    assert_provider_host_is_safe,
+)
 from hring_api.domains.integrations.runtime import (
     RuntimeProviderConfig,
     list_runtime_providers,
@@ -43,6 +50,18 @@ class InternalAiProviderResponse(BaseModel):
     max_retries: int
     endpoint_path: str | None
     max_tokens_field: str | None
+
+
+class InternalCompanyAiRouteResponse(BaseModel):
+    mode: str
+    provider_key: str | None = None
+    adapter: str | None = None
+    base_url: str | None = None
+    default_model: str | None = None
+    auth_scheme: str | None = None
+    secret: str | None = None
+    timeout_seconds: int = 15
+    max_retries: int = 0
 
 
 class InternalAiProviderSummaryResponse(BaseModel):
@@ -112,6 +131,62 @@ def _safe_endpoint_path(value: str | None) -> str | None:
         return None
     return value
 
+
+
+@router.get(
+    "/internal/companies/{company_id}/ai-connections/{capability_key}",
+    response_model=InternalCompanyAiRouteResponse,
+    include_in_schema=False,
+)
+async def internal_company_ai_route(
+    company_id: UUID,
+    capability_key: str = Path(min_length=1, max_length=120, pattern=r"^[a-z0-9_.-]+$"),
+    authorization: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> InternalCompanyAiRouteResponse:
+    """Resolve one tenant BYOK route for the internal AI Gateway only."""
+
+    _require_internal_key(authorization, settings)
+    connection = await get_company_ai_connection(
+        db, company_id=company_id, capability_key=capability_key
+    )
+    if connection is None or connection.mode == "hring_managed":
+        return InternalCompanyAiRouteResponse(mode="hring_managed")
+    if (
+        not connection.is_active
+        or connection.status != "healthy"
+        or not connection.provider_key
+        or not connection.adapter
+        or not connection.base_url
+        or not connection.default_model
+        or not connection.secret_ciphertext
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Company BYOK connection is not ready",
+        )
+    try:
+        await assert_provider_host_is_safe(
+            connection.base_url,
+            is_internal=False,
+            allowed_internal_hosts=settings.integration_internal_hosts,
+        )
+        secret = ProviderSecretCipher(settings).decrypt(connection.secret_ciphertext)
+    except IntegrationSecurityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Company BYOK connection is not ready",
+        ) from exc
+    return InternalCompanyAiRouteResponse(
+        mode="byok",
+        provider_key=connection.provider_key,
+        adapter=connection.adapter,
+        base_url=connection.base_url,
+        default_model=connection.default_model,
+        auth_scheme=connection.auth_scheme,
+        secret=secret,
+    )
 
 @router.get(
     "/internal/integrations/ai/providers",

@@ -163,7 +163,7 @@ test('product catalogs describe the independent runtime and omit retired claims'
 test('onboarding roadmap does not present invented employee activity as real data', async () => {
   const onboarding = await read('src/pages/OnboardingRoadmap.tsx');
 
-  assert.match(onboarding, /نمونه ساختار/);
+  assert.match(onboarding, /\/development\/onboarding-plans/);
   assert.match(onboarding, /ساخت برنامه ۹۰ روزه/);
   assert.equal(/progress: (?:30|75|100)|done: true|شنبه ۱۵ دی|یکشنبه ۱۶ دی|سه‌شنبه ۱۸ دی/.test(onboarding), false);
 });
@@ -226,8 +226,10 @@ test('retired strategy product surfaces are absent', async () => {
   const dashboard = await read('src/pages/Dashboard.tsx');
   const catalog = await read('apps/api/src/hring_api/domains/ai/feature_catalog.py');
   const productCatalog = await read('public/hring-product-catalog.html');
+  const individual = await read('src/components/dashboard/IndividualDashboard.tsx');
+  const corporate = await read('src/components/dashboard/CorporateDashboard.tsx');
 
-  for (const source of [app, dashboard, catalog, productCatalog]) {
+  for (const source of [app, dashboard, individual, corporate, catalog, productCatalog]) {
     assert.equal(
       /StrategicCompass|StrategicRadar|strategic-compass|strategic-radar|قطب‌نمای استراتژیک|رادار اطلاعات استراتژیک/.test(source),
       false,
@@ -246,7 +248,7 @@ test('dashboards do not present invented operational metrics or retired modules'
   assert.equal(/سارا احمدی|const hiringHealth = 95|\/unicorn-lab/.test(individual), false);
 
   assert.match(corporate, /members\.length/);
-  assert.match(corporate, /این داشبورد عدد نمونه نشان نمی‌دهد/);
+  assert.match(corporate, /دادهٔ نمونه را آگاهانه فعال کنید/);
   assert.equal(/پروژه‌های فعال|جلسات این هفته|\/unicorn-lab/.test(corporate), false);
 
   assert.equal(/planMaxCredits|allocatedCredits|creditPercentage/.test(dashboard), false);
@@ -298,4 +300,38 @@ test('smart ad displays structured independent AI responses and rejects empty su
   assert.match(page, /generated_job_ad/);
   assert.match(page, /if \(!responseText && !responseImage\)/);
   assert.match(page, /سرویس پاسخ قابل نمایش برنگرداند/);
+});
+
+
+test('marketplace purchases cannot be self-granted from the browser', async () => {
+  const products = await read('src/hooks/useDigitalProducts.tsx');
+
+  assert.equal(/recordPurchase/.test(products), false);
+  assert.equal(/from\(['\"]user_purchases['\"]\)[\s\S]{0,300}\.insert/.test(products), false);
+  assert.match(products, /download-product/);
+});
+
+
+test('HR dashboard visibly distinguishes explicitly loaded demo data from uploaded records', async () => {
+  const dashboard = await read('src/pages/HRDashboard.tsx');
+  const history = await read('src/components/hr-dashboard/UploadHistorySheet.tsx');
+
+  assert.match(dashboard, /dataOrigin/);
+  assert.match(dashboard, /حالت دمو/);
+  assert.match(dashboard, /داده نمونه/);
+  assert.match(history, /uploadId: string, name: string/);
+});
+
+
+test('HR dashboard history uses the native API and not a browser Supabase client', async () => {
+  const dashboard = await read('src/pages/HRDashboard.tsx');
+  const history = await read('src/components/hr-dashboard/UploadHistorySheet.tsx');
+
+  for (const source of [dashboard, history]) {
+    assert.equal(/integrations\/supabase|from\('hr_uploads'\)/.test(source), false);
+  }
+  assert.match(dashboard, /\/hr-data\/uploads\/latest/);
+  assert.match(dashboard, /\/hr-data\/uploads/);
+  assert.match(history, /\/hr-data\/uploads\?limit=50/);
+  assert.match(history, /\/hr-data\/uploads\/\$\{id\}/);
 });

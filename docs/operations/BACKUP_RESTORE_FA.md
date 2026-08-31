@@ -59,7 +59,18 @@ systemctl list-timers hring-backup.timer
 
 ## نسخه خارج از سرور
 
-تا زمان انتخاب مقصد و ثبت Credential مربوط، artifact تأییدشده باید بعد از هر Drill به یک مقصد خارج از همان سرور کپی شود. مقصد نهایی باید رمزنگاری‌شده، دارای retention مستقل و فاقد mount نوشتنی دائمی روی سرور HRing باشد. اتصال Credential این مقصد طبق تصمیم مالک محصول در مرحله نهایی تنظیم سرویس‌ها انجام می‌شود؛ Secret نباید در Git، Chat، log یا unit فایل قرار گیرد.
+برای انتقال نسخهٔ **تأییدشده** به مقصد خارج از سرور از اسکریپت immutable زیر استفاده می‌شود. مقصد `OFFSITE_REMOTE` باید یک remote رمزنگاری‌شدهٔ rclone باشد و روی سرور HRing mount نوشتنی دائمی نداشته باشد.
+
+```bash
+latest="$(find /var/backups/hring -mindepth 1 -maxdepth 1 -type d -name '20*T*Z' | sort | tail -n 1)"
+ENV_FILE=/opt/hring/.env.standalone \
+OFFSITE_REMOTE='encrypted-remote:hring-backups' \
+./scripts/operations/offsite-backup.sh "$latest"
+```
+
+این دستور ابتدا `rclone copy --immutable --checksum` و بعد `rclone check --one-way --checksum` اجرا می‌کند؛ بنابراین artifact موجود را overwrite نمی‌کند و پیش از اعلام موفقیت، تطابق مقصد را کنترل می‌کند. آن را فقط پس از `verify-backup.sh` یا Restore Drill موفق اجرا کنید.
+
+Credential مقصد در Git، Chat، log، متغیر unit systemd یا فایل `.env.standalone` قرار نمی‌گیرد. پیکربندی `rclone` باید با مجوز مالک سرویس در محل محافظت‌شدهٔ سیستم نگهداری شود. زمان‌بندی offsite تا وقتی مقصد و روش نگهداری نهایی انتخاب نشده، عمدی است که دستی بماند.
 
 ## ممنوعیت‌ها
 

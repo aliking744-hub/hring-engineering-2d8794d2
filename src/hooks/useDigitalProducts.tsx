@@ -152,16 +152,6 @@ export const useDigitalProducts = () => {
     return purchases.some(p => p.product_id === productId);
   };
 
-  const recordPurchase = async (productId: string) => {
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('user_purchases')
-      .insert({ user_id: user.id, product_id: productId });
-
-    if (error && !error.message.includes('duplicate')) throw error;
-    await fetchPurchases();
-  };
 
   return {
     products,
@@ -175,6 +165,5 @@ export const useDigitalProducts = () => {
     downloadFile,
     incrementDownloadCount,
     hasPurchased,
-    recordPurchase,
   };
 };

@@ -3,8 +3,9 @@ import asyncio
 import httpx
 
 from hring_ai_gateway.config import GatewaySettings
-from hring_ai_gateway.providers import generate_openai_compatible
+from hring_ai_gateway.providers import ProviderUnavailableError, generate_openai_compatible
 from hring_ai_gateway.registry import (
+    CompanyAiRouteError,
     ProviderConfig,
     fetch_registry_provider_names,
     parse_registry_provider,
@@ -334,3 +335,110 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
     assert result.content == ""
     assert [item.url for item in result.images] == [image_url]
 
+
+
+def test_gateway_prefers_healthy_company_byok_route(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def company_route(_settings, *, company_id, feature_key):
+        assert str(company_id) == "00000000-0000-0000-0000-000000000707"
+        assert feature_key == "job_engineering.job_profile"
+        return ProviderConfig(
+            name="company.openai",
+            adapter="openai",
+            base_url="https://company-provider.example/v1",
+            api_key="company-secret",
+            auth_scheme="bearer",
+            endpoint_path="/chat/completions",
+            max_tokens_field="max_completion_tokens",
+            default_model="company-model",
+            timeout_seconds=20,
+            max_retries=0,
+        )
+
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, _exc_type, _exc, _traceback) -> None:
+            return None
+
+        async def post(self, url: str, *, json: dict, headers: dict) -> httpx.Response:
+            captured.update({"url": url, "json": json, "headers": headers})
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", url),
+                json={
+                    "id": "company-result",
+                    "choices": [{"message": {"content": "company output"}}],
+                    "usage": {"prompt_tokens": 3, "completion_tokens": 2},
+                },
+            )
+
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.fetch_company_ai_provider",
+        company_route,
+    )
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+    request = GenerateRequest.model_validate(
+        {
+            "request_id": "00000000-0000-0000-0000-000000000708",
+            "company_id": "00000000-0000-0000-0000-000000000707",
+            "feature_key": "job_engineering.job_profile",
+            "provider": "gemini",
+            "model": "platform-model",
+            "messages": [{"role": "user", "content": "Create profile"}],
+        }
+    )
+
+    result = asyncio.run(generate_openai_compatible(settings=GatewaySettings(), request=request))
+
+    assert captured["url"] == "https://company-provider.example/v1/chat/completions"
+    assert captured["headers"] == {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer company-secret",
+        "X-Client-Request-Id": "00000000-0000-0000-0000-000000000708",
+    }
+    assert result.provider == "company.openai"
+    assert result.model == "company-model"
+
+
+def test_gateway_never_falls_back_to_platform_when_company_byok_route_is_invalid(monkeypatch) -> None:
+    async def invalid_company_route(_settings, *, company_id, feature_key):
+        _ = company_id, feature_key
+        raise CompanyAiRouteError("Company BYOK connection is unavailable")
+
+    async def platform_routes_should_not_run(*_args, **_kwargs):
+        raise AssertionError("platform provider fallback must not run for a failed company BYOK route")
+
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.fetch_company_ai_provider",
+        invalid_company_route,
+    )
+    monkeypatch.setattr(
+        "hring_ai_gateway.providers.provider_configs",
+        platform_routes_should_not_run,
+    )
+    request = GenerateRequest.model_validate(
+        {
+            "request_id": "00000000-0000-0000-0000-000000000709",
+            "company_id": "00000000-0000-0000-0000-000000000707",
+            "feature_key": "development.learning_path",
+            "provider": "gemini",
+            "model": "platform-model",
+            "messages": [{"role": "user", "content": "Create learning path"}],
+        }
+    )
+
+    try:
+        asyncio.run(generate_openai_compatible(settings=GatewaySettings(), request=request))
+    except ProviderUnavailableError as exc:
+        assert "Company BYOK connection is unavailable" in str(exc)
+    else:
+        raise AssertionError("company BYOK route failure must be fail-closed")

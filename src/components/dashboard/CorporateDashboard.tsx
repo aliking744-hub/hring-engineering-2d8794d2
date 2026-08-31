@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Building2, Briefcase, 
-  Target, BarChart3, UserPlus, Gem, Settings, Coins, Radar
+  BarChart3, UserPlus, Gem, Settings, Coins, Megaphone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -122,10 +122,10 @@ const CorporateDashboard = () => {
           <div className="grid grid-cols-2 gap-3">
             <Button 
               className="glow-button text-foreground h-12"
-              onClick={() => navigate('/strategic-compass')}
+              onClick={() => navigate('/smart-ad-generator')}
             >
-              <Target className="w-4 h-4 ml-2" />
-              قطب‌نمای استراتژی
+              <Megaphone className="w-4 h-4 ml-2" />
+              تولید آگهی
             </Button>
             <Button 
               variant="outline" 
@@ -153,14 +153,6 @@ const CorporateDashboard = () => {
                 مدیریت اعضا
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              className="border-cyan-500/50 bg-cyan-950/30 h-12 hover:bg-cyan-900/50 text-cyan-300"
-              onClick={() => navigate('/strategic-radar')}
-            >
-              <Radar className="w-4 h-4 ml-2" />
-              رادار استراتژیک
-            </Button>
           </div>
         </motion.div>
 
@@ -211,21 +203,21 @@ const CorporateDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Strategic Overview */}
+      {/* HR data activation */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
         className="glass-card p-6"
       >
-        <h2 className="text-lg font-semibold text-foreground mb-3">نمای استراتژیک</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-3">تحلیل داده‌های منابع انسانی</h2>
         <div className="flex flex-col gap-4 rounded-xl border border-border/60 bg-secondary/20 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm leading-6 text-muted-foreground">
-            شاخص‌های استراتژیک پس از ثبت داده در قطب‌نما نمایش داده می‌شوند؛ این داشبورد عدد نمونه نشان نمی‌دهد.
+            نمودارها فقط از داده‌های کارکنان ساخته می‌شوند. دادهٔ واقعی را وارد کنید یا در داشبورد HR حالت دادهٔ نمونه را آگاهانه فعال کنید.
           </p>
-          <Button variant="outline" onClick={() => navigate('/strategic-compass')}>
-            <Target className="ml-2 h-4 w-4" />
-            ورود به قطب‌نما
+          <Button variant="outline" onClick={() => navigate('/hr-dashboard')}>
+            <BarChart3 className="ml-2 h-4 w-4" />
+            ورود به داشبورد HR
           </Button>
         </div>
       </motion.div>

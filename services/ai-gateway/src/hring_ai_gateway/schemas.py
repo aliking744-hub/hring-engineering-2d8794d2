@@ -16,6 +16,8 @@ class GatewayMessage(BaseModel):
 
 class GenerateRequest(BaseModel):
     request_id: UUID
+    feature_key: str | None = Field(default=None, min_length=1, max_length=120, pattern=r"^[a-z0-9_.-]+$")
+    company_id: UUID | None = None
     provider: str = Field(min_length=1, max_length=64)
     model: str = Field(min_length=1, max_length=160)
     messages: list[GatewayMessage] = Field(min_length=1, max_length=100)

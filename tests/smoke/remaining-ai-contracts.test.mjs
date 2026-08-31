@@ -69,3 +69,128 @@ test('new migrations are linear and headhunting remains out of scope', async () 
   assert.match(support, /down_revision: str \| None = "20260829_0025"/);
   assert.equal(/headhunt/i.test(labor + support), false);
 });
+
+
+test('company AI connection control plane keeps secrets tenant-scoped and headhunting deferred', async () => {
+  const model = await read('apps/api/src/hring_api/domains/company_ai/models.py');
+  const service = await read('apps/api/src/hring_api/domains/company_ai/service.py');
+  const routes = await read('apps/api/src/hring_api/domains/company_ai/routes.py');
+  const migration = await read(
+    'apps/api/alembic/versions/20260829_0028_company_ai_connections.py',
+  );
+
+  assert.match(model, /secret_ciphertext/);
+  assert.match(model, /uq_company_ai_connections_capability/);
+  assert.match(service, /ProviderSecretCipher/);
+  assert.match(service, /assert_provider_host_is_safe/);
+  assert.match(service, /COMPANY_CONFIGURABLE_FEATURE_KEYS/);
+  assert.match(service, /existing\.secret_ciphertext is None/);
+  assert.equal(/smart_headhunting\.candidate_analysis/.test(service), false);
+  assert.match(routes, /company\.integrations\.read/);
+  assert.match(routes, /company\.integrations\.manage/);
+  assert.match(migration, /down_revision: str \| None = "20260829_0027"/);
+});
+
+
+test('development and compatibility AI honor healthy company BYOK before managed billing', async () => {
+  const development = await read('apps/api/src/hring_api/domains/development/service.py');
+  const compatibility = await read('apps/api/src/hring_api/domains/compat/functions.py');
+
+  assert.match(development, /from hring_api\.domains\.company_ai\.service import uses_company_byok/);
+  assert.match(development, /capability_key=ONBOARDING_FEATURE_KEY/);
+  assert.match(development, /capability_key=LEARNING_PATH_FEATURE_KEY/);
+  assert.match(development, /if managed_cost == 0:/);
+  assert.match(compatibility, /capability_key=feature_key/);
+  assert.match(compatibility, /credits_charged=managed_cost/);
+  assert.match(compatibility, /if managed_cost <= 0:/);
+});
+
+
+test('company settings exposes a permission-gated AI connection panel without rendering secrets', async () => {
+  const settings = await read('src/pages/CompanySettings.tsx');
+
+  assert.match(settings, /company\.integrations\.read/);
+  assert.match(settings, /company\.integrations\.manage/);
+  assert.match(settings, /ai-connections\/catalog/);
+  assert.match(settings, /\/test/);
+  assert.match(settings, /secret_configured/);
+  assert.match(settings, /type="password"/);
+  assert.equal(/secret_ciphertext/.test(settings), false);
+  assert.equal(/smart_headhunting/.test(settings), false);
+});
+
+
+test('BYOK zero-credit executions keep a durable idempotency guard', async () => {
+  const billing = await read('apps/api/src/hring_api/domains/billing/credit_service.py');
+  const leases = await read('apps/api/src/hring_api/domains/billing/models.py');
+  const migration = await read('apps/api/alembic/versions/20260829_0029_ai_execution_leases.py');
+  const jobProfile = await read('apps/api/src/hring_api/domains/job_engineering/service.py');
+  const interview = await read('apps/api/src/hring_api/domains/interview/service.py');
+  const development = await read('apps/api/src/hring_api/domains/development/service.py');
+  const smartAd = await read('apps/api/src/hring_api/domains/job_ads/service.py');
+
+  assert.match(billing, /async def run_with_ai_execution_guard/);
+  assert.match(leases, /class AiExecutionLease/);
+  assert.match(migration, /down_revision: str \| None = "20260829_0028"/);
+  for (const source of [jobProfile, interview, development, smartAd]) {
+    assert.match(source, /run_with_ai_execution_guard/);
+  }
+});
+
+
+test('onboarding roadmap is a persisted workflow, not a static template', async () => {
+  const models = await read('apps/api/src/hring_api/domains/development/models.py');
+  const schemas = await read('apps/api/src/hring_api/domains/development/schemas.py');
+  const routes = await read('apps/api/src/hring_api/domains/development/routes.py');
+  const service = await read('apps/api/src/hring_api/domains/development/service.py');
+  const roadmap = await read('src/pages/OnboardingRoadmap.tsx');
+  const migration = await read('apps/api/alembic/versions/20260829_0030_operational_onboarding.py');
+
+  assert.match(models, /class OnboardingTask/);
+  assert.match(models, /class OnboardingTaskEvent/);
+  assert.match(schemas, /OnboardingTaskCreateRequest/);
+  assert.match(schemas, /OnboardingTaskUpdateRequest/);
+  assert.match(routes, /onboarding-plans\/{plan_id}\/tasks/);
+  assert.match(service, /_seed_onboarding_tasks/);
+  assert.match(service, /event_type = "completed"/);
+  assert.match(roadmap, /\/development\/onboarding-plans/);
+  assert.match(roadmap, /گردش‌کار واقعی/);
+  assert.equal(/roadmapPhases/.test(roadmap), false);
+  assert.match(migration, /down_revision: str \| None = "20260829_0029"/);
+});
+
+
+test('HR dashboard preserves the distinction between private uploads and truthful demo data', async () => {
+  const dashboard = await read('src/pages/HRDashboard.tsx');
+  const routes = await read('apps/api/src/hring_api/domains/hr_data/routes.py');
+  const schemas = await read('apps/api/src/hring_api/domains/hr_data/schemas.py');
+
+  assert.match(dashboard, /hr-data\/uploads\/latest/);
+  assert.match(dashboard, /dataOrigin === 'demo'/);
+  assert.match(dashboard, /data\.length\.toLocaleString\('fa-IR'\)/);
+  assert.equal(/۷۸ رکورد ساختگی/.test(dashboard), false);
+  assert.match(routes, /owner_user_id=principal\.user_id/);
+  assert.match(schemas, /max_length=2000/);
+  assert.match(schemas, /5_000_000/);
+});
+
+
+test('standalone runtime fails fast without tenant provider encryption', async () => {
+  const compose = await read('compose.yaml');
+  const envExample = await read('.env.standalone.example');
+
+  assert.match(compose, /INTEGRATION_SECRET_ENCRYPTION_KEY:\s*\$\{INTEGRATION_SECRET_ENCRYPTION_KEY:\?set INTEGRATION_SECRET_ENCRYPTION_KEY\}/);
+  assert.match(envExample, /INTEGRATION_SECRET_ENCRYPTION_KEY=CHANGE_ME_FERNET_KEY_FOR_TENANT_PROVIDER_SECRETS/);
+});
+
+
+test('PR66 includes a secret-safe staging transfer preflight', async () => {
+  const preflight = await read('scripts/pr66-staging-preflight.sh');
+  const uat = await read('docs/operations/PR744_PR66_STAGING_UAT_FA.md');
+
+  assert.match(preflight, /INTEGRATION_SECRET_ENCRYPTION_KEY/);
+  assert.match(preflight, /CHANGE_ME/);
+  assert.match(preflight, /docker compose --env-file/);
+  assert.match(preflight, /pr66-migration-roundtrip\.sh/);
+  assert.match(uat, /pr66-staging-preflight\.sh/);
+});

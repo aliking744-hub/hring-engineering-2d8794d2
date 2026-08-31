@@ -131,6 +131,14 @@ def _upload_size(file: UploadFile) -> int:
     return int(size)
 
 
+def _upload_header(file: UploadFile, limit: int = 512) -> bytes:
+    current = file.file.tell()
+    file.file.seek(0)
+    header = file.file.read(limit)
+    file.file.seek(current)
+    return bytes(header)
+
+
 async def _storage_admin_for_bucket(
     db: AsyncSession,
     *,
@@ -423,6 +431,7 @@ async def upload_compat_object(
             object_path=safe_path,
             content_type=file.content_type,
             size_bytes=_upload_size(file),
+            header_bytes=_upload_header(file),
         )
         key = put_object(
             settings,

@@ -1,12 +1,17 @@
+import csv
+import json
+from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import StreamingResponse
 
 from hring_api.db.session import get_db_session
 from hring_api.domains.access.policy import PlatformPrincipal, require_platform_permission
 from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.admin.repository import (
+    add_audit_log,
     get_profile_for_admin,
     list_audit_logs,
     list_companies_for_admin,
@@ -341,6 +346,67 @@ async def change_product_setting(
         raise _admin_error(exc) from exc
     await db.commit()
     return SiteSettingResponse.model_validate(row)
+
+
+@router.get(
+    "/admin/platform/audit-logs/export.csv",
+    tags=["platform-admin"],
+)
+async def export_platform_audit_logs(
+    company_id: UUID | None = None,
+    limit: int = Query(default=10_000, ge=1, le=50_000),
+    actor: PlatformPrincipal = Depends(require_platform_permission("platform.audit.read")),
+    db: AsyncSession = Depends(get_db_session),
+) -> StreamingResponse:
+    rows = await list_audit_logs(db, company_id=company_id, limit=limit, offset=0)
+    output = StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "id",
+            "created_at",
+            "actor_user_id",
+            "company_id",
+            "action",
+            "resource_type",
+            "resource_id",
+            "outcome",
+            "ip_address",
+            "metadata_json",
+        ]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                row.id,
+                row.created_at.isoformat(),
+                row.actor_user_id or "",
+                row.company_id or "",
+                row.action,
+                row.resource_type,
+                row.resource_id or "",
+                row.outcome,
+                row.ip_address or "",
+                json.dumps(row.metadata_json, ensure_ascii=False, separators=(",", ":")),
+            ]
+        )
+
+    await add_audit_log(
+        db,
+        actor_user_id=actor.user_id,
+        company_id=company_id,
+        action="platform.audit.export",
+        resource_type="audit_log",
+        resource_id=None,
+        metadata_json={"row_count": len(rows), "limit": limit},
+    )
+    await db.commit()
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="hring-audit-logs.csv"'},
+    )
 
 
 @router.get(

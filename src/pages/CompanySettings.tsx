@@ -2,15 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  AlertTriangle,
   Building2,
+  CheckCircle2,
   ChevronLeft,
   Coins,
+  Cpu,
   Crown,
   Gem,
   KeyRound,
   Loader2,
   Save,
   Shield,
+  TestTube2,
+  Trash2,
   Users,
 } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
@@ -52,6 +57,59 @@ interface PermissionMatrixResponse {
   matrix: PermissionState[];
 }
 
+type CompanyAiMode = 'byok' | 'hring_managed';
+
+interface CompanyAiConnection {
+  id: string;
+  company_id: string;
+  capability_key: string;
+  mode: CompanyAiMode;
+  provider_key: string | null;
+  adapter: string | null;
+  base_url: string | null;
+  default_model: string | null;
+  auth_scheme: 'bearer' | 'x-api-key' | 'api-key' | 'x-goog-api-key';
+  secret_configured: boolean;
+  secret_hint: string | null;
+  is_active: boolean;
+  status: 'untested' | 'healthy' | 'unhealthy' | 'disabled';
+  last_tested_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CompanyAiCapability {
+  feature_key: string;
+  display_name: string;
+  category: string;
+  description: string;
+  connection: CompanyAiConnection | null;
+}
+
+interface CompanyAiDraft {
+  mode: CompanyAiMode;
+  provider_key: string;
+  adapter: string;
+  base_url: string;
+  default_model: string;
+  auth_scheme: CompanyAiConnection['auth_scheme'];
+  secret: string;
+  is_active: boolean;
+}
+
+const emptyAiDraft = (): CompanyAiDraft => ({
+  mode: 'hring_managed',
+  provider_key: '',
+  adapter: 'openai_compatible',
+  base_url: '',
+  default_model: '',
+  auth_scheme: 'bearer',
+  secret: '',
+  is_active: true,
+});
+
 const EDITABLE_ROLES: CompanyRole[] = ['deputy', 'manager', 'employee'];
 
 const CompanySettings = () => {
@@ -65,9 +123,19 @@ const CompanySettings = () => {
   const [matrix, setMatrix] = useState<PermissionMatrixResponse | null>(null);
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [permissionBusy, setPermissionBusy] = useState<string | null>(null);
+  const [aiCatalog, setAiCatalog] = useState<CompanyAiCapability[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [selectedAiFeature, setSelectedAiFeature] = useState<string | null>(null);
+  const [aiDraft, setAiDraft] = useState<CompanyAiDraft>(emptyAiDraft);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiTesting, setAiTesting] = useState(false);
+  const [aiDeleting, setAiDeleting] = useState(false);
 
   const canManageSettings = Boolean(context?.companyPermissions.includes('company.settings.manage'));
   const isCEO = context?.companyRole === 'ceo';
+  const canReadAiConnections = Boolean(context?.companyPermissions.includes('company.integrations.read'));
+  const canManageAiConnections = Boolean(context?.companyPermissions.includes('company.integrations.manage'));
+  const selectedAiCapability = aiCatalog.find((item) => item.feature_key === selectedAiFeature) ?? null;
 
   useEffect(() => {
     if (!company) return;
@@ -95,6 +163,47 @@ const CompanySettings = () => {
   useEffect(() => {
     void loadMatrix();
   }, [context?.companyId, isCEO]);
+
+  const loadAiCatalog = async () => {
+    if (!context?.companyId || !canReadAiConnections) {
+      setAiCatalog([]);
+      setSelectedAiFeature(null);
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const catalog = await apiRequest<CompanyAiCapability[]>(
+        `/companies/${context.companyId}/ai-connections/catalog`,
+      );
+      setAiCatalog(catalog);
+      setSelectedAiFeature((current) => current && catalog.some((item) => item.feature_key === current)
+        ? current
+        : catalog[0]?.feature_key ?? null);
+    } catch (error) {
+      console.error('Company AI catalog load failed:', error);
+      toast.error('دریافت اتصال‌های هوش مصنوعی انجام نشد');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadAiCatalog();
+  }, [context?.companyId, canReadAiConnections]);
+
+  useEffect(() => {
+    const connection = selectedAiCapability?.connection;
+    setAiDraft(connection ? {
+      mode: connection.mode,
+      provider_key: connection.provider_key || '',
+      adapter: connection.adapter || 'openai_compatible',
+      base_url: connection.base_url || '',
+      default_model: connection.default_model || '',
+      auth_scheme: connection.auth_scheme,
+      secret: '',
+      is_active: connection.is_active,
+    } : emptyAiDraft());
+  }, [selectedAiFeature, selectedAiCapability?.connection?.id, selectedAiCapability?.connection?.updated_at]);
 
   const saveCompany = async () => {
     if (!company || !context?.companyId || !canManageSettings) return;
@@ -144,6 +253,73 @@ const CompanySettings = () => {
       toast.error(error instanceof Error ? error.message : 'تغییر سطح دسترسی انجام نشد');
     } finally {
       setPermissionBusy(null);
+    }
+  };
+
+  const saveAiConnection = async () => {
+    if (!context?.companyId || !selectedAiCapability || !canManageAiConnections) return;
+    if (
+      aiDraft.mode === 'byok'
+      && !selectedAiCapability.connection?.secret_configured
+      && !aiDraft.secret.trim()
+    ) {
+      toast.error('برای نخستین اتصال BYOK، کلید Provider لازم است');
+      return;
+    }
+    setAiSaving(true);
+    try {
+      await apiRequest<CompanyAiConnection>(
+        `/companies/${context.companyId}/ai-connections/${selectedAiCapability.feature_key}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...aiDraft,
+            secret: aiDraft.secret.trim() || undefined,
+          }),
+        },
+      );
+      setAiDraft((current) => ({ ...current, secret: '' }));
+      await loadAiCatalog();
+      toast.success(aiDraft.mode === 'byok' ? 'تنظیم اتصال AI ذخیره شد؛ برای فعال شدن ابتدا تست کنید' : 'مسیر مدیریت‌شدهٔ HRing ذخیره شد');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ذخیره اتصال AI انجام نشد');
+    } finally {
+      setAiSaving(false);
+    }
+  };
+
+  const testAiConnection = async () => {
+    if (!context?.companyId || !selectedAiCapability || !canManageAiConnections) return;
+    setAiTesting(true);
+    try {
+      const result = await apiRequest<{ healthy: boolean; message: string }>(
+        `/companies/${context.companyId}/ai-connections/${selectedAiCapability.feature_key}/test`,
+        { method: 'POST' },
+      );
+      await loadAiCatalog();
+      if (result.healthy) toast.success('اتصال AI با موفقیت تست شد');
+      else toast.error(result.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تست اتصال انجام نشد');
+    } finally {
+      setAiTesting(false);
+    }
+  };
+
+  const deleteAiConnection = async () => {
+    if (!context?.companyId || !selectedAiCapability?.connection || !canManageAiConnections) return;
+    setAiDeleting(true);
+    try {
+      await apiRequest<void>(
+        `/companies/${context.companyId}/ai-connections/${selectedAiCapability.feature_key}`,
+        { method: 'DELETE' },
+      );
+      await loadAiCatalog();
+      toast.success('اتصال اختصاصی این قابلیت حذف شد');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'حذف اتصال انجام نشد');
+    } finally {
+      setAiDeleting(false);
     }
   };
 
@@ -202,6 +378,75 @@ const CompanySettings = () => {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Cpu className="h-5 w-5 text-primary" /> اتصال هوش مصنوعی شرکت</CardTitle>
+              <CardDescription>برای هر قابلیت، کلید اختصاصی شرکت یا سرویس مدیریت‌شدهٔ HRing را انتخاب کنید. کلید فقط هنگام ذخیره ارسال می‌شود و هرگز دوباره نمایش داده نمی‌شود.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!canReadAiConnections ? (
+                <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">مجوز مشاهدهٔ اتصال‌های AI برای این حساب فعال نیست.</div>
+              ) : aiLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+              ) : selectedAiCapability ? (
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                  <div className="max-h-[34rem] space-y-2 overflow-y-auto rounded-xl border p-2">
+                    {aiCatalog.map((capability) => {
+                      const active = capability.feature_key === selectedAiCapability.feature_key;
+                      const connection = capability.connection;
+                      return (
+                        <button
+                          type="button"
+                          key={capability.feature_key}
+                          onClick={() => setSelectedAiFeature(capability.feature_key)}
+                          className={`w-full rounded-lg border p-3 text-right transition ${active ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted/60'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{capability.display_name}</span>
+                            {connection?.mode === 'hring_managed' || connection?.status === 'healthy' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">{connection?.mode === 'byok' ? `کلید اختصاصی شرکت · ${connection.status === 'healthy' ? 'تست‌شده' : 'نیازمند تست'}` : 'سرویس مدیریت‌شدهٔ HRing'}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-4">
+                    <div className="rounded-xl border p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div><div className="font-semibold">{selectedAiCapability.display_name}</div><div className="mt-1 text-sm text-muted-foreground">{selectedAiCapability.description}</div></div>
+                        <Badge variant={selectedAiCapability.connection?.mode === 'hring_managed' || selectedAiCapability.connection?.status === 'healthy' ? 'default' : 'outline'}>{selectedAiCapability.connection?.mode === 'hring_managed' ? 'مدیریت‌شده' : selectedAiCapability.connection?.status === 'healthy' ? 'تست موفق' : 'فعال‌سازی پس از تست'}</Badge>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Button type="button" variant={aiDraft.mode === 'hring_managed' ? 'default' : 'outline'} disabled={!canManageAiConnections} onClick={() => setAiDraft((current) => ({ ...current, mode: 'hring_managed' }))}>اعتبار مدیریت‌شدهٔ HRing</Button>
+                      <Button type="button" variant={aiDraft.mode === 'byok' ? 'default' : 'outline'} disabled={!canManageAiConnections} onClick={() => setAiDraft((current) => ({ ...current, mode: 'byok' }))}>کلید اختصاصی شرکت</Button>
+                    </div>
+                    {aiDraft.mode === 'hring_managed' ? (
+                      <div className="rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">این قابلیت با Provider و قیمت‌گذاری پلتفرم اجرا می‌شود. هزینه فقط هنگام اجرای موفق از اعتبار شرکت کم می‌شود.</div>
+                    ) : (
+                      <div className="space-y-3 rounded-xl border p-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1"><Label>شناسه Provider</Label><Input dir="ltr" value={aiDraft.provider_key} disabled={!canManageAiConnections} placeholder="openai-company" onChange={(event) => setAiDraft((current) => ({ ...current, provider_key: event.target.value }))} /></div>
+                          <div className="space-y-1"><Label>Adapter</Label><Input dir="ltr" value={aiDraft.adapter} disabled={!canManageAiConnections} placeholder="openai_compatible" onChange={(event) => setAiDraft((current) => ({ ...current, adapter: event.target.value }))} /></div>
+                          <div className="space-y-1"><Label>Base URL</Label><Input dir="ltr" value={aiDraft.base_url} disabled={!canManageAiConnections} placeholder="https://api.example.com/v1" onChange={(event) => setAiDraft((current) => ({ ...current, base_url: event.target.value }))} /></div>
+                          <div className="space-y-1"><Label>مدل پیش‌فرض</Label><Input dir="ltr" value={aiDraft.default_model} disabled={!canManageAiConnections} placeholder="gpt-4.1-mini" onChange={(event) => setAiDraft((current) => ({ ...current, default_model: event.target.value }))} /></div>
+                        </div>
+                        <div className="space-y-1"><Label>کلید Provider {selectedAiCapability.connection?.secret_configured ? `(ثبت‌شده: ${selectedAiCapability.connection.secret_hint || '••••'})` : ''}</Label><Input dir="ltr" type="password" autoComplete="new-password" value={aiDraft.secret} disabled={!canManageAiConnections} placeholder={selectedAiCapability.connection?.secret_configured ? 'فقط برای تعویض کلید وارد کنید' : 'کلید Provider'} onChange={(event) => setAiDraft((current) => ({ ...current, secret: event.target.value }))} /></div>
+                        <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-sm"><span>اتصال برای اجرا فعال باشد</span><Switch checked={aiDraft.is_active} disabled={!canManageAiConnections} onCheckedChange={(checked) => setAiDraft((current) => ({ ...current, is_active: checked }))} /></div>
+                      </div>
+                    )}
+                    {canManageAiConnections && <div className="flex flex-wrap gap-2">
+                      <Button type="button" onClick={() => void saveAiConnection()} disabled={aiSaving}>{aiSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}ذخیره اتصال</Button>
+                      {selectedAiCapability.connection?.mode === 'byok' && <Button type="button" variant="secondary" onClick={() => void testAiConnection()} disabled={aiTesting}>{aiTesting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <TestTube2 className="ml-2 h-4 w-4" />}تست اتصال</Button>}
+                      {selectedAiCapability.connection && <Button type="button" variant="outline" onClick={() => void deleteAiConnection()} disabled={aiDeleting}>{aiDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Trash2 className="ml-2 h-4 w-4" />}حذف تنظیم اختصاصی</Button>}
+                    </div>}
+                    {selectedAiCapability.connection?.last_error && <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">{selectedAiCapability.connection.last_error}</div>}
+                  </div>
+                </div>
+              ) : <div className="text-sm text-muted-foreground">قابلیت قابل‌تنظیمی برای این شرکت پیدا نشد.</div>}
+            </CardContent>
+          </Card>
 
           <Card className="mt-6">
             <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" /> سطح دسترسی نقش‌های شرکت</CardTitle><CardDescription>{isCEO ? 'مدیرعامل می‌تواند مجوزهای معاون، مدیر و کارشناس را برای همین شرکت تنظیم کند.' : 'فقط مدیرعامل شرکت به ماتریس سطح دسترسی دسترسی دارد.'}</CardDescription></CardHeader>

@@ -7,7 +7,9 @@ import httpx
 
 from hring_ai_gateway.config import GatewaySettings
 from hring_ai_gateway.registry import (
+    CompanyAiRouteError,
     ProviderConfig,
+    fetch_company_ai_provider,
     fetch_registry_providers,
 )
 from hring_ai_gateway.schemas import (
@@ -456,7 +458,22 @@ async def generate_openai_compatible(
     request: GenerateRequest,
     resolved_providers: list[ProviderConfig] | None = None,
 ) -> GenerateResponse:
-    routes = resolved_providers or await provider_configs(settings, request.provider)
+    if resolved_providers is not None:
+        routes = resolved_providers
+    elif request.company_id is not None and request.feature_key is not None:
+        try:
+            company_provider = await fetch_company_ai_provider(
+                settings,
+                company_id=request.company_id,
+                feature_key=request.feature_key,
+            )
+        except CompanyAiRouteError as exc:
+            raise ProviderUnavailableError(str(exc)) from exc
+        routes = [company_provider] if company_provider is not None else await provider_configs(
+            settings, request.provider
+        )
+    else:
+        routes = await provider_configs(settings, request.provider)
     if not routes:
         raise ProviderUnavailableError("Provider is not configured")
 

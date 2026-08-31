@@ -145,3 +145,5 @@ def test_auth_context_contains_effective_company_permissions() -> None:
         assert "company.members.manage" in body["company_permissions"]
         assert "company.settings.manage" in body["company_permissions"]
         assert "company.features.manage" in body["company_permissions"]
+        assert "company.integrations.read" in body["company_permissions"]
+        assert "company.integrations.manage" in body["company_permissions"]

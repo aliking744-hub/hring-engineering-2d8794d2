@@ -5,6 +5,7 @@ from pydantic import SecretStr
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiCitation
+from hring_api.domains.compat.access import PERSONAL_OPERATION_RULES
 from hring_api.domains.compat.functions import _response_with_citations
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
@@ -59,6 +60,14 @@ def test_personal_scope_does_not_infer_company_sharing() -> None:
     assert scope_for("notifications").scope == "personal"
     assert scope_for("hr_uploads").scope == "personal"
     assert scope_for("learning_path_records").scope == "personal"
+
+
+def test_user_cannot_self_grant_a_marketplace_purchase() -> None:
+    assert PERSONAL_OPERATION_RULES["user_purchases"] == frozenset({"select"})
+
+
+def test_user_cannot_append_to_the_credit_ledger() -> None:
+    assert PERSONAL_OPERATION_RULES["credit_transactions"] == frozenset({"select"})
 
 
 @pytest.mark.parametrize(
@@ -222,6 +231,33 @@ def test_valid_legacy_public_assets_remain_supported() -> None:
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         size_bytes=2_000_000,
     )
+
+
+def test_public_uploads_reject_spoofed_mime_and_magic_bytes() -> None:
+    with pytest.raises(StoragePolicyError):
+        validate_storage_upload(
+            logical_bucket="avatars",
+            object_path=f"{uuid4()}/avatar.jpg",
+            content_type="image/jpeg",
+            size_bytes=100,
+            header_bytes=b"<html>not really a jpeg</html>",
+        )
+    with pytest.raises(StoragePolicyError):
+        validate_storage_upload(
+            logical_bucket="products",
+            object_path="catalog.xlsx",
+            content_type="text/plain",
+            size_bytes=100,
+            header_bytes=b"PK\x03\x04fake-office-archive",
+        )
+    with pytest.raises(StoragePolicyError):
+        validate_storage_upload(
+            logical_bucket="products",
+            object_path="document.pdf",
+            content_type="application/pdf",
+            size_bytes=100,
+            header_bytes=b"not-a-pdf",
+        )
 
 
 def test_production_settings_still_require_real_independent_secrets() -> None:

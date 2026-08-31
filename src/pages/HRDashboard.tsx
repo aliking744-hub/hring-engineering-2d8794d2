@@ -8,20 +8,21 @@ import { MapTab } from '@/components/hr-dashboard/MapTab';
 import { ProfileTab } from '@/components/hr-dashboard/ProfileTab';
 import { OvertimeTab } from '@/components/hr-dashboard/OvertimeTab';
 import { UploadPage } from '@/components/hr-dashboard/UploadPage';
-import { UploadHistorySheet } from '@/components/hr-dashboard/UploadHistorySheet';
+import { UploadHistorySheet, HrUploadRecord } from '@/components/hr-dashboard/UploadHistorySheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, LayoutDashboard, Cake, Banknote, MapPin, User, Clock, RefreshCw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AuroraBackground from '@/components/AuroraBackground';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/api';
 
 export default function HRDashboard() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<Employee[] | null>(null);
+  const [dataOrigin, setDataOrigin] = useState<'demo' | 'uploaded' | null>(null);
   const [currentUploadId, setCurrentUploadId] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   const [restoring, setRestoring] = useState(true);
@@ -34,7 +35,7 @@ export default function HRDashboard() {
   });
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  // Restore most recent upload on login
+  // Restore the owner's most recent native HR upload after login.
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -42,51 +43,50 @@ export default function HRDashboard() {
       return;
     }
     let cancelled = false;
-    (async () => {
-      const { data: row } = await supabase
-        .from('hr_uploads')
-        .select('id, data')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      if (row) {
-        setData((row.data as unknown as Employee[]) || []);
+    void (async () => {
+      try {
+        const row = await apiRequest<HrUploadRecord | null>('/hr-data/uploads/latest');
+        if (cancelled || row === null) return;
+        setData(row.records);
+        setDataOrigin(row.is_demo ? 'demo' : 'uploaded');
         setCurrentUploadId(row.id);
+      } catch {
+        if (!cancelled) {
+          toast({ title: 'بازیابی نشد', description: 'آخرین بارگذاری HR در دسترس نیست', variant: 'destructive' });
+        }
+      } finally {
+        if (!cancelled) setRestoring(false);
       }
-      setRestoring(false);
     })();
     return () => { cancelled = true; };
   }, [user, authLoading]);
 
   const persistUpload = useCallback(async (employees: Employee[], name: string) => {
     if (!user) return null;
-    const { data: row, error } = await supabase
-      .from('hr_uploads')
-      .insert([{
-        user_id: user.id,
-        name,
-        employee_count: employees.length,
-        data: employees as never,
-      }])
-      .select('id')
-      .single();
-    if (error) {
+    const isDemo = name.startsWith('داده نمونه');
+    try {
+      const row = await apiRequest<HrUploadRecord>('/hr-data/uploads', {
+        method: 'POST',
+        body: JSON.stringify({ name, records: employees, is_demo: isDemo }),
+      });
+      setHistoryRefresh(k => k + 1);
+      return row.id;
+    } catch {
       toast({ title: 'ذخیره نشد', description: 'بارگذاری در تاریخچه ذخیره نشد', variant: 'destructive' });
       return null;
     }
-    setHistoryRefresh(k => k + 1);
-    return row?.id ?? null;
   }, [user]);
 
   const handleDataLoaded = useCallback(async (employees: Employee[], name: string) => {
     setData(employees);
+    setDataOrigin(name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
     const id = await persistUpload(employees, name);
     setCurrentUploadId(id);
   }, [persistUpload]);
 
-  const handleLoadFromHistory = useCallback((employees: Employee[], id: string) => {
+  const handleLoadFromHistory = useCallback((employees: Employee[], id: string, _name: string, isDemo: boolean) => {
     setData(employees);
+    setDataOrigin(isDemo ? 'demo' : 'uploaded');
     setCurrentUploadId(id);
   }, []);
 
@@ -160,6 +160,9 @@ export default function HRDashboard() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">داشبورد منابع انسانی</h1>
               <p className="text-muted-foreground text-xs md:text-sm mt-1 hidden sm:block">تحلیل و گزارش‌گیری اطلاعات پرسنلی</p>
+              {dataOrigin === 'demo' && (
+                <p className="mt-1 text-xs font-medium text-amber-400">حالت دمو — نمودارها با {data.length.toLocaleString('fa-IR')} رکورد ساختگی نمایش داده می‌شوند.</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -170,7 +173,7 @@ export default function HRDashboard() {
                 refreshKey={historyRefresh}
               />
             )}
-            <Button variant="outline" size="sm" onClick={() => setData(null)} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => { setData(null); setDataOrigin(null); }} className="gap-2">
               <RefreshCw className="w-4 h-4" />
               <span>بارگذاری مجدد</span>
             </Button>

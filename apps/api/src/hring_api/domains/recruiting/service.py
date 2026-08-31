@@ -8,6 +8,7 @@ from hring_api.domains.recruiting.repository import (
     create_campaign,
     delete_campaign,
     get_campaign_for_owner,
+    get_candidate_for_owner,
     list_candidates_for_campaign,
     list_campaigns_for_owner,
 )
@@ -112,3 +113,42 @@ async def add_owner_candidates(
     if campaign is None:
         raise CampaignNotFoundError("Campaign not found")
     return await add_candidates(session, campaign_id=campaign.id, rows=rows)
+
+async def get_owner_candidate(
+    session: AsyncSession,
+    *,
+    campaign_id: UUID,
+    candidate_id: UUID,
+    owner_user_id: UUID,
+) -> RecruitingCandidate:
+    candidate = await get_candidate_for_owner(
+        session,
+        campaign_id=campaign_id,
+        candidate_id=candidate_id,
+        owner_user_id=owner_user_id,
+    )
+    if candidate is None:
+        raise CampaignNotFoundError("Candidate not found")
+    return candidate
+
+
+async def update_owner_candidate_status(
+    session: AsyncSession,
+    *,
+    campaign_id: UUID,
+    candidate_id: UUID,
+    owner_user_id: UUID,
+    status: str,
+) -> RecruitingCandidate:
+    candidate = await get_candidate_for_owner(
+        session,
+        campaign_id=campaign_id,
+        candidate_id=candidate_id,
+        owner_user_id=owner_user_id,
+        for_update=True,
+    )
+    if candidate is None:
+        raise CampaignNotFoundError("Candidate not found")
+    candidate.status = status
+    await session.flush()
+    return candidate

@@ -370,3 +370,32 @@ def test_last_super_admin_cannot_remove_own_super_admin_role_and_audit_is_writte
             and row["resource_id"] == created["company"]["id"]
             for row in logs.json()
         )
+
+
+
+def test_audit_export_requires_permission_and_returns_utf8_csv() -> None:
+    with TestClient(app) as client:
+        regular = _register(client, "audit-export-regular")
+        forbidden = client.get(
+            "/api/v1/admin/platform/audit-logs/export.csv",
+            headers=_auth(regular),
+        )
+        assert forbidden.status_code == 403
+
+        admin = _register_with_platform_role(client, "audit-export-admin", "super_admin")
+        exported = client.get(
+            "/api/v1/admin/platform/audit-logs/export.csv",
+            headers=_auth(admin),
+        )
+        assert exported.status_code == 200, exported.text
+        assert exported.headers["content-type"].startswith("text/csv")
+        assert "attachment;" in exported.headers["content-disposition"]
+        assert exported.content.startswith(b"\xef\xbb\xbf")
+        assert "action" in exported.text
+
+        logs = client.get(
+            "/api/v1/admin/platform/audit-logs",
+            headers=_auth(admin),
+        )
+        assert logs.status_code == 200, logs.text
+        assert any(row["action"] == "platform.audit.export" for row in logs.json())

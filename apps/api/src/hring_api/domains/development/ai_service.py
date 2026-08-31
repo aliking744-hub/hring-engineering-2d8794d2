@@ -186,8 +186,8 @@ async def generate_learning_path_content(
     settings: Settings,
     session: AsyncSession | None = None,
 ) -> LearningPathResult:
-    # Employee identity is required only for HRing storage/email delivery and is
-    # deliberately excluded from the provider payload, matching the source feature.
+    # Deliberately omit employee name/email from the provider payload.
+    # employee identity is required only for HRing storage/email delivery and is deliberately excluded from the provider payload.
     has_training_months = payload.training_months is not None and payload.training_months > 0
     roadmap_count = str(payload.training_months) if has_training_months else "4 to 6"
     if has_training_months:
@@ -207,15 +207,6 @@ async def generate_learning_path_content(
             "Generate 4-6 months of realistic milestones."
         )
 
-    provider_input = {
-        "jobTitle": payload.job_title,
-        "industry": payload.industry,
-        "seniorityLevel": payload.seniority_level,
-        "educationLevel": payload.education_level,
-        "fieldOfStudy": payload.field_of_study or "Not specified",
-        "experienceYears": payload.experience_years,
-        "trainingMonths": payload.training_months,
-    }
     system_prompt = f"""You are an expert HR and L&D (Learning and Development) strategist with a deep understanding of realistic capacity planning. Based on the user's current profile, generate a highly personalized, practical learning and development roadmap.
 
 CRITICAL REALISM RULE: {training_rule}
