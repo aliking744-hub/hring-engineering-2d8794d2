@@ -186,8 +186,8 @@ async def generate_learning_path_content(
     settings: Settings,
     session: AsyncSession | None = None,
 ) -> LearningPathResult:
-    # Employee identity is required only for HRing storage/email delivery and is
-    # deliberately excluded from the provider payload, matching the source feature.
+    # Deliberately omit employee name/email from the provider payload.
+    # employee identity is required only for HRing storage/email delivery and is deliberately excluded from the provider payload.
     has_training_months = payload.training_months is not None and payload.training_months > 0
     roadmap_count = str(payload.training_months) if has_training_months else "4 to 6"
     if has_training_months:
