@@ -37,6 +37,7 @@ from hring_api.domains.development.repository import (
     get_onboarding_plan,
     get_onboarding_plan_by_idempotency,
     get_onboarding_task,
+    list_learning_paths as list_learning_path_rows,
     list_onboarding_plans,
     list_onboarding_tasks,
     update_onboarding_task,
@@ -371,6 +372,15 @@ async def _single_task_response(
 ) -> OnboardingTaskResponse:
     _, event_map = await list_onboarding_tasks(session, plan_ids=[task.plan_id])
     return _task_response(task, event_map.get(task.id, []))
+
+
+async def list_learning_paths(
+    session: AsyncSession,
+    *,
+    owner_user_id: UUID,
+    limit: int,
+) -> list[LearningPath]:
+    return await list_learning_path_rows(session, owner_user_id=owner_user_id, limit=limit)
 
 
 async def generate_learning_path(
