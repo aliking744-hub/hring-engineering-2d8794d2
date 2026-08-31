@@ -42,7 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { apiRequest } from "@/lib/api";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useAuth } from "@/hooks/useAuth";
 import * as XLSX from "@e965/xlsx";
@@ -54,6 +54,7 @@ const SmartHeadhunting = () => {
   
   const [showNewCampaignForm, setShowNewCampaignForm] = useState(false);
   const [autoHeadhunting, setAutoHeadhunting] = useState(false);
+  const [enableWebEnrichment, setEnableWebEnrichment] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [deletingCampaignId, setDeletingCampaignId] = useState<string | null>(null);
@@ -445,40 +446,20 @@ const SmartHeadhunting = () => {
       if (autoHeadhunting) {
         toast.info("در حال ارسال درخواست به سیستم هدهانتینگ خودکار...");
 
-        // ── Step 1+2+3 are handled inside the edge function ──
-        const { data: autoData, error: autoError } = await supabase.functions.invoke("auto-headhunt", {
-          body: {
-            campaignId: campaign.id,
-            jobRequirements: {
-              jobTitle: formData.jobTitle,
-              city: formData.city,
-              skills: formData.skills,
-              experience: formData.experience,
-              industry: formData.industry,
-              description: formData.description,
-              seniorityLevel: formData.seniorityLevel,
-            },
-          },
-        });
-
-        if (autoError) {
-          console.error("Auto headhunting error:", autoError);
-          toast.warning("هدهانتینگ خودکار با مشکل مواجه شد. کمپین در وضعیت انتظار قرار گرفت.");
-          await updateCampaign(campaign.id, { status: "paused", progress: 0 });
-        } else {
-          const stats = autoData?.stats;
-          toast.success(
-            stats
-              ? `هدهانتینگ خودکار کامل شد! ${stats.total} کاندیدا یافت شد (🔥${stats.hot} داغ | 🌡${stats.warm} گرم)`
-              : "کمپین هدهانتینگ خودکار با موفقیت راه‌اندازی شد."
-          );
-        }
-        
+        // A source run must be accepted by the configured connector and then return
+        // through a signed callback. Until that connector is configured, fail closed:
+        // do not claim that candidates were found.
+        await updateCampaign(campaign.id, { status: "paused", progress: 0 });
+        toast.warning("منبع‌یابی خودکار هنوز به اتصال امن sourcing متصل نشده است؛ کمپین ذخیره شد اما نتیجه‌ای ثبت نشده.");
       } else if (parsedCandidates.length > 0) {
         toast.info("در حال تحلیل کاندیداها با هوش مصنوعی...");
 
-        const { data, error } = await supabase.functions.invoke("analyze-candidates", {
-          body: {
+        const data = await apiRequest<{
+          candidates: Array<Record<string, any>>;
+          stats: { total: number };
+        }>("/recruiting/analyze-candidates", {
+          method: "POST",
+          body: JSON.stringify({
             candidates: parsedCandidates,
             jobRequirements: {
               jobTitle: formData.jobTitle,
@@ -489,10 +470,11 @@ const SmartHeadhunting = () => {
               description: formData.description,
               seniorityLevel: formData.seniorityLevel,
             },
-          },
+            // Web enrichment is intentionally opt-in; imported private contact data
+            // is not sent to the AI provider by the HRing API.
+            enableWebSearch: enableWebEnrichment,
+          }),
         });
-
-        if (error) throw error;
 
         // Save analyzed candidates to database
         const candidatesToInsert = data.candidates.map((c: any) => ({
@@ -771,8 +753,7 @@ const SmartHeadhunting = () => {
                           هدهانتینگ خودکار با هوش مصنوعی
                         </label>
                         <p className="text-sm text-slate-400 mt-1">
-                          سیستم با استفاده از Perplexity AI در اینترنت برای کاندیداهای مناسب جستجو می‌کند.
-                          برای نتایج بهتر، فایل اکسل آپلود کنید تا AI تحلیل عمیق‌تری انجام دهد.
+                          منبع‌یابی خودکار پس از اتصال امن sourcing انجام می‌شود. برای تحلیل فوری، فایل اکسل آپلود کنید.
                         </p>
                         {autoHeadhunting && (
                           <div className="mt-2 p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
@@ -855,6 +836,24 @@ const SmartHeadhunting = () => {
                           {pdfFiles.length} فایل آپلود شد
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-slate-700/50 bg-slate-800/50 p-4">
+                    <Checkbox
+                      id="webEnrichment"
+                      checked={enableWebEnrichment}
+                      onCheckedChange={(checked) => setEnableWebEnrichment(checked === true)}
+                      disabled={autoHeadhunting}
+                      className="mt-1"
+                    />
+                    <div>
+                      <label htmlFor="webEnrichment" className="cursor-pointer text-sm font-medium text-white">
+                        جست‌وجوی اطلاعات عمومی حرفه‌ای
+                      </label>
+                      <p className="mt-1 text-xs text-slate-400">
+                        اختیاری است؛ فقط نام، آخرین شرکت و صنعت هدف برای جست‌وجو ارسال می‌شود. ایمیل، تلفن و فایل رزومه ارسال نمی‌شود.
+                      </p>
                     </div>
                   </div>
 
