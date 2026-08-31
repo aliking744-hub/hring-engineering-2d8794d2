@@ -200,3 +200,28 @@ async def update_candidate_status(
     await db.commit()
     await db.refresh(candidate)
     return CandidateResponse.model_validate(candidate)
+
+
+@router.post("/analyze-candidates", response_model=AnalyzeCandidatesResponse)
+async def analyze_recruiting_candidates(
+    payload: AnalyzeCandidatesRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> AnalyzeCandidatesResponse:
+    """Analyze imported candidates without passing private contact fields to the AI provider."""
+    try:
+        return await analyze_candidates(
+            candidates=payload.candidates,
+            job=payload.job_requirements,
+            enable_web_search=payload.enable_web_search,
+            user_id=principal.user_id,
+            company_id=_primary_company_id(principal),
+            settings=settings,
+            session=db,
+        )
+    except RecruitingAiError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="سرویس تحلیل کاندیداها موقتاً در دسترس نیست",
+        ) from exc
