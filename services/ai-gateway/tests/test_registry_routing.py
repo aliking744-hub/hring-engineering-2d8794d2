@@ -5,6 +5,7 @@ import httpx
 from hring_ai_gateway.config import GatewaySettings
 from hring_ai_gateway.providers import ProviderUnavailableError, generate_openai_compatible
 from hring_ai_gateway.registry import (
+    CompanyAiRouteError,
     ProviderConfig,
     fetch_registry_provider_names,
     parse_registry_provider,
