@@ -32,7 +32,7 @@ test("candidate analysis preserves privacy and five-layer contract", () => {
 
 test("sourcing connector has a durable callback hand-off contract", () => {
   const model = read("apps/api/src/hring_api/domains/recruiting/models.py");
-  const migration = read("apps/api/alembic/versions/20260830_0027_recruiting_source_runs.py");
+  const migration = read("apps/api/alembic/versions/20260831_0031_recruiting_source_runs.py");
   const contract = read("docs/operations/SMART_HEADHUNTING_SOURCING_CONNECTOR_FA.md");
 
   assert.match(model, /class RecruitingSourceRun/);
