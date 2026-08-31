@@ -163,7 +163,7 @@ test('product catalogs describe the independent runtime and omit retired claims'
 test('onboarding roadmap does not present invented employee activity as real data', async () => {
   const onboarding = await read('src/pages/OnboardingRoadmap.tsx');
 
-  assert.match(onboarding, /نمونه ساختار/);
+  assert.match(onboarding, /\/development\/onboarding-plans/);
   assert.match(onboarding, /ساخت برنامه ۹۰ روزه/);
   assert.equal(/progress: (?:30|75|100)|done: true|شنبه ۱۵ دی|یکشنبه ۱۶ دی|سه‌شنبه ۱۸ دی/.test(onboarding), false);
 });
