@@ -86,9 +86,9 @@ async def company_ai_capability_list(
 @router.put("/{capability_key}", response_model=CompanyAiConnectionResponse)
 async def company_ai_connection_upsert(
     company_id: UUID,
+    payload: CompanyAiConnectionUpsertRequest,
+    request: Request,
     capability_key: str = Path(min_length=1, max_length=120, pattern=r"^[a-z0-9_.-]+$"),
-    payload: CompanyAiConnectionUpsertRequest = ...,
-    request: Request = ...,
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -117,8 +117,8 @@ async def company_ai_connection_upsert(
 @router.post("/{capability_key}/test", response_model=CompanyAiConnectionTestResponse)
 async def company_ai_connection_test(
     company_id: UUID,
+    request: Request,
     capability_key: str = Path(min_length=1, max_length=120, pattern=r"^[a-z0-9_.-]+$"),
-    request: Request = ...,
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -145,8 +145,8 @@ async def company_ai_connection_test(
 @router.delete("/{capability_key}", status_code=status.HTTP_204_NO_CONTENT)
 async def company_ai_connection_delete(
     company_id: UUID,
+    request: Request,
     capability_key: str = Path(min_length=1, max_length=120, pattern=r"^[a-z0-9_.-]+$"),
-    request: Request = ...,
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
 ) -> Response:
