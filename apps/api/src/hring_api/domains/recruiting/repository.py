@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hring_api.domains.recruiting.models import RecruitingCampaign, RecruitingCandidate
+from hring_api.domains.recruiting.models import RecruitingCampaign, RecruitingCandidate, RecruitingSourceRun
 
 
 async def list_campaigns_for_owner(
@@ -102,6 +102,40 @@ async def get_candidate_for_owner(
             RecruitingCampaign.owner_user_id == owner_user_id,
         )
     )
+    if for_update:
+        statement = statement.with_for_update()
+    result = await session.execute(statement)
+    return result.scalar_one_or_none()
+
+
+async def create_source_run(
+    session: AsyncSession,
+    *,
+    campaign_id: UUID,
+    owner_user_id: UUID,
+    idempotency_key: str,
+    callback_key_hash: str,
+    request_payload: dict[str, object],
+) -> RecruitingSourceRun:
+    row = RecruitingSourceRun(
+        campaign_id=campaign_id,
+        owner_user_id=owner_user_id,
+        idempotency_key=idempotency_key,
+        callback_key_hash=callback_key_hash,
+        request_payload=request_payload,
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def get_source_run(
+    session: AsyncSession,
+    *,
+    source_run_id: UUID,
+    for_update: bool = False,
+) -> RecruitingSourceRun | None:
+    statement = select(RecruitingSourceRun).where(RecruitingSourceRun.id == source_run_id)
     if for_update:
         statement = statement.with_for_update()
     result = await session.execute(statement)
