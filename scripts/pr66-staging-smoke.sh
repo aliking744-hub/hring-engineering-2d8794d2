@@ -47,7 +47,7 @@ curl --silent --show-error --head --connect-timeout 10 --max-time 30 \
 
 require_header() {
   local header_name="$1"
-  if ! rg -i "^${header_name}:" "$headers_report" >/dev/null; then
+  if ! grep -Eqi "^${header_name}:" "$headers_report" >/dev/null; then
     printf 'Required security header %s is missing.\n' "$header_name" >&2
     exit 1
   fi
