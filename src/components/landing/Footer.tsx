@@ -54,17 +54,35 @@ const Footer = () => {
             </Link>
           </div>
 
-          {/* Credit */}
-          <p className="text-sm text-muted-foreground text-center md:text-right">
-            {footerCredit}{" "}
-            <span className="text-foreground">{footerAuthor}</span>
-            {footerAi && (
-              <>
-                {" "}&{" "}
-                <span className="gradient-text-primary">{footerAi}</span>
-              </>
-            )}
-          </p>
+          <div className="flex items-center gap-5">
+            {/* eNamad trust seal */}
+            <a
+              href="https://trustseal.enamad.ir/?id=5400235&Code=jF7dgCBDkRnuxB9WeJSMdwDTI1OlZBTI"
+              target="_blank"
+              rel="noopener"
+              referrerPolicy="origin"
+              aria-label="مشاهده نماد اعتماد الکترونیکی HRing"
+            >
+              <img
+                src="https://trustseal.enamad.ir/logo.aspx?id=5400235&Code=jF7dgCBDkRnuxB9WeJSMdwDTI1OlZBTI"
+                alt="نماد اعتماد الکترونیکی HRing"
+                referrerPolicy="origin"
+                className="h-16 w-16 object-contain"
+              />
+            </a>
+
+            {/* Credit */}
+            <p className="text-sm text-muted-foreground text-center md:text-right">
+              {footerCredit}{" "}
+              <span className="text-foreground">{footerAuthor}</span>
+              {footerAi && (
+                <>
+                  {" "}&{" "}
+                  <span className="gradient-text-primary">{footerAi}</span>
+                </>
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="mt-8 pt-8 border-t border-border text-center text-xs text-muted-foreground">
