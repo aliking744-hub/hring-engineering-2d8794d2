@@ -444,13 +444,19 @@ const SmartHeadhunting = () => {
       setShowNewCampaignForm(false);
 
       if (autoHeadhunting) {
-        toast.info("در حال ارسال درخواست به سیستم هدهانتینگ خودکار...");
-
-        // A source run must be accepted by the configured connector and then return
-        // through a signed callback. Until that connector is configured, fail closed:
-        // do not claim that candidates were found.
-        await updateCampaign(campaign.id, { status: "paused", progress: 0 });
-        toast.warning("منبع‌یابی خودکار هنوز به اتصال امن sourcing متصل نشده است؛ کمپین ذخیره شد اما نتیجه‌ای ثبت نشده.");
+        toast.info("درخواست منبع‌یابی امن ارسال شد؛ نتیجه پس از دریافت callback نمایش داده می‌شود.");
+        await apiRequest<{ sourceRunId: string }>("/recruiting/campaigns/" + campaign.id + "/auto-source", {
+          method: "POST",
+          body: JSON.stringify({
+            jobRequirements: {
+              jobTitle: formData.jobTitle, city: formData.city, skills: formData.skills,
+              experience: formData.experience, industry: formData.industry,
+              description: formData.description, seniorityLevel: formData.seniorityLevel,
+            },
+          }),
+        });
+        await fetchCampaigns();
+        toast.success("درخواست هدهانتینگ پذیرفته شد؛ وضعیت کمپین پس از دریافت نتایج به‌روز می‌شود.");
       } else if (parsedCandidates.length > 0) {
         toast.info("در حال تحلیل کاندیداها با هوش مصنوعی...");
 
