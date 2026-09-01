@@ -17,6 +17,7 @@ test("candidate analysis preserves privacy and five-layer contract", () => {
   const service = read("apps/api/src/hring_api/domains/recruiting/ai_service.py");
   const schemas = read("apps/api/src/hring_api/domains/recruiting/schemas.py");
   const routes = read("apps/api/src/hring_api/domains/recruiting/routes.py");
+  const aiRoutes = read("apps/api/src/hring_api/domains/recruiting/ai_routes.py");
 
   assert.match(service, /Activity & Sentiment/);
   assert.match(service, /Hard Skill Match/);
@@ -41,4 +42,20 @@ test("sourcing connector has a durable callback hand-off contract", () => {
   assert.match(migration, /recruiting_source_runs/);
   assert.match(contract, /callbackToken/);
   assert.match(contract, /202 Accepted/);
+});
+
+
+test("auto sourcing requests a real callback run from the UI", () => {
+  const page = read("src/pages/SmartHeadhunting.tsx");
+  assert.match(page, /"\/recruiting\/campaigns\/" \+ campaign\.id \+ "\/auto-source"/);
+  assert.doesNotMatch(page, /updateCampaign\(campaign\.id, \{ status: "paused"/);
+});
+
+
+test("source callback is authenticated and asynchronous", () => {
+  const routes = read("apps/api/src/hring_api/domains/recruiting/ai_routes.py");
+    assert.match(routes, /source-runs\/\{source_run_id\}\/callback/);
+  assert.match(routes, /hmac\.compare_digest/);
+  assert.match(routes, /HTTP_202_ACCEPTED/);
+  assert.match(routes, /callbackToken/);
 });
