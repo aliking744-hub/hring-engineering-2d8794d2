@@ -54,7 +54,7 @@ test("auto sourcing requests a real callback run from the UI", () => {
 
 test("source callback is authenticated and asynchronous", () => {
   const routes = read("apps/api/src/hring_api/domains/recruiting/ai_routes.py");
-  assert.match(routes, /source-runs\\/\\{source_run_id\\}\\/callback/);
+    assert.match(routes, /source-runs\/\{source_run_id\}\/callback/);
   assert.match(routes, /hmac\\.compare_digest/);
   assert.match(routes, /HTTP_202_ACCEPTED/);
   assert.match(routes, /callbackToken/);
