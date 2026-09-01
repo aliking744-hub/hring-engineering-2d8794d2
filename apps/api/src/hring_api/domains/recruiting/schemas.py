@@ -154,6 +154,17 @@ class AutoSourceRequest(BaseModel):
     job_requirements: JobRequirements = Field(alias="jobRequirements")
 
 
+class SourceRunCallbackRequest(BaseModel):
+    candidates: list[CandidateAnalysisInput] = Field(min_length=1, max_length=100)
+
+
+class SourceRunAcceptedResponse(BaseModel):
+    success: bool = True
+    accepted: bool = True
+    campaign_id: UUID = Field(alias="campaignId")
+    source_run_id: UUID = Field(alias="sourceRunId")
+
+
 class AnalyzedCandidate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
