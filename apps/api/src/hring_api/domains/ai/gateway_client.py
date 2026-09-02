@@ -127,6 +127,8 @@ async def generate_with_ai_gateway(
     max_output_tokens: int | None = None,
     response_format: str = "text",
     modalities: list[str] | None = None,
+    image_aspect_ratio: str | None = None,
+    image_size: str | None = None,
     metadata_json: dict[str, object] | None = None,
 ) -> AiGatewayResult:
     """Call the internal provider hub and persist billing telemetry.
@@ -153,6 +155,10 @@ async def generate_with_ai_gateway(
         payload["max_output_tokens"] = max_output_tokens
     if modalities is not None:
         payload["modalities"] = modalities
+    if image_aspect_ratio is not None:
+        payload["image_aspect_ratio"] = image_aspect_ratio
+    if image_size is not None:
+        payload["image_size"] = image_size
 
     started = monotonic()
     url = f"{settings.ai_base_url.rstrip('/')}/generate"
