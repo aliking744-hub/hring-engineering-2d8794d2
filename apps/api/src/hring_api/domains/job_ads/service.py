@@ -66,50 +66,6 @@ VARIATION_PROFILES = (
     "Candidate-first: lead with what a strong professional can build and learn here; keep company details secondary.",
     "Role-first: begin with the job title as a decisive statement; use a distinct three-part narrative and fresh CTA.",
 )
-TONE_STYLES = {
-    "formal": {
-        "style": "رسمی، حرفه‌ای و جدی",
-        "colors": "رنگ‌های خنثی و رسمی مثل سرمه‌ای، خاکستری، سفید و طلایی ملایم",
-        "elements": "المان‌های ساده و مینیمال، بدون ایموجی و آیکون‌های کارتونی",
-        "mood": "فضای آرام، متین و قابل اعتماد",
-    },
-    "friendly": {
-        "style": "دوستانه، گرم و صمیمی",
-        "colors": "رنگ‌های گرم و شاد مثل نارنجی، آبی روشن، سبز",
-        "elements": "آیکون‌های ۳D جذاب مثل کیف، افراد، بلندگو و ستاره",
-        "mood": "فضای انرژی‌بخش و خوشایند",
-    },
-    "challenge": {
-        "style": "چالشی، انگیزشی و پویا",
-        "colors": "رنگ‌های قوی و پرانرژی مثل قرمز، بنفش، آبی تیره",
-        "elements": "المان‌های نشان‌دهنده رشد و پیشرفت مثل راکت، نمودار و لامپ",
-        "mood": "فضای هیجان‌انگیز و انگیزشی",
-    },
-}
-TECH_INDUSTRY_TERMS = (
-    "tech",
-    "technology",
-    "فناوری",
-    "تکنولوژی",
-    "it",
-    "آی‌تی",
-    "نرم‌افزار",
-    "software",
-    "finance",
-    "مالی",
-    "بانک",
-    "banking",
-    "fintech",
-    "marketing",
-    "مارکتینگ",
-    "بازاریابی",
-    "digital",
-    "startup",
-    "استارتاپ",
-    "ai",
-    "هوش مصنوعی",
-)
-
 TEXT_SYSTEM_PROMPT = """You are an expert HR copywriter specializing in creating compelling job advertisements.
 Create a job advertisement in Persian (Farsi) language based on the given inputs.
 
@@ -226,6 +182,7 @@ Make the job title dominant, the company secondary, and the contact line small b
 Use high contrast and crisp Persian typography.
 Do not add any other words, logo, real brand mark, heart shape, explanation, or watermark.
 Return exactly one image."""
+
 
 async def _generate_content(
     *,
