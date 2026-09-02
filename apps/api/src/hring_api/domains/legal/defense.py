@@ -262,6 +262,7 @@ async def _generate_phase(
     principal: Principal,
     settings: Settings,
     max_output_tokens: int,
+    credits_charged: int = 0,
 ) -> AiGatewayResult:
     async def fallback() -> AiGatewayResult:
         route = await resolve_runtime_feature_route(
@@ -280,6 +281,7 @@ async def _generate_phase(
                 {"role": "user", "content": user_prompt.format_map(variables)},
             ],
             max_output_tokens=max_output_tokens,
+            credits_charged=credits_charged,
             response_format="json_object",
             metadata_json={
                 "ai_route_source": route.source,
@@ -296,6 +298,7 @@ async def _generate_phase(
         user_id=principal.user_id,
         company_id=_company_id(principal),
         fallback=fallback,
+        credits_charged=credits_charged,
     )
 
 
@@ -312,6 +315,7 @@ async def generate_legal_defense(
     payload: LegalDefenseRequest,
     principal: Principal,
     settings: Settings,
+    credits_charged: int = 0,
 ) -> LegalDefenseResponse:
     complaint_text, evidence_context, evidence_summary = await _case_context(payload)
     claims_variables = {
@@ -329,6 +333,7 @@ async def generate_legal_defense(
             principal=principal,
             settings=settings,
             max_output_tokens=2_000,
+            credits_charged=credits_charged,
         )
         claims_output = _parse_json(claims_result, _ClaimsOutput)
         claims = claims_output.claims

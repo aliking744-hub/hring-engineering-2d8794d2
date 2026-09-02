@@ -20,6 +20,8 @@ export const DIAMOND_COSTS = {
   // Image Generation - 25 Diamonds
   SMART_AD_IMAGE: 25,
   HR_DASHBOARD: 25,
+  HR_DASHBOARD_UPLOAD: 50,
+  COST_CALCULATOR: 5,
   ANALYTICS_HUB: 25,
 
   // Premium Deep Search (Perplexity + Gemini Pro) - 60 Diamonds
@@ -35,7 +37,9 @@ export const DIAMOND_COST_LABELS: Record<keyof typeof DIAMOND_COSTS, string> = {
   ONBOARDING_PLAN: 'برنامه آنبوردینگ ۹۰ روزه',
   STRATEGIC_ANALYSIS: 'تحلیل قطب‌نمای استراتژیک',
   SMART_AD_IMAGE: 'تصویر آگهی هوشمند',
-  HR_DASHBOARD: 'داشبورد منابع انسانی',
+  HR_DASHBOARD: 'داشبورد منابع انسانی (دمو)',
+  HR_DASHBOARD_UPLOAD: 'داشبورد منابع انسانی (اکسل)',
+  COST_CALCULATOR: 'ماشین‌حساب هزینه نیروی انسانی',
   ANALYTICS_HUB: 'هاب تحلیلی',
   HEADHUNTING: 'هدهانتینگ هوشمند',
 };

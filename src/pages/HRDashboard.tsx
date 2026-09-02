@@ -67,21 +67,29 @@ export default function HRDashboard() {
     try {
       const row = await apiRequest<HrUploadRecord>('/hr-data/uploads', {
         method: 'POST',
+        headers: { 'X-Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({ name, records: employees, is_demo: isDemo }),
       });
       setHistoryRefresh(k => k + 1);
+      window.dispatchEvent(new Event('hring:credits-changed'));
       return row.id;
     } catch {
-      toast({ title: 'ذخیره نشد', description: 'بارگذاری در تاریخچه ذخیره نشد', variant: 'destructive' });
+      window.dispatchEvent(new Event('hring:credits-changed'));
+      toast({ title: 'داشبورد ساخته نشد', description: 'اعتبار یا ذخیره‌سازی درخواست را بررسی کنید', variant: 'destructive' });
       return null;
     }
   }, [user]);
 
   const handleDataLoaded = useCallback(async (employees: Employee[], name: string) => {
+    const id = await persistUpload(employees, name);
+    if (!id) return;
     setData(employees);
     setDataOrigin(name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
-    const id = await persistUpload(employees, name);
     setCurrentUploadId(id);
+    toast({
+      title: 'داشبورد آماده است',
+      description: `${employees.length.toLocaleString('fa-IR')} رکورد پردازش شد`,
+    });
   }, [persistUpload]);
 
   const handleLoadFromHistory = useCallback((employees: Employee[], id: string, _name: string, isDemo: boolean) => {

@@ -173,6 +173,7 @@ async def generate_legal_advice(
     payload: LegalAdvisorRequest,
     principal: Principal,
     settings: Settings,
+    credits_charged: int = 0,
 ) -> LegalAdvisorResponse:
     results = await search_legal_knowledge(
         session,
@@ -218,6 +219,7 @@ async def generate_legal_advice(
                 {"role": "user", "content": USER_PROMPT.format_map(variables)},
             ],
             max_output_tokens=2_000,
+            credits_charged=credits_charged,
             metadata_json={
                 "ai_route_source": route.source,
                 "prompt_key": LEGAL_ADVISOR_PROMPT_KEY,
@@ -236,6 +238,7 @@ async def generate_legal_advice(
             user_id=principal.user_id,
             company_id=_company_id(principal),
             fallback=fallback,
+            credits_charged=credits_charged,
         )
     except (AiGatewayError, PromptRegistryError) as exc:
         raise LegalAdvisorError("سرویس مشاور حقوقی در دسترس نیست") from exc

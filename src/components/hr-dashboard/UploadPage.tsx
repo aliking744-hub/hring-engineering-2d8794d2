@@ -9,7 +9,7 @@ import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
 
 interface UploadPageProps {
-  onDataLoaded: (data: Employee[], name: string) => void;
+  onDataLoaded: (data: Employee[], name: string) => Promise<void>;
   historySlot?: React.ReactNode;
 }
 
@@ -38,12 +38,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
 
       const employees = parseExcelData(jsonData);
 
-      toast({
-        title: 'موفقیت',
-        description: `${employees.length} رکورد با موفقیت بارگذاری شد`,
-      });
-
-      onDataLoaded(employees, file.name);
+      await onDataLoaded(employees, file.name);
     } catch (error) {
       toast({
         title: 'خطا',
@@ -76,13 +71,14 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
     if (file) handleFile(file);
   }, [handleFile]);
 
-  const handleDemoData = useCallback(() => {
+  const handleDemoData = useCallback(async () => {
+    setIsLoading(true);
     const sampleData = generateSampleData(78);
-    toast({
-      title: 'داده نمونه',
-      description: '78 رکورد نمونه بارگذاری شد',
-    });
-    onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
+    try {
+      await onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
+    } finally {
+      setIsLoading(false);
+    }
   }, [onDataLoaded]);
 
   const handleDownloadTemplate = useCallback(() => {

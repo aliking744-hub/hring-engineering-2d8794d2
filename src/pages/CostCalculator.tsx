@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Calculator, Users, Clock, Gift, Building2, Briefcase, TrendingUp, Printer } from 'lucide-react';
+import { ArrowRight, Calculator, Users, Clock, Gift, Building2, Briefcase, TrendingUp, Printer, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AuroraBackground from '@/components/AuroraBackground';
 import { Button } from '@/components/ui/button';
@@ -10,16 +10,12 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import logo from '@/assets/logo.png';
+import { apiRequest } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 // Format number with Persian separators
 const formatNumber = (num: number): string => {
   return new Intl.NumberFormat('fa-IR').format(Math.round(num));
-};
-
-// Parse formatted number back to number
-const parseNumber = (str: string): number => {
-  const cleaned = str.replace(/[^\d]/g, '');
-  return parseInt(cleaned) || 0;
 };
 
 // Input component with Rial formatting
@@ -102,6 +98,35 @@ const NumberInput = ({
   );
 };
 
+interface StatutoryRates {
+  year: number;
+  housing_allowance_rial: number;
+  grocery_allowance_rial: number;
+}
+
+interface EmployeeCostResult {
+  statutoryYear: number;
+  effectiveBase: number;
+  insurableGross: number;
+  totalGross: number;
+  overtimePay: number;
+  variablePay: number;
+  monthlyOccasionalBenefits: number;
+  employerInsurance: number;
+  employerIncomeTax: number;
+  incomeTax: number;
+  severanceAccrual: number;
+  eidiAccrual: number;
+  leaveRedemption: number;
+  totalStatutory: number;
+  totalWelfare: number;
+  totalHiddenHR: number;
+  totalMonthlyCost: number;
+  netSalary: number;
+  multiplier: number;
+  isNetContract: boolean;
+}
+
 export default function CostCalculator() {
   const navigate = useNavigate();
   
@@ -111,8 +136,9 @@ export default function CostCalculator() {
   const [jobAbsorption, setJobAbsorption] = useState(0);
   const [responsibilityAllowance, setResponsibilityAllowance] = useState(0);
   const [jobSuperlative, setJobSuperlative] = useState(0);
-  const [housingAllowance, setHousingAllowance] = useState(11000000); // Fixed
-  const [groceryAllowance, setGroceryAllowance] = useState(8500000); // Fixed
+  const [statutoryYear, setStatutoryYear] = useState(1405);
+  const [housingAllowance, setHousingAllowance] = useState(30000000);
+  const [groceryAllowance, setGroceryAllowance] = useState(22000000);
   const [childrenAllowance, setChildrenAllowance] = useState(0);
   const [otherBenefits, setOtherBenefits] = useState(0);
 
@@ -131,171 +157,96 @@ export default function CostCalculator() {
   const [trainingCost, setTrainingCost] = useState(0);
   const [miscCost, setMiscCost] = useState(0);
 
-  // Income Tax Calculation 1404 - Progressive brackets (Annual amounts in Rials)
-  // Monthly thresholds = Annual / 12
-  const calculateIncomeTax = (monthlyTaxableIncome: number): number => {
-    const annualIncome = monthlyTaxableIncome * 12;
-    
-    // 1404 Tax Brackets (Annual in Rials)
-    // 0 - 1,680,000,000: Exempt
-    // 1,680,000,001 - 2,760,000,000: 10%
-    // 2,760,000,001 - 4,320,000,000: 15%
-    // 4,320,000,001 - 7,200,000,000: 20%
-    // 7,200,000,001 - 12,000,000,000: 25%
-    // Above 12,000,000,000: 30%
-    
-    const exemptLimit = 1680000000;
-    const bracket1Limit = 2760000000;
-    const bracket2Limit = 4320000000;
-    const bracket3Limit = 7200000000;
-    const bracket4Limit = 12000000000;
-    
-    let annualTax = 0;
-    
-    if (annualIncome <= exemptLimit) {
-      annualTax = 0;
-    } else if (annualIncome <= bracket1Limit) {
-      annualTax = (annualIncome - exemptLimit) * 0.10;
-    } else if (annualIncome <= bracket2Limit) {
-      annualTax = (bracket1Limit - exemptLimit) * 0.10 +
-                  (annualIncome - bracket1Limit) * 0.15;
-    } else if (annualIncome <= bracket3Limit) {
-      annualTax = (bracket1Limit - exemptLimit) * 0.10 +
-                  (bracket2Limit - bracket1Limit) * 0.15 +
-                  (annualIncome - bracket2Limit) * 0.20;
-    } else if (annualIncome <= bracket4Limit) {
-      annualTax = (bracket1Limit - exemptLimit) * 0.10 +
-                  (bracket2Limit - bracket1Limit) * 0.15 +
-                  (bracket3Limit - bracket2Limit) * 0.20 +
-                  (annualIncome - bracket3Limit) * 0.25;
-    } else {
-      annualTax = (bracket1Limit - exemptLimit) * 0.10 +
-                  (bracket2Limit - bracket1Limit) * 0.15 +
-                  (bracket3Limit - bracket2Limit) * 0.20 +
-                  (bracket4Limit - bracket3Limit) * 0.25 +
-                  (annualIncome - bracket4Limit) * 0.30;
-    }
-    
-    return annualTax / 12; // Monthly tax
-  };
+  const [calculations, setCalculations] = useState<EmployeeCostResult | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  // Gross-up calculation for net contracts (iterative approach)
-  const grossUpFromNet = (netSalary: number): number => {
-    // Net = Gross - 7% Insurance - Tax(Gross)
-    // We need to find Gross such that: Gross - 0.07*Gross - Tax(Gross) = Net
-    // Using iterative approach for accurate calculation
-    let gross = netSalary / 0.93; // Initial estimate
-    
-    for (let i = 0; i < 10; i++) {
-      const insurance = gross * 0.07;
-      const tax = calculateIncomeTax(gross);
-      const calculatedNet = gross - insurance - tax;
-      const diff = netSalary - calculatedNet;
-      gross += diff;
-    }
-    
-    return gross;
-  };
+  useEffect(() => {
+    void (async () => {
+      try {
+        const rates = await apiRequest<StatutoryRates>('/costing/statutory-rates/current');
+        setStatutoryYear(rates.year);
+        setHousingAllowance(rates.housing_allowance_rial);
+        setGroceryAllowance(rates.grocery_allowance_rial);
+      } catch {
+        toast({
+          title: 'نرخ‌های قانونی دریافت نشد',
+          description: 'مقادیر مصوب پیش‌فرض ۱۴۰۵ نمایش داده می‌شوند.',
+          variant: 'destructive',
+        });
+      }
+    })();
+  }, []);
 
-  // Calculations
-  const calculations = useMemo(() => {
-    let effectiveBase = baseSalary;
-    let effectiveAbsorption = 0;
-    let effectiveResponsibility = 0;
-    let effectiveSuperlative = 0;
-
-    if (isNetContract) {
-      // In net mode, baseSalary is the net salary
-      // Gross-up considering 7% insurance AND income tax
-      effectiveBase = grossUpFromNet(baseSalary);
-      // Other components are ignored in net mode
-    } else {
-      // In gross mode, use all components
-      effectiveAbsorption = jobAbsorption;
-      effectiveResponsibility = responsibilityAllowance;
-      effectiveSuperlative = jobSuperlative;
-    }
-
-    // Gross salary components subject to insurance
-    const insurableGross = effectiveBase + effectiveAbsorption + effectiveResponsibility + effectiveSuperlative;
-    
-    // Total gross salary
-    const totalGross = insurableGross + housingAllowance + groceryAllowance + childrenAllowance + otherBenefits;
-
-    // Overtime calculation
-    const hourlyRate = overtimeBaseHours > 0 ? insurableGross / overtimeBaseHours : 0;
-    const overtimePay = hourlyRate * 1.4 * overtimeHours;
-
-    // Variable pay total
-    const variablePay = overtimePay + monthlyPerformance + monthlyBonus;
-
-    // Annual benefits amortized monthly
-    const monthlyOccasionalBenefits = annualOccasionalBenefits / 12;
-
-    // Calculate income tax
-    const incomeTax = calculateIncomeTax(insurableGross);
-    
-    // Statutory costs (Employer)
-    // In Net contract: Employer pays 30% (23% + 7% employee share) + Income Tax
-    // In Gross contract: Employer pays only 23%
-    const employerInsuranceRate = isNetContract ? 0.30 : 0.23;
-    const employerInsurance = insurableGross * employerInsuranceRate;
-    
-    // Income tax cost for employer (only in net contract, in gross the employee pays)
-    const employerIncomeTax = isNetContract ? incomeTax : 0;
-    
-    const severanceAccrual = effectiveBase / 12; // 1 month per year
-    const eidiAccrual = (effectiveBase * 2) / 12; // 2 months per year
-    const leaveRedemption = (effectiveBase / 30) * 2.5; // 2.5 days per month
-
-    // Total statutory costs
-    const totalStatutory = employerInsurance + employerIncomeTax + severanceAccrual + eidiAccrual + leaveRedemption;
-
-    // Welfare costs
-    const totalWelfare = supplementaryInsurance + monthlyOccasionalBenefits;
-
-    // Hidden HR costs
-    const totalHiddenHR = recruitmentCost + trainingCost + miscCost;
-
-    // Total monthly cost
-    const totalMonthlyCost = totalGross + variablePay + totalStatutory + totalWelfare + totalHiddenHR;
-
-    // Net salary (for comparison)
-    const employeeInsurance = isNetContract ? 0 : insurableGross * 0.07;
-    const employeeTax = isNetContract ? 0 : incomeTax;
-    const netSalary = isNetContract ? baseSalary : (totalGross - employeeInsurance - employeeTax);
-
-    // Multiplier
-    const multiplier = netSalary > 0 ? totalMonthlyCost / netSalary : 0;
-
-    return {
-      effectiveBase,
-      insurableGross,
-      totalGross,
-      overtimePay,
-      variablePay,
-      monthlyOccasionalBenefits,
-      employerInsurance,
-      employerIncomeTax,
-      incomeTax,
-      severanceAccrual,
-      eidiAccrual,
-      leaveRedemption,
-      totalStatutory,
-      totalWelfare,
-      totalHiddenHR,
-      totalMonthlyCost,
-      netSalary,
-      multiplier,
-      isNetContract
-    };
+  useEffect(() => {
+    setCalculations(null);
   }, [
     isNetContract, baseSalary, jobAbsorption, responsibilityAllowance, jobSuperlative,
     housingAllowance, groceryAllowance, childrenAllowance, otherBenefits,
     overtimeBaseHours, overtimeHours, monthlyPerformance, monthlyBonus,
     supplementaryInsurance, annualOccasionalBenefits,
-    recruitmentCost, trainingCost, miscCost
+    recruitmentCost, trainingCost, miscCost,
   ]);
+
+  const handleCalculate = async () => {
+    setIsCalculating(true);
+    try {
+      const result = await apiRequest<Record<string, any>>('/costing/calculate', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify({
+          is_net_contract: isNetContract,
+          base_salary: baseSalary,
+          job_absorption: jobAbsorption,
+          responsibility_allowance: responsibilityAllowance,
+          job_superlative: jobSuperlative,
+          children_allowance: childrenAllowance,
+          other_benefits: otherBenefits,
+          overtime_base_hours: overtimeBaseHours,
+          overtime_hours: overtimeHours,
+          monthly_performance: monthlyPerformance,
+          monthly_bonus: monthlyBonus,
+          supplementary_insurance: supplementaryInsurance,
+          annual_occasional_benefits: annualOccasionalBenefits,
+          recruitment_cost: recruitmentCost,
+          training_cost: trainingCost,
+          misc_cost: miscCost,
+        }),
+      });
+      setCalculations({
+        statutoryYear: result.statutory_year,
+        effectiveBase: result.effective_base,
+        insurableGross: result.insurable_gross,
+        totalGross: result.total_gross,
+        overtimePay: result.overtime_pay,
+        variablePay: result.variable_pay,
+        monthlyOccasionalBenefits: result.monthly_occasional_benefits,
+        employerInsurance: result.employer_insurance,
+        employerIncomeTax: result.employer_income_tax,
+        incomeTax: result.income_tax,
+        severanceAccrual: result.severance_accrual,
+        eidiAccrual: result.eidi_accrual,
+        leaveRedemption: result.leave_redemption,
+        totalStatutory: result.total_statutory,
+        totalWelfare: result.total_welfare,
+        totalHiddenHR: result.total_hidden_hr,
+        totalMonthlyCost: result.total_monthly_cost,
+        netSalary: result.net_salary,
+        multiplier: result.multiplier,
+        isNetContract: result.is_net_contract,
+      });
+      window.dispatchEvent(new Event('hring:credits-changed'));
+    } catch (error) {
+      window.dispatchEvent(new Event('hring:credits-changed'));
+      toast({
+        title: 'محاسبه انجام نشد',
+        description: error instanceof Error ? error.message : 'اعتبار یا ورودی‌ها را بررسی کنید.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -329,6 +280,7 @@ export default function CostCalculator() {
             variant="outline" 
             size="sm" 
             onClick={handlePrint}
+            disabled={!calculations}
             className="print:hidden gap-2"
           >
             <Printer className="w-4 h-4" />
@@ -379,8 +331,8 @@ export default function CostCalculator() {
                     <RialInput label="حق جذب" value={jobAbsorption} onChange={setJobAbsorption} disabled={isNetContract} />
                     <RialInput label="حق مسئولیت" value={responsibilityAllowance} onChange={setResponsibilityAllowance} disabled={isNetContract} />
                     <RialInput label="فوق‌العاده شغل" value={jobSuperlative} onChange={setJobSuperlative} disabled={isNetContract} />
-                    <RialInput label="حق مسکن (ثابت)" value={housingAllowance} onChange={setHousingAllowance} disabled={isNetContract} />
-                    <RialInput label="بن خواروبار (ثابت)" value={groceryAllowance} onChange={setGroceryAllowance} disabled={isNetContract} />
+                    <RialInput label={`حق مسکن مصوب ${statutoryYear}`} value={housingAllowance} onChange={setHousingAllowance} disabled />
+                    <RialInput label={`بن خواروبار مصوب ${statutoryYear}`} value={groceryAllowance} onChange={setGroceryAllowance} disabled />
                     <RialInput label="حق اولاد" value={childrenAllowance} onChange={setChildrenAllowance} disabled={isNetContract} />
                     <RialInput label="سایر مزایا" value={otherBenefits} onChange={setOtherBenefits} disabled={isNetContract} />
                   </div>
@@ -411,7 +363,7 @@ export default function CostCalculator() {
                     <RialInput label="پاداش ماهانه" value={monthlyBonus} onChange={setMonthlyBonus} />
                   </div>
                   
-                  {overtimeHours > 0 && (
+                  {overtimeHours > 0 && calculations && (
                     <div className="p-3 bg-accent/10 rounded-lg text-sm">
                       <p className="text-muted-foreground">
                         محاسبه اضافه‌کار: (پایه + جذب + مسئولیت + فوق‌العاده) ÷ {overtimeBaseHours} × ۱.۴ × {overtimeHours} = 
@@ -444,7 +396,7 @@ export default function CostCalculator() {
                     <RialInput label="مزایای موردی سالانه (مصوب هیئت‌مدیره)" value={annualOccasionalBenefits} onChange={setAnnualOccasionalBenefits} />
                   </div>
                   
-                  {annualOccasionalBenefits > 0 && (
+                  {annualOccasionalBenefits > 0 && calculations && (
                     <div className="p-3 bg-green-500/10 rounded-lg text-sm">
                       <p className="text-muted-foreground">
                         سهم ماهانه مزایای موردی: {formatNumber(annualOccasionalBenefits)} ÷ ۱۲ = 
@@ -484,6 +436,17 @@ export default function CostCalculator() {
                 </CardContent>
               </Card>
             </motion.div>
+
+            <Button
+              type="button"
+              size="lg"
+              onClick={handleCalculate}
+              disabled={isCalculating || baseSalary <= 0}
+              className="w-full gap-2 print:hidden"
+            >
+              {isCalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calculator className="w-5 h-5" />}
+              محاسبه نهایی (۵ اعتبار)
+            </Button>
           </div>
 
           {/* Output Section */}
@@ -494,6 +457,8 @@ export default function CostCalculator() {
               transition={{ delay: 0.5 }}
               className="sticky top-6"
             >
+              {calculations ? (
+                <>
               {/* Main Result */}
               <Card className="glass-card border-destructive/30 bg-gradient-to-br from-destructive/10 to-transparent mb-6">
                 <CardContent className="pt-6">
@@ -552,7 +517,7 @@ export default function CostCalculator() {
                       </div>
                       {calculations.isNetContract && calculations.employerIncomeTax > 0 && (
                         <div className="flex justify-between text-amber-500">
-                          <span>مالیات حقوق (پلکانی ۱۴۰۴)</span>
+                          <span>مالیات حقوق (پلکانی {calculations.statutoryYear})</span>
                           <span className="font-medium">{formatNumber(calculations.employerIncomeTax)}</span>
                         </div>
                       )}
@@ -612,6 +577,16 @@ export default function CostCalculator() {
                   </div>
                 </CardContent>
               </Card>
+                </>
+              ) : (
+                <Card className="glass-card border-border">
+                  <CardContent className="py-12 text-center">
+                    <Calculator className="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
+                    <p className="font-medium">نتیجه هنوز محاسبه نشده است</p>
+                    <p className="text-sm text-muted-foreground mt-2">پس از تکمیل ورودی‌ها، دکمه محاسبه را بزنید.</p>
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
           </div>
         </div>
