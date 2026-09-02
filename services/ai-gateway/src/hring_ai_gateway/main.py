@@ -1,4 +1,5 @@
 from hmac import compare_digest
+import logging
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
@@ -13,6 +14,9 @@ from hring_ai_gateway.providers import (
 )
 from hring_ai_gateway.registry import fetch_registry_provider_names
 from hring_ai_gateway.schemas import GenerateRequest, GenerateResponse, HealthResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI(
@@ -80,6 +84,7 @@ async def generate(
         mapped = status.HTTP_429_TOO_MANY_REQUESTS if upstream_status == 429 else status.HTTP_502_BAD_GATEWAY
         raise HTTPException(status_code=mapped, detail="AI provider request failed") from exc
     except ProviderResponseError as exc:
+        logger.warning("AI provider response rejected: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI provider returned an invalid response",
