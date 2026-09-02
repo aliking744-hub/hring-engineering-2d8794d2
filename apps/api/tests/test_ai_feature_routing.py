@@ -78,14 +78,14 @@ def test_ai_feature_map_is_complete_admin_managed_and_runtime_effective() -> Non
         }
         original = next(item for item in routes if item["feature_key"] == feature_key)
         assert original["source"] == "environment_default"
-        assert original["provider_alias"] == "gemini"
+        assert original["provider_alias"] == "avalai.primary"
         assert original["model"] == "gemini-2.5-pro"
         enrichment = next(
             item
             for item in routes
             if item["feature_key"] == "smart_headhunting.web_enrichment"
         )
-        assert enrichment["provider_alias"] == "perplexity"
+        assert enrichment["provider_alias"] == "avalai.search"
         assert enrichment["model"] == "sonar"
 
         forbidden = client.put(
@@ -129,7 +129,7 @@ def test_ai_feature_map_is_complete_admin_managed_and_runtime_effective() -> Non
         )
         assert reset.status_code == 200, reset.text
         assert reset.json()["source"] == "environment_default"
-        assert reset.json()["provider_alias"] == "gemini"
+        assert reset.json()["provider_alias"] == "avalai.primary"
 
         logs = client.get("/api/v1/admin/platform/audit-logs", headers=super_headers)
         assert logs.status_code == 200, logs.text

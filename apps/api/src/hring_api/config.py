@@ -28,21 +28,23 @@ class Settings(BaseSettings):
     object_storage_secret_key: SecretStr = SecretStr("change-me")
     ai_base_url: str = "http://ai:8000/v1"
     ai_api_key: SecretStr = SecretStr("local-development")
-    recruiting_ai_provider: str = "gemini"
+    # Runtime aliases resolve through Integration Center; no upstream secret is
+    # embedded in feature code. AvalAI aliases are the standalone production default.
+    recruiting_ai_provider: str = "avalai.primary"
     recruiting_ai_model: str = "gemini-2.5-pro"
-    job_profile_ai_provider: str = "gemini"
-    job_profile_ai_model: str = "gemini-2.5-flash-lite"
-    interview_ai_provider: str = "gemini"
+    job_profile_ai_provider: str = "avalai.primary"
+    job_profile_ai_model: str = "gemini-2.5-flash"
+    interview_ai_provider: str = "avalai.primary"
     interview_ai_model: str = "gemini-2.5-flash"
-    smart_ad_text_ai_provider: str = "gemini"
+    smart_ad_text_ai_provider: str = "avalai.primary"
     smart_ad_text_ai_model: str = "gemini-2.5-flash"
-    smart_ad_image_ai_provider: str = "gemini"
+    smart_ad_image_ai_provider: str = "avalai.primary"
     smart_ad_image_ai_model: str = "gemini-3-pro-image-preview"
-    legal_advisor_ai_provider: str = "gemini"
+    legal_advisor_ai_provider: str = "avalai.primary"
     legal_advisor_ai_model: str = "gemini-2.5-flash"
-    legal_defense_ai_provider: str = "gemini"
+    legal_defense_ai_provider: str = "avalai.primary"
     legal_defense_ai_model: str = "gemini-2.5-pro"
-    recruiting_enrichment_provider: str = "perplexity"
+    recruiting_enrichment_provider: str = "avalai.search"
     recruiting_enrichment_model: str = "sonar"
     recruiting_sourcing_webhook_url: SecretStr | None = None
     recruiting_sourcing_webhook_bearer_token: SecretStr | None = None
