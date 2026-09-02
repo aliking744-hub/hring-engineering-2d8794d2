@@ -23,7 +23,11 @@ from hring_api.domains.billing.credit_service import (
     run_with_credit_reservation,
 )
 from hring_api.domains.identity.dependencies import Principal
-from hring_api.domains.job_ads.schemas import SmartAdGenerateRequest, SmartAdResponse
+from hring_api.domains.job_ads.schemas import (
+    SmartAdGenerateRequest,
+    SmartAdImageResponse,
+    SmartAdResponse,
+)
 
 
 SMART_AD_TEXT_FEATURE_KEY = "job_ads.smart_ad_text"
@@ -395,3 +399,113 @@ async def generate_smart_ad(
         operation=operation,
     )
 
+
+
+
+async def _generate_image_content(
+    *,
+    payload: SmartAdGenerateRequest,
+    principal: Principal,
+    image_credits: int,
+    settings: Settings,
+    session: AsyncSession,
+) -> SmartAdImageResponse:
+    """Generate only the poster image; text generation is intentionally not invoked."""
+    image_prompt = _image_prompt(payload, uuid4().hex[:12])
+
+    async def image_fallback() -> AiGatewayResult:
+        route = await resolve_runtime_feature_route(
+            feature_key=SMART_AD_IMAGE_FEATURE_KEY,
+            default_provider=settings.smart_ad_image_ai_provider,
+            default_model=settings.smart_ad_image_ai_model,
+        )
+        return await generate_with_ai_gateway(
+            feature_key=SMART_AD_IMAGE_FEATURE_KEY,
+            user_id=principal.user_id,
+            company_id=_company_id(principal),
+            provider=route.provider,
+            model=route.model,
+            messages=[{"role": "user", "content": image_prompt}],
+            credits_charged=image_credits,
+            modalities=["image", "text"],
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": SMART_AD_IMAGE_FEATURE_KEY,
+                "prompt_mode": "embedded_fallback",
+                "image_format": payload.image_format,
+                "standalone_action": True,
+            },
+        )
+
+    try:
+        image_result = await generate_with_managed_prompt(
+            session,
+            prompt_key=SMART_AD_IMAGE_FEATURE_KEY,
+            variables={"image_prompt": image_prompt},
+            user_id=principal.user_id,
+            company_id=_company_id(principal),
+            fallback=image_fallback,
+            credits_charged=image_credits,
+            modalities=["image", "text"],
+        )
+    except (AiGatewayError, PromptRegistryError) as exc:
+        raise SmartAdError("سرویس تولید تصویر آگهی در دسترس نیست") from exc
+
+    if not image_result.images:
+        raise SmartAdError("سرویس هوش مصنوعی تصویر آگهی تولید نکرد")
+    return SmartAdImageResponse(image_url=image_result.images[0].url)
+
+
+async def generate_smart_ad_image(
+    session: AsyncSession,
+    *,
+    payload: SmartAdGenerateRequest,
+    principal: Principal,
+    idempotency_key: str,
+    request_id: str | None,
+    settings: Settings,
+) -> SmartAdImageResponse:
+    """Bill and execute an image request independently from smart-ad text."""
+    image_cost = await feature_credit_cost(
+        session,
+        feature_key=SMART_AD_IMAGE_FEATURE_KEY,
+        default_cost=SMART_AD_IMAGE_DEFAULT_CREDIT_COST,
+    )
+    image_byok = await uses_company_byok(
+        session,
+        company_id=_company_id(principal),
+        capability_key=SMART_AD_IMAGE_FEATURE_KEY,
+    )
+    image_credits = 0 if image_byok else image_cost
+    key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
+
+    async def operation() -> SmartAdImageResponse:
+        return await _generate_image_content(
+            payload=payload,
+            principal=principal,
+            image_credits=image_credits,
+            settings=settings,
+            session=session,
+        )
+
+    if image_credits == 0:
+        return await run_with_ai_execution_guard(
+            session,
+            principal=principal,
+            company_id=_company_id(principal),
+            feature_key=SMART_AD_IMAGE_FEATURE_KEY,
+            idempotency_key=f"{SMART_AD_IMAGE_FEATURE_KEY}:{key_hash}",
+            request_id=request_id,
+            operation=operation,
+        )
+
+    return await run_with_credit_reservation(
+        session,
+        principal=principal,
+        amount=image_credits,
+        idempotency_key=f"{SMART_AD_IMAGE_FEATURE_KEY}:{key_hash}",
+        feature_key=SMART_AD_IMAGE_FEATURE_KEY,
+        description="Generate smart job advertisement image",
+        request_id=request_id,
+        operation=operation,
+    )
