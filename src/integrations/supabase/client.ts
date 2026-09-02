@@ -45,6 +45,9 @@ const METERED_COMPAT_FUNCTIONS = new Set([
   'generate-interview-kit',
   'generate-onboarding-plan',
   'generate-job-ad',
+  'legal-advisor-chat',
+  'defense-builder',
+  'hring-support',
 ]);
 
 const newIdempotencyKey = () => {
@@ -227,15 +230,19 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
     if (functionName === 'legal-advisor-chat') {
       const data = await apiRequest('/legal/advisor/chat', {
         method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
         body: JSON.stringify(body),
       });
+      notifyCreditsChanged();
       return { data, error: null };
     }
     if (functionName === 'defense-builder') {
       const data = await apiRequest('/legal/defense/analyze', {
         method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
         body: JSON.stringify(body),
       });
+      notifyCreditsChanged();
       return { data, error: null };
     }
     if (functionName === 'auto-headhunt') {
