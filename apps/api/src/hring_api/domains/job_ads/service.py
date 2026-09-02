@@ -322,12 +322,16 @@ async def _generate_content(
                 company_id=_company_id(principal),
                 provider=route.provider,
                 model=route.model,
+                # AvalAI's native Gemini-image contract accepts a user prompt
+                # with image modalities; forwarding a separate system message or
+                # max-completion-tokens causes upstream failures for this route.
                 messages=[
-                    {"role": "system", "content": IMAGE_SYSTEM_PROMPT},
-                    {"role": "user", "content": image_prompt},
+                    {
+                        "role": "user",
+                        "content": f"{IMAGE_SYSTEM_PROMPT}\n\n{image_prompt}",
+                    },
                 ],
                 credits_charged=image_credits,
-                max_output_tokens=2_048,
                 modalities=["image", "text"],
                 metadata_json={
                     "ai_route_source": route.source,
