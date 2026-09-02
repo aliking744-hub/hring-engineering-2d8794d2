@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits, CREDIT_COSTS, DIAMOND_COSTS } from "@/hooks/useCredits";
@@ -80,13 +79,13 @@ const SmartAdGenerator = () => {
   const [industry, setIndustry] = useState("");
   const [platform, setPlatform] = useState("");
   const [tone, setTone] = useState("");
-  const [generateImage, setGenerateImage] = useState(false);
   const [imageFormat, setImageFormat] = useState("16:9");
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [generatedText, setGeneratedText] = useState("");
   const [editableText, setEditableText] = useState("");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isTextLoading, setIsTextLoading] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -119,137 +118,148 @@ const SmartAdGenerator = () => {
     }
   };
 
-  const handleGenerate = async () => {
+  const validateInputs = () => {
     if (!jobTitle || !companyName || !contactMethod || !platform || !tone) {
       toast({
         title: "خطا",
         description: "لطفاً تمام فیلدهای ضروری را پر کنید",
         variant: "destructive",
       });
-      return;
+      return false;
     }
+    return true;
+  };
 
-    // Calculate required credits
-    const requiredCredits = generateImage ? CREDIT_COSTS.SMART_AD_IMAGE : CREDIT_COSTS.SMART_AD_TEXT;
-    
-    if (credits < requiredCredits) {
+  const ensureCredits = (requiredCredits: number) => {
+    if (credits >= requiredCredits) return true;
+    toast({
+      title: "اعتبار ناکافی",
+      description: `برای این عملیات ${requiredCredits} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+      variant: "destructive",
+    });
+    return false;
+  };
+
+  const requestBody = () => {
+    const selectedFormat = imageFormats.find((format) => format.value === imageFormat);
+    return {
+      jobTitle,
+      companyName,
+      contactMethod,
+      industry,
+      platform,
+      tone,
+      generateImage: false,
+      imageFormat,
+      imageWidth: selectedFormat?.width || 1920,
+      imageHeight: selectedFormat?.height || 1080,
+    };
+  };
+
+  const showRequestError = (error: unknown, fallback: string) => {
+    console.error("Smart ad request failed:", error);
+    const apiError = error as { context?: { status?: number; detail?: unknown } };
+    const status = apiError.context?.status;
+    const serverMessage =
+      typeof apiError.context?.detail === "string" ? apiError.context.detail : undefined;
+
+    if (status === 429) {
       toast({
-        title: "اعتبار ناکافی",
-        description: `برای این عملیات ${requiredCredits} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        title: "محدودیت درخواست",
+        description: "لطفاً کمی صبر کنید و دوباره تلاش کنید",
         variant: "destructive",
       });
-      return;
-    }
-
-    setIsLoading(true);
-    setGeneratedText("");
-    setEditableText("");
-    setGeneratedImage(null);
-
-    try {
-      const selectedFormat = imageFormats.find((f) => f.value === imageFormat);
-      const { data, error } = await supabase.functions.invoke("generate-job-ad", {
-        body: {
-          jobTitle,
-          companyName,
-          contactMethod,
-          industry,
-          platform,
-          tone,
-          generateImage,
-          imageFormat,
-          imageWidth: selectedFormat?.width || 1920,
-          imageHeight: selectedFormat?.height || 1080,
-        },
+    } else if (status === 402) {
+      toast({
+        title: "اعتبار ناکافی",
+        description: "اعتبار هوش مصنوعی کافی نیست. لطفاً حساب را شارژ کنید.",
+        variant: "destructive",
       });
+    } else {
+      toast({
+        title: "خطا",
+        description: serverMessage || fallback,
+        variant: "destructive",
+      });
+    }
+  };
 
+  const scrollToResult = () => {
+    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  const handleGenerateText = async () => {
+    if (!validateInputs() || !ensureCredits(CREDIT_COSTS.SMART_AD_TEXT)) return;
+
+    setIsTextLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-job-ad-text", {
+        body: requestBody(),
+      });
       if (error) {
-        console.error("Error:", error);
-
-        const apiError = error as { context?: { status?: number; detail?: unknown } };
-        const status = apiError.context?.status;
-        const serverMessage = typeof apiError.context?.detail === 'string'
-          ? apiError.context.detail
-          : undefined;
-
-        if (status === 429) {
-          toast({
-            title: "محدودیت درخواست",
-            description: "لطفاً کمی صبر کنید و دوباره تلاش کنید",
-            variant: "destructive",
-          });
-        } else if (status === 402) {
-          toast({
-            title: "اعتبار ناکافی",
-            description: "اعتبار هوش مصنوعی کافی نیست. لطفاً حساب را شارژ کنید.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "خطا",
-            description: serverMessage || "مشکلی در تولید آگهی پیش آمد. لطفاً دوباره تلاش کنید.",
-            variant: "destructive",
-          });
-        }
+        showRequestError(error, "مشکلی در تولید متن آگهی پیش آمد. لطفاً دوباره تلاش کنید.");
         return;
       }
-
       if (data?.error) {
-        toast({
-          title: "خطا",
-          description: String(data.error),
-          variant: "destructive",
-        });
+        showRequestError(data.error, String(data.error));
         return;
       }
 
       const responseText = formatGeneratedJobAd(data);
-      const responseImage = typeof data?.imageUrl === "string" ? data.imageUrl : null;
+      if (!responseText) {
+        toast({
+          title: "متن تولید نشد",
+          description: "سرویس پاسخ قابل نمایش برنگرداند؛ اعتباری نباید مصرف شود.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      if (generateImage && !responseImage) {
+      setGeneratedText(responseText);
+      setEditableText(responseText);
+      toast({ title: "موفق", description: "متن آگهی با موفقیت تولید شد" });
+      scrollToResult();
+    } catch (error) {
+      showRequestError(error, "مشکلی در تولید متن آگهی پیش آمد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setIsTextLoading(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!validateInputs() || !ensureCredits(CREDIT_COSTS.SMART_AD_IMAGE)) return;
+
+    setIsImageLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-job-ad-image", {
+        body: requestBody(),
+      });
+      if (error) {
+        showRequestError(error, "مشکلی در تولید تصویر آگهی پیش آمد. لطفاً دوباره تلاش کنید.");
+        return;
+      }
+      if (data?.error) {
+        showRequestError(data.error, String(data.error));
+        return;
+      }
+
+      const responseImage = typeof data?.imageUrl === "string" ? data.imageUrl : null;
+      if (!responseImage) {
         toast({
           title: "تصویر تولید نشد",
-          description: "درخواست تصویر کامل نشده است؛ اعتبار این درخواست نباید مصرف شود.",
+          description: "سرویس تصویر معتبری برنگرداند؛ اعتباری نباید مصرف شود.",
           variant: "destructive",
         });
         return;
       }
 
-      if (!responseText && !responseImage) {
-        toast({
-          title: "خروجی دریافت نشد",
-          description: "سرویس پاسخ قابل نمایش برنگرداند. لطفاً دوباره تلاش کنید.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (responseText) {
-        setGeneratedText(responseText);
-        setEditableText(responseText);
-      }
-
-      if (responseImage) {
-        setGeneratedImage(responseImage);
-      }
-
-      toast({
-        title: "موفق",
-        description: "آگهی شغلی با موفقیت تولید شد",
-      });
-
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } catch (err) {
-      console.error("Error:", err);
-      toast({
-        title: "خطا",
-        description: "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-        variant: "destructive",
-      });
+      setGeneratedImage(responseImage);
+      toast({ title: "موفق", description: "تصویر آگهی با موفقیت تولید شد" });
+      scrollToResult();
+    } catch (error) {
+      showRequestError(error, "مشکلی در تولید تصویر آگهی پیش آمد. لطفاً دوباره تلاش کنید.");
     } finally {
-      setIsLoading(false);
+      setIsImageLoading(false);
     }
   };
 
@@ -458,68 +468,74 @@ const SmartAdGenerator = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1">
-                  <ImageIcon className="w-5 h-5 text-primary flex-shrink-0" />
-                  <div>
-                    <Label htmlFor="generateImage" className="text-base font-medium cursor-pointer">
-                      تولید تصویر با هوش مصنوعی
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      یک تصویر جذاب برای آگهی شما ساخته می‌شود
-                    </p>
-                  </div>
+            <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+              <div className="flex items-center gap-3">
+                <ImageIcon className="w-5 h-5 text-primary flex-shrink-0" />
+                <div>
+                  <Label className="text-base font-medium">فرمت تصویر</Label>
+                  <p className="text-sm text-muted-foreground">
+                    فقط هنگام فشردن دکمه «تولید تصویر» استفاده می‌شود
+                  </p>
                 </div>
-                <Switch
-                  id="generateImage"
-                  checked={generateImage}
-                  onCheckedChange={setGenerateImage}
-                  className="flex-shrink-0"
-                />
               </div>
-
-              {generateImage && (
-                <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
-                  <Label>فرمت تصویر</Label>
-                  <Select value={imageFormat} onValueChange={setImageFormat}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="انتخاب فرمت" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {imageFormats.map((f) => (
-                        <SelectItem key={f.value} value={f.value}>
-                          {f.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <Select value={imageFormat} onValueChange={setImageFormat}>
+                <SelectTrigger>
+                  <SelectValue placeholder="انتخاب فرمت" />
+                </SelectTrigger>
+                <SelectContent>
+                  {imageFormats.map((format) => (
+                    <SelectItem key={format.value} value={format.value}>
+                      {format.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <Button
-              onClick={handleGenerate}
-              disabled={isLoading}
-              className="w-full h-12 text-lg gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  در حال تولید...
-                </>
-              ) : (
-                <>
-                  <Megaphone className="w-5 h-5" />
-                  تولید آگهی
-                </>
-              )}
-            </Button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button
+                onClick={handleGenerateText}
+                disabled={isTextLoading || isImageLoading}
+                className="h-12 text-base gap-2"
+              >
+                {isTextLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    در حال تولید متن...
+                  </>
+                ) : (
+                  <>
+                    <Megaphone className="w-5 h-5" />
+                    تولید متن
+                    <span className="text-xs opacity-80">({CREDIT_COSTS.SMART_AD_TEXT} جم)</span>
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleGenerateImage}
+                disabled={isTextLoading || isImageLoading}
+                variant="secondary"
+                className="h-12 text-base gap-2"
+              >
+                {isImageLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    در حال تولید تصویر...
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="w-5 h-5" />
+                    تولید تصویر
+                    <span className="text-xs opacity-80">({CREDIT_COSTS.SMART_AD_IMAGE} جم)</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
         {/* Result Section */}
-        {generatedText && (
+        {(generatedText || generatedImage) && (
           <div ref={resultRef} className="mt-8 space-y-6">
             {generatedImage && (
               <Card className="shadow-lg border-0 overflow-hidden">
@@ -545,7 +561,8 @@ const SmartAdGenerator = () => {
               </Card>
             )}
 
-            <Card className="shadow-lg border-0">
+            {generatedText && (
+              <Card className="shadow-lg border-0">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
@@ -581,7 +598,8 @@ const SmartAdGenerator = () => {
                   </div>
                 )}
               </CardContent>
-            </Card>
+              </Card>
+            )}
           </div>
         )}
       </div>
