@@ -374,6 +374,8 @@ async def _generate_content(
                 ],
                 credits_charged=image_credits,
                 modalities=["image", "text"],
+                image_aspect_ratio=payload.image_format,
+                image_size="2K",
                 metadata_json={
                     "ai_route_source": route.source,
                     "prompt_key": SMART_AD_IMAGE_FEATURE_KEY,
