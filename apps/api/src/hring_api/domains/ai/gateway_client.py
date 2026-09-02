@@ -9,6 +9,9 @@ from hring_api.config import get_settings
 from hring_api.domains.ai.service import persist_ai_usage_isolated
 
 
+MAX_GENERATED_IMAGE_URL_LENGTH = 64_000_000
+
+
 class AiGatewayError(RuntimeError):
     pass
 
@@ -73,8 +76,13 @@ def _images(value: object) -> tuple[AiGeneratedImage, ...]:
     for item in value[:4]:
         if not isinstance(item, dict):
             continue
-        url = _optional_text(item.get("url"), limit=20_000_000)
-        if url is None:
+        raw_url = item.get("url")
+        if not isinstance(raw_url, str):
+            continue
+        url = raw_url.strip()
+        # Never slice a data URL: truncation produces an apparently successful
+        # response whose downloaded image is corrupt.
+        if not url or len(url) > MAX_GENERATED_IMAGE_URL_LENGTH:
             continue
         images.append(
             AiGeneratedImage(

@@ -53,8 +53,13 @@ class GatewayCitation(BaseModel):
     snippet: str | None = Field(default=None, max_length=2000)
 
 
+MAX_GENERATED_IMAGE_URL_LENGTH = 64_000_000
+
+
 class GatewayImage(BaseModel):
-    url: str = Field(min_length=1, max_length=20_000_000)
+    # AvalAI Gemini image models return the binary as a data URL. A 4K JPEG can
+    # exceed the former 20 MB character cap even though the provider response is valid.
+    url: str = Field(min_length=1, max_length=MAX_GENERATED_IMAGE_URL_LENGTH)
     mime_type: str | None = Field(default=None, max_length=120)
 
     @field_validator("url")
