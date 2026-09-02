@@ -140,6 +140,8 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
 
     image_call = next(call for call in captured if call.get("modalities"))
     assert image_call["modalities"] == ["image", "text"]
+    assert image_call["image_aspect_ratio"] == "16:9"
+    assert image_call["image_size"] == "2K"
     image_prompt = "\n".join(message["content"] for message in image_call["messages"])
     assert 'عبارت "استخدام می‌کنیم"' in image_prompt
     assert "ابعاد تصویر: 1920x1080" in image_prompt
