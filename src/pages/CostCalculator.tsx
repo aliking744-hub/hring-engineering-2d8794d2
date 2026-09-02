@@ -138,7 +138,7 @@ export default function CostCalculator() {
   const [jobSuperlative, setJobSuperlative] = useState(0);
   const [statutoryYear, setStatutoryYear] = useState(1405);
   const [housingAllowance, setHousingAllowance] = useState(30000000);
-  const [groceryAllowance, setGroceryAllowance] = useState(22000000)
+  const [groceryAllowance, setGroceryAllowance] = useState(22000000);
   const [childrenAllowance, setChildrenAllowance] = useState(0);
   const [otherBenefits, setOtherBenefits] = useState(0);
 
