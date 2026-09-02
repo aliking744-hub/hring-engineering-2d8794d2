@@ -253,85 +253,26 @@ const SupportChatWidget = () => {
   };
 
   const streamChat = async (userMessage: string) => {
-    // End-of-conversation -> offer feedback (no AI call)
     if (handleConversationEnd(userMessage)) return;
-
-    // New message: cancel any pending follow-up
     clearFollowUpTimer();
 
     const newMessages = [...messagesRef.current, { role: 'user' as const, content: userMessage }];
     setMessages(newMessages);
     setIsLoading(true);
 
-    let assistantContent = '';
-    let didStreamAnyContent = false;
-
     try {
-      const resp = await fetch('/functions/v1/hring-support', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('hring-support', {
+        body: {
           messages: newMessages,
           sessionId,
           userId: user?.id || null,
-        }),
+        },
       });
-
-      if (!resp.ok) {
-        const errorData = await resp.json();
-        throw new Error(errorData.error || 'خطا در ارتباط');
-      }
-
-      const reader = resp.body?.getReader();
-      if (!reader) throw new Error('No reader');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex;
-        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-          let line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
-
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') break;
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              didStreamAnyContent = true;
-              assistantContent += content;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === 'assistant') {
-                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantContent } : m));
-                }
-                return [...prev, { role: 'assistant', content: assistantContent }];
-              });
-            }
-          } catch {
-            buffer = line + '\n' + buffer;
-            break;
-          }
-        }
-      }
-
-      if (didStreamAnyContent) {
-        startFollowUpTimer();
-      }
+      if (error) throw new Error(error.message || 'خطا در ارتباط');
+      const assistantContent = typeof data?.content === 'string' ? data.content.trim() : '';
+      if (!assistantContent) throw new Error('پاسخی از پشتیبانی دریافت نشد');
+      setMessages([...newMessages, { role: 'assistant', content: assistantContent }]);
+      setTimeout(startFollowUpTimer, 0);
     } catch (error) {
       console.error('Chat error:', error);
       toast.error(error instanceof Error ? error.message : 'خطا در ارتباط با پشتیبانی');
