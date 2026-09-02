@@ -989,6 +989,9 @@ _COMPAT_CREDIT_COSTS = {
     "generate-job-profile": 5,
     "generate-interview-kit": 5,
     "generate-onboarding-plan": 15,
+    "generate-learning-path": 15,
+    "hring-support": 5,
+    "labor-complaint-assistant": 20,
 }
 
 
@@ -1019,7 +1022,7 @@ async def compatibility_credit_cost(
     if function_name == "generate-job-ad":
         default_cost = 25 if isinstance(body, dict) and body.get("generateImage") is True else 5
     else:
-        default_cost = _COMPAT_CREDIT_COSTS.get(function_name, 0)
+        default_cost = _COMPAT_CREDIT_COSTS.get(function_name, 5)
     return await feature_credit_cost(
         session,
         feature_key=feature_key,
