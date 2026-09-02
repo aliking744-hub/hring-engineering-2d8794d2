@@ -64,3 +64,19 @@ class SmartAdResponse(BaseModel):
         serialization_alias="imageUrl",
         max_length=20_000_000,
     )
+
+
+class SmartAdTextResponse(BaseModel):
+    generated_text: str = Field(
+        serialization_alias="generatedText",
+        min_length=1,
+        max_length=40_000,
+    )
+
+
+class SmartAdImageResponse(BaseModel):
+    image_url: str = Field(
+        serialization_alias="imageUrl",
+        min_length=1,
+        max_length=20_000_000,
+    )
