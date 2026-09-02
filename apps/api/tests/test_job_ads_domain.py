@@ -137,6 +137,13 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
     assert "ابعاد تصویر: 1920x1080" in image_prompt
     assert "هیچ لوگویی قرار نده" in image_prompt
     assert "اسم صنعت را روی تصویر ننویس" in image_prompt
+    assert image_call["messages"] == [
+        {
+            "role": "user",
+            "content": image_prompt,
+        }
+    ]
+    assert "max_output_tokens" not in image_call
 
 
 def test_image_failure_preserves_generated_text(monkeypatch) -> None:
