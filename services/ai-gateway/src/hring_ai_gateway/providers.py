@@ -389,8 +389,12 @@ async def _generate_once(
         payload = {
             "model": model,
             "messages": [message.model_dump() for message in request.messages],
-            "stream": False,
         }
+        # AvalAI's documented Gemini image contract omits the stream field.
+        # Some image backends return a successful but non-image response when
+        # stream=false is sent explicitly.
+        if "image" not in request.modalities:
+            payload["stream"] = False
         if request.modalities != ["text"]:
             payload["modalities"] = request.modalities
         if request.temperature is not None:
