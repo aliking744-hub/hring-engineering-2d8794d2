@@ -293,13 +293,17 @@ test('integration center only activates adapters backed by runtime consumers', a
 });
 
 
-test('smart ad displays structured independent AI responses and rejects empty success', async () => {
+test('smart ad preserves independent text and image results and rejects empty success', async () => {
   const page = await read('src/pages/SmartAdGenerator.tsx');
 
   assert.match(page, /formatGeneratedJobAd/);
   assert.match(page, /generated_job_ad/);
-  assert.match(page, /if \(!responseText && !responseImage\)/);
-  assert.match(page, /سرویس پاسخ قابل نمایش برنگرداند/);
+  assert.match(page, /if \(!responseText\)/);
+  assert.match(page, /if \(!responseImage\)/);
+  assert.match(page, /generate-job-ad-text/);
+  assert.match(page, /generate-job-ad-image/);
+  assert.match(page, /generatedText \|\| generatedImage/);
+  assert.match(page, /اعتباری نباید مصرف شود/);
 });
 
 
