@@ -206,6 +206,15 @@ const SmartAdGenerator = () => {
       const responseText = formatGeneratedJobAd(data);
       const responseImage = typeof data?.imageUrl === "string" ? data.imageUrl : null;
 
+      if (generateImage && !responseImage) {
+        toast({
+          title: "تصویر تولید نشد",
+          description: "درخواست تصویر کامل نشده است؛ اعتبار این درخواست نباید مصرف شود.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       if (!responseText && !responseImage) {
         toast({
           title: "خروجی دریافت نشد",
