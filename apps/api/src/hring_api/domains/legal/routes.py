@@ -1,4 +1,5 @@
 from collections.abc import Awaitable
+from hashlib import sha256
 from datetime import date
 from typing import TypeVar
 from uuid import UUID
@@ -8,6 +9,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Request,
@@ -20,6 +22,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
+from hring_api.domains.billing.credit_service import (
+    CreditConflictError,
+    CreditError,
+    CreditForbiddenError,
+    CreditNotFoundError,
+    InsufficientCreditsError,
+    feature_credit_cost,
+    run_with_credit_reservation,
+)
 from hring_api.domains.access.policy import PlatformPrincipal, require_platform_permission
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.legal.advisor import (
@@ -87,6 +98,16 @@ def _request_id(request: Request) -> str | None:
 
 
 def _http_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, InsufficientCreditsError):
+        return HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc))
+    if isinstance(exc, CreditForbiddenError):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    if isinstance(exc, CreditNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, CreditConflictError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, CreditError):
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     if isinstance(exc, LegalNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, LegalConflictError):
@@ -130,21 +151,40 @@ async def search_legal_sources(
 @router.post("/advisor/chat", response_model=LegalAdvisorResponse)
 async def legal_advisor_chat(
     payload: LegalAdvisorRequest,
+    request: Request,
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
     db: AsyncSession = Depends(get_db_session),
 ) -> LegalAdvisorResponse:
-    try:
-        await enforce_legal_advisor_rate_limit(
-            user_id=principal.user_id,
-            settings=settings,
-        )
+    feature_key = "legal.advisor"
+    cost = await feature_credit_cost(db, feature_key=feature_key, default_cost=5)
+    key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
+
+    async def operation() -> LegalAdvisorResponse:
+        await enforce_legal_advisor_rate_limit(user_id=principal.user_id, settings=settings)
         return await generate_legal_advice(
             db,
             payload=payload,
             principal=principal,
             settings=settings,
+            credits_charged=cost,
         )
+
+    try:
+        return await run_with_credit_reservation(
+            db,
+            principal=principal,
+            amount=cost,
+            idempotency_key=f"{feature_key}:{key_hash}",
+            feature_key=feature_key,
+            description="Generate legal advisor response",
+            request_id=_request_id(request),
+            operation=operation,
+        )
+    except CreditError as exc:
+        await db.rollback()
+        raise _http_error(exc) from exc
     except LegalAdvisorRateLimitError as exc:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -166,21 +206,40 @@ async def legal_advisor_chat(
 @router.post("/defense/analyze", response_model=LegalDefenseResponse)
 async def analyze_legal_defense(
     payload: LegalDefenseRequest,
+    request: Request,
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key", min_length=8, max_length=128),
     principal: Principal = Depends(get_current_principal),
     settings: Settings = Depends(get_settings),
     db: AsyncSession = Depends(get_db_session),
 ) -> LegalDefenseResponse:
-    try:
-        await enforce_legal_defense_rate_limit(
-            user_id=principal.user_id,
-            settings=settings,
-        )
+    feature_key = "legal.defense"
+    cost = await feature_credit_cost(db, feature_key=feature_key, default_cost=20)
+    key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
+
+    async def operation() -> LegalDefenseResponse:
+        await enforce_legal_defense_rate_limit(user_id=principal.user_id, settings=settings)
         return await generate_legal_defense(
             db,
             payload=payload,
             principal=principal,
             settings=settings,
+            credits_charged=cost,
         )
+
+    try:
+        return await run_with_credit_reservation(
+            db,
+            principal=principal,
+            amount=cost,
+            idempotency_key=f"{feature_key}:{key_hash}",
+            feature_key=feature_key,
+            description="Generate legal defense analysis",
+            request_id=_request_id(request),
+            operation=operation,
+        )
+    except CreditError as exc:
+        await db.rollback()
+        raise _http_error(exc) from exc
     except LegalDefenseRateLimitError as exc:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
