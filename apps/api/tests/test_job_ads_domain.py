@@ -135,6 +135,8 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
     assert "Formal and professional tone" in text_prompt
     assert "Every generation must feel newly written" in text_prompt
     assert "Do not reuse a fixed template" in text_prompt
+    assert "Follow this structural profile exactly" in text_prompt
+    assert "Structural variation profile:" in text_prompt
 
     image_call = next(call for call in captured if call.get("modalities"))
     assert image_call["modalities"] == ["image", "text"]
