@@ -177,6 +177,16 @@ export default function CostCalculator() {
     })();
   }, []);
 
+  useEffect(() => {
+    setCalculations(null);
+  }, [
+    isNetContract, baseSalary, jobAbsorption, responsibilityAllowance, jobSuperlative,
+    housingAllowance, groceryAllowance, childrenAllowance, otherBenefits,
+    overtimeBaseHours, overtimeHours, monthlyPerformance, monthlyBonus,
+    supplementaryInsurance, annualOccasionalBenefits,
+    recruitmentCost, trainingCost, miscCost,
+  ]);
+
   const handleCalculate = async () => {
     setIsCalculating(true);
     try {
