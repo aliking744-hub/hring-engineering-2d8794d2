@@ -155,31 +155,5 @@ def downgrade() -> None:
         )
         """
     )
-    op.execute(
-        """
-        UPDATE ai_prompt_versions
-        SET provider_alias = 'gemini'
-        WHERE provider_alias = 'avalai.primary'
-        """
-    )
-    op.execute(
-        """
-        UPDATE ai_prompt_versions
-        SET provider_alias = 'perplexity'
-        WHERE provider_alias = 'avalai.search'
-        """
-    )
-    op.execute(
-        """
-        UPDATE ai_feature_routes
-        SET provider_alias = 'gemini', updated_at = now()
-        WHERE provider_alias = 'avalai.primary'
-        """
-    )
-    op.execute(
-        """
-        UPDATE ai_feature_routes
-        SET provider_alias = 'perplexity', updated_at = now()
-        WHERE provider_alias = 'avalai.search'
-        """
-    )
+    # Runtime alias remapping is intentionally not reversed: later admin choices may
+    # use the same aliases and must not be overwritten by a code rollback.
