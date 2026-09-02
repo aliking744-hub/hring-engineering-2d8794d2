@@ -202,7 +202,10 @@ def test_legal_defense_route_requires_auth_and_preserves_ui_aliases(monkeypatch)
         response = client.post(
             "/api/v1/legal/defense/analyze",
             json=payload,
-            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+            headers={
+                "Authorization": f"Bearer {account['tokens']['access_token']}",
+                "X-Idempotency-Key": "test-legal-request",
+            },
         )
         assert response.status_code == 200, response.text
         body = response.json()
