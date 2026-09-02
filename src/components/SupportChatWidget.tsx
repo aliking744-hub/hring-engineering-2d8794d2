@@ -261,14 +261,31 @@ const SupportChatWidget = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('hring-support', {
-        body: {
-          messages: newMessages,
-          sessionId,
-          userId: user?.id || null,
-        },
-      });
-      if (error) throw new Error(error.message || 'خطا در ارتباط');
+      let data: { content?: string } | null = null;
+      if (user) {
+        const response = await supabase.functions.invoke('hring-support', {
+          body: {
+            messages: newMessages,
+            sessionId,
+            userId: user.id,
+          },
+        });
+        if (response.error) throw new Error(response.error.message || 'خطا در ارتباط');
+        data = response.data;
+      } else {
+        const response = await fetch('/api/v1/compat/public-functions/hring-support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            body: { messages: newMessages, sessionId, userId: null },
+          }),
+        });
+        if (!response.ok) throw new Error('خطا در ارتباط');
+        const stream = await response.text();
+        const dataLine = stream.split('\n').find((line) => line.startsWith('data: {'));
+        const event = dataLine ? JSON.parse(dataLine.slice(6)) : null;
+        data = { content: event?.choices?.[0]?.delta?.content };
+      }
       const assistantContent = typeof data?.content === 'string' ? data.content.trim() : '';
       if (!assistantContent) throw new Error('پاسخی از پشتیبانی دریافت نشد');
       setMessages([...newMessages, { role: 'assistant', content: assistantContent }]);
