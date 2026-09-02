@@ -38,11 +38,6 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
 
       const employees = parseExcelData(jsonData);
 
-      toast({
-        title: 'موفقیت',
-        description: `${employees.length} رکورد با موفقیت بارگذاری شد`,
-      });
-
       await onDataLoaded(employees, file.name);
     } catch (error) {
       toast({
@@ -79,10 +74,6 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
   const handleDemoData = useCallback(async () => {
     setIsLoading(true);
     const sampleData = generateSampleData(78);
-    toast({
-      title: 'داده نمونه',
-      description: '78 رکورد نمونه بارگذاری شد',
-    });
     try {
       await onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
     } finally {
