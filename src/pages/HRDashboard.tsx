@@ -86,6 +86,10 @@ export default function HRDashboard() {
     setData(employees);
     setDataOrigin(name.startsWith('داده نمونه') ? 'demo' : 'uploaded');
     setCurrentUploadId(id);
+    toast({
+      title: 'داشبورد آماده است',
+      description: `${employees.length.toLocaleString('fa-IR')} رکورد پردازش شد`,
+    });
   }, [persistUpload]);
 
   const handleLoadFromHistory = useCallback((employees: Employee[], id: string, _name: string, isDemo: boolean) => {
