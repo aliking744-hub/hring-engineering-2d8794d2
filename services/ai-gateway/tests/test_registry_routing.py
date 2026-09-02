@@ -332,6 +332,7 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
     payload = captured["json"]
     assert isinstance(payload, dict)
     assert payload["modalities"] == ["image", "text"]
+    assert "stream" not in payload
     assert result.content == ""
     assert [item.url for item in result.images] == [image_url]
 
