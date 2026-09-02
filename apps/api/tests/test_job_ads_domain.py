@@ -15,6 +15,7 @@ from hring_api.domains.ai.gateway_client import (
 )
 from hring_api.domains.job_ads.schemas import (
     SmartAdGenerateRequest,
+    SmartAdImageResponse,
     SmartAdResponse,
 )
 from hring_api.domains.job_ads.service import (
@@ -268,3 +269,44 @@ def test_smart_ad_route_requires_auth_and_returns_ui_aliases(monkeypatch) -> Non
             "imageUrl": "data:image/png;base64,aGVsbG8=",
         }
 
+
+
+
+def test_split_smart_ad_routes_are_independent(monkeypatch) -> None:
+    async def fake_text(*_args: object, **_kwargs: object) -> SmartAdResponse:
+        return SmartAdResponse(generated_text="متن مستقل", image_url=None)
+
+    async def fake_image(*_args: object, **_kwargs: object) -> SmartAdImageResponse:
+        return SmartAdImageResponse(image_url="data:image/png;base64,aGVsbG8=")
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.generate_smart_ad",
+        fake_text,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.generate_smart_ad_image",
+        fake_image,
+    )
+
+    payload = _payload().model_dump(by_alias=True)
+    with TestClient(app) as client:
+        account = _register(client)
+        headers = {"Authorization": f"Bearer {account['tokens']['access_token']}"}
+
+        text_response = client.post(
+            "/api/v1/job-ads/generate-text",
+            json=payload,
+            headers={**headers, "X-Idempotency-Key": "smart-ad-text-independent"},
+        )
+        assert text_response.status_code == 200, text_response.text
+        assert text_response.json() == {"generatedText": "متن مستقل"}
+
+        image_response = client.post(
+            "/api/v1/job-ads/generate-image",
+            json=payload,
+            headers={**headers, "X-Idempotency-Key": "smart-ad-image-independent"},
+        )
+        assert image_response.status_code == 200, image_response.text
+        assert image_response.json() == {
+            "imageUrl": "data:image/png;base64,aGVsbG8="
+        }

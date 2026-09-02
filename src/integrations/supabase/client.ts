@@ -45,6 +45,8 @@ const METERED_COMPAT_FUNCTIONS = new Set([
   'generate-interview-kit',
   'generate-onboarding-plan',
   'generate-job-ad',
+  'generate-job-ad-text',
+  'generate-job-ad-image',
   'legal-advisor-chat',
   'defense-builder',
   'hring-support',
@@ -202,6 +204,24 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
 
     if (functionName === 'generate-job-ad') {
       const data = await apiRequest('/job-ads/generate', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'generate-job-ad-text') {
+      const data = await apiRequest('/job-ads/generate-text', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'generate-job-ad-image') {
+      const data = await apiRequest('/job-ads/generate-image', {
         method: 'POST',
         headers: { 'X-Idempotency-Key': newIdempotencyKey() },
         body: JSON.stringify(body),

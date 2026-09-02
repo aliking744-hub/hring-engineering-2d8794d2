@@ -6,10 +6,19 @@ import test from "node:test";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("smart ad UI uses the dedicated independent endpoint", () => {
+test("smart ad UI exposes independent text and image actions", () => {
   const client = read("src/integrations/supabase/client.ts");
-  assert.match(client, /functionName === 'generate-job-ad'/);
-  assert.match(client, /\/job-ads\/generate/);
+  const page = read("src/pages/SmartAdGenerator.tsx");
+
+  assert.match(client, /functionName === 'generate-job-ad-text'/);
+  assert.match(client, /\/job-ads\/generate-text/);
+  assert.match(client, /functionName === 'generate-job-ad-image'/);
+  assert.match(client, /\/job-ads\/generate-image/);
+  assert.match(page, /handleGenerateText/);
+  assert.match(page, /handleGenerateImage/);
+  assert.match(page, /تولید متن/);
+  assert.match(page, /تولید تصویر/);
+  assert.doesNotMatch(page, /<Switch/);
 });
 
 test("native smart ad preserves Lovable text and image behavior", () => {

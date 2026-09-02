@@ -11,8 +11,17 @@ from hring_api.domains.billing.credit_service import (
     InsufficientCreditsError,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
-from hring_api.domains.job_ads.schemas import SmartAdGenerateRequest, SmartAdResponse
-from hring_api.domains.job_ads.service import SmartAdError, generate_smart_ad
+from hring_api.domains.job_ads.schemas import (
+    SmartAdGenerateRequest,
+    SmartAdImageResponse,
+    SmartAdResponse,
+    SmartAdTextResponse,
+)
+from hring_api.domains.job_ads.service import (
+    SmartAdError,
+    generate_smart_ad,
+    generate_smart_ad_image,
+)
 
 
 router = APIRouter(prefix="/job-ads", tags=["job-ads"])
@@ -61,3 +70,66 @@ async def create_smart_ad(
         await db.rollback()
         raise _http_error(exc) from exc
 
+
+
+@router.post("/generate-text", response_model=SmartAdTextResponse)
+async def create_smart_ad_text(
+    payload: SmartAdGenerateRequest,
+    request: Request,
+    idempotency_key: str = Header(
+        ...,
+        alias="X-Idempotency-Key",
+        min_length=8,
+        max_length=128,
+    ),
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> SmartAdTextResponse:
+    """Generate and bill only smart-ad text."""
+    try:
+        text_payload = payload.model_copy(update={"generate_image": False})
+        result = await generate_smart_ad(
+            db,
+            payload=text_payload,
+            principal=principal,
+            idempotency_key=idempotency_key,
+            request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+            settings=settings,
+        )
+        await db.commit()
+        return SmartAdTextResponse(generated_text=result.generated_text)
+    except (CreditError, SmartAdError) as exc:
+        await db.rollback()
+        raise _http_error(exc) from exc
+
+
+@router.post("/generate-image", response_model=SmartAdImageResponse)
+async def create_smart_ad_image(
+    payload: SmartAdGenerateRequest,
+    request: Request,
+    idempotency_key: str = Header(
+        ...,
+        alias="X-Idempotency-Key",
+        min_length=8,
+        max_length=128,
+    ),
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> SmartAdImageResponse:
+    """Generate and bill only a smart-ad image."""
+    try:
+        result = await generate_smart_ad_image(
+            db,
+            payload=payload,
+            principal=principal,
+            idempotency_key=idempotency_key,
+            request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+            settings=settings,
+        )
+        await db.commit()
+        return result
+    except (CreditError, SmartAdError) as exc:
+        await db.rollback()
+        raise _http_error(exc) from exc
