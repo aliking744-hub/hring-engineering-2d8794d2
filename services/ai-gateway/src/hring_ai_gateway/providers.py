@@ -397,19 +397,6 @@ async def _generate_once(
             payload["stream"] = False
         if request.modalities != ["text"]:
             payload["modalities"] = request.modalities
-        if "image" in request.modalities and request.image_aspect_ratio is not None:
-            image_config: dict[str, str] = {
-                "aspectRatio": request.image_aspect_ratio,
-            }
-            if request.image_size is not None:
-                image_config["imageSize"] = request.image_size
-            # AvalAI documents Gemini-specific settings under extra_body for
-            # its OpenAI-compatible /chat/completions endpoint.
-            payload["extra_body"] = {
-                "generationConfig": {
-                    "imageConfig": image_config,
-                }
-            }
         if request.temperature is not None:
             payload["temperature"] = request.temperature
         if request.max_output_tokens is not None:

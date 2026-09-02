@@ -140,13 +140,14 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
 
     image_call = next(call for call in captured if call.get("modalities"))
     assert image_call["modalities"] == ["image", "text"]
-    assert image_call["image_aspect_ratio"] == "16:9"
-    assert image_call["image_size"] == "2K"
+    assert "image_aspect_ratio" not in image_call
+    assert "image_size" not in image_call
     image_prompt = "\n".join(message["content"] for message in image_call["messages"])
-    assert 'عبارت "استخدام می‌کنیم"' in image_prompt
-    assert "ابعاد تصویر: 1920x1080" in image_prompt
-    assert "هیچ لوگویی قرار نده" in image_prompt
-    assert "اسم صنعت را روی تصویر ننویس" in image_prompt
+    assert "Create one professional 16:9 recruitment poster" in image_prompt
+    assert "Badge: استخدام می‌کنیم" in image_prompt
+    assert "Job title: کارشناس منابع انسانی" in image_prompt
+    assert "Do not add any other words, logo" in image_prompt
+    assert len(image_prompt) < 1_200
     assert image_call["messages"] == [
         {
             "role": "user",
@@ -206,12 +207,12 @@ def test_image_prompt_changes_materially_with_selected_tone() -> None:
     friendly = _image_prompt(_payload().model_copy(update={"tone": "friendly"}), "seed-b")
     challenge = _image_prompt(_payload().model_copy(update={"tone": "challenge"}), "seed-c")
 
-    assert "سرمه‌ای، خاکستری، سفید و طلایی" in formal
-    assert "بدون ایموجی و آیکون‌های کارتونی" in formal
-    assert "نارنجی، آبی روشن، سبز" in friendly
-    assert "آیکون‌های ۳D" in friendly
-    assert "قرمز، بنفش، آبی تیره" in challenge
-    assert "راکت، نمودار و لامپ" in challenge
+    assert "formal, executive and trustworthy" in formal
+    assert "no cartoon icons" in formal
+    assert "warm, welcoming and energetic" in friendly
+    assert "clean 3D workplace elements" in friendly
+    assert "bold, ambitious and growth-oriented" in challenge
+    assert "rocket, chart or upward-motion elements" in challenge
     assert len({formal, friendly, challenge}) == 3
 
 

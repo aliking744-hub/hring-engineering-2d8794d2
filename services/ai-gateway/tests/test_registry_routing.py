@@ -307,8 +307,6 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
             "model": "gemini-image-model",
             "messages": [{"role": "user", "content": "Create an image"}],
             "modalities": ["image", "text"],
-            "image_aspect_ratio": "16:9",
-            "image_size": "2K",
         }
     )
     route = ProviderConfig(
@@ -334,14 +332,7 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
     payload = captured["json"]
     assert isinstance(payload, dict)
     assert payload["modalities"] == ["image", "text"]
-    assert payload["extra_body"] == {
-        "generationConfig": {
-            "imageConfig": {
-                "aspectRatio": "16:9",
-                "imageSize": "2K",
-            }
-        }
-    }
+    assert "extra_body" not in payload
     assert "stream" not in payload
     assert result.content == ""
     assert [item.url for item in result.images] == [image_url]
