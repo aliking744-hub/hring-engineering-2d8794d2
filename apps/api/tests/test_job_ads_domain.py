@@ -17,7 +17,11 @@ from hring_api.domains.job_ads.schemas import (
     SmartAdGenerateRequest,
     SmartAdResponse,
 )
-from hring_api.domains.job_ads.service import _generate_content
+from hring_api.domains.job_ads.service import (
+    SmartAdError,
+    _generate_content,
+    _image_prompt,
+)
 from hring_api.main import app
 
 
@@ -129,6 +133,8 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
     assert "Start with a compelling hook" in text_prompt
     assert "Use hashtags at the bottom (3-5 relevant ones)" in text_prompt
     assert "Formal and professional tone" in text_prompt
+    assert "Every generation must feel newly written" in text_prompt
+    assert "Do not reuse a fixed template" in text_prompt
 
     image_call = next(call for call in captured if call.get("modalities"))
     assert image_call["modalities"] == ["image", "text"]
@@ -146,7 +152,7 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
     assert "max_output_tokens" not in image_call
 
 
-def test_image_failure_preserves_generated_text(monkeypatch) -> None:
+def test_requested_image_failure_fails_the_whole_request(monkeypatch) -> None:
     async def fake_route(**_kwargs: object) -> SimpleNamespace:
         return SimpleNamespace(provider="test", model="test-model", source="test")
 
@@ -178,18 +184,31 @@ def test_image_failure_preserves_generated_text(monkeypatch) -> None:
         fake_managed,
     )
 
-    result = asyncio.run(
-        _generate_content(
-            payload=_payload(),
-            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
-            text_credits=5,
-            image_credits=20,
-            settings=Settings(),
-            session=SimpleNamespace(),
+    with pytest.raises(SmartAdError, match="تصویر آگهی"):
+        asyncio.run(
+            _generate_content(
+                payload=_payload(),
+                principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+                text_credits=5,
+                image_credits=20,
+                settings=Settings(),
+                session=SimpleNamespace(),
+            )
         )
-    )
-    assert result.generated_text == "متن آگهی معتبر"
-    assert result.image_url is None
+
+
+def test_image_prompt_changes_materially_with_selected_tone() -> None:
+    formal = _image_prompt(_payload().model_copy(update={"tone": "formal"}), "seed-a")
+    friendly = _image_prompt(_payload().model_copy(update={"tone": "friendly"}), "seed-b")
+    challenge = _image_prompt(_payload().model_copy(update={"tone": "challenge"}), "seed-c")
+
+    assert "سرمه‌ای، خاکستری، سفید و طلایی" in formal
+    assert "بدون ایموجی و آیکون‌های کارتونی" in formal
+    assert "نارنجی، آبی روشن، سبز" in friendly
+    assert "آیکون‌های ۳D" in friendly
+    assert "قرمز، بنفش، آبی تیره" in challenge
+    assert "راکت، نمودار و لامپ" in challenge
+    assert len({formal, friendly, challenge}) == 3
 
 
 def test_smart_ad_rejects_dimensions_that_do_not_match_format() -> None:
