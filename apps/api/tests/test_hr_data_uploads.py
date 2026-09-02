@@ -36,7 +36,11 @@ def test_hr_uploads_are_private_and_the_history_omits_records() -> None:
             "records": [{"fullName": "کاربر خصوصی", "department": "منابع انسانی"}],
         }
 
-        created = client.post("/api/v1/hr-data/uploads", json=payload, headers=_auth(owner))
+        created = client.post(
+            "/api/v1/hr-data/uploads",
+            json=payload,
+            headers={**_auth(owner), "X-Idempotency-Key": "test-hr-upload-create"},
+        )
         assert created.status_code == 201, created.text
         upload_id = created.json()["id"]
         assert created.json()["records"] == payload["records"]
