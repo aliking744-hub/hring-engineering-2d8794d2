@@ -176,7 +176,7 @@ def _normalize_response_payload(value: object) -> object:
         normalized = dict(item)
         raw_id = normalized.get("id")
         if isinstance(raw_id, int) and not isinstance(raw_id, bool):
-            normalized["id"] = str(raw_id)
+            normalized["id"] = f"q-{raw_id}"
         normalized["sectionIcon"] = _section_icon(
             normalized.get("sectionIcon"),
             normalized.get("section"),
