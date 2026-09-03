@@ -382,7 +382,17 @@ async def _generate_once(
     request: GenerateRequest,
     provider: ProviderConfig,
 ) -> GenerateResponse:
-    model = provider.default_model or request.model
+    # Honor the feature-level model selected in Admin when this is the requested provider.
+    # Provider defaults are only fallbacks for alternate/BYOK routes; otherwise every
+    # per-feature model choice would silently collapse to the provider default.
+    provider_matches_request = (
+        provider.name.strip().lower() == request.provider.strip().lower()
+    )
+    model = (
+        request.model
+        if provider_matches_request
+        else (provider.default_model or request.model)
+    )
     if provider.adapter == "anthropic":
         payload = _anthropic_payload(request, model)
     else:

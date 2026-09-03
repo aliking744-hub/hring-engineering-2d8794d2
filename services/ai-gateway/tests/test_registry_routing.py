@@ -303,7 +303,7 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
     request = GenerateRequest.model_validate(
         {
             "request_id": "00000000-0000-0000-0000-000000000103",
-            "provider": "gemini",
+            "provider": "avalai.image",
             "model": "gemini-image-model",
             "messages": [{"role": "user", "content": "Create an image"}],
             "modalities": ["image", "text"],
@@ -317,7 +317,7 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
         auth_scheme="bearer",
         endpoint_path="/chat/completions",
         max_tokens_field="max_completion_tokens",
-        default_model="gemini-image-model",
+        default_model="gemini-2.5-flash",
         timeout_seconds=30,
         max_retries=0,
     )
@@ -331,6 +331,7 @@ def test_gateway_forwards_image_modalities_and_extracts_image(monkeypatch) -> No
     )
     payload = captured["json"]
     assert isinstance(payload, dict)
+    assert payload["model"] == "gemini-image-model"
     assert payload["modalities"] == ["image", "text"]
     assert "extra_body" not in payload
     assert "stream" not in payload
