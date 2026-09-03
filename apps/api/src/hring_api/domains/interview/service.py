@@ -138,7 +138,12 @@ def _string_list(value: object) -> list[str]:
 
 
 def _section_icon(value: object, section: object, position: int) -> str:
-    if value in {"technical", "behavioral", "intelligence", "cultural"}:
+    if isinstance(value, str) and value in {
+        "technical",
+        "behavioral",
+        "intelligence",
+        "cultural",
+    }:
         return value
     hint = f"{value or ''} {section or ''}".lower()
     if any(token in hint for token in ("technical", "تخصص", "فنی", "💻", "⚙", "🔧")):
@@ -149,11 +154,13 @@ def _section_icon(value: object, section: object, position: int) -> str:
         return "intelligence"
     if any(token in hint for token in ("cultural", "فرهنگ", "صنعت", "🏢", "🌍", "❤️")):
         return "cultural"
-    return _EXPECTED_ICONS_BY_POSITION[position] if position < len(_EXPECTED_ICONS_BY_POSITION) else "technical"
+    if position < len(_EXPECTED_ICONS_BY_POSITION):
+        return _EXPECTED_ICONS_BY_POSITION[position]
+    return "technical"
 
 
 def _normalize_response_payload(value: object) -> object:
-    """Accept harmless provider formatting variants without loosening the 11-question contract.""
+    """Accept harmless provider formatting variants without loosening the 11-question contract."""
 
     if not isinstance(value, dict):
         return value
@@ -182,6 +189,7 @@ def _normalize_response_payload(value: object) -> object:
     normalized_payload: dict[str, Any] = dict(value)
     normalized_payload["questions"] = normalized_questions
     return normalized_payload
+
 
 def _parse_response(content: str) -> InterviewKitResponse:
     normalized = content.strip()
