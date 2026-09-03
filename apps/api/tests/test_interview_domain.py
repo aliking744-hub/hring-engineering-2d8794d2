@@ -14,7 +14,7 @@ from hring_api.domains.interview.schemas import (
     InterviewKitGenerateRequest,
     InterviewKitResponse,
 )
-from hring_api.domains.interview.service import _generate_content
+from hring_api.domains.interview.service import _generate_content, _parse_response
 from hring_api.main import app
 
 
@@ -119,6 +119,41 @@ def test_interview_prompt_preserves_exact_lovable_contract(monkeypatch) -> None:
     assert "**بخش ۳: سوالات هوش و حل مسئله (۲ سوال)**" in prompt
     assert "**بخش ۴: سوالات صنعت و تناسب فرهنگی (۲ سوال)**" in prompt
     assert "تأکید بیشتر روی سوالات رهبری و مدیریت" in prompt
+
+
+
+def test_interview_response_normalizes_common_provider_json_variants() -> None:
+    questions = _questions()
+    icons = {
+        "technical": "💻",
+        "behavioral": "🤝",
+        "intelligence": "🧠",
+        "cultural": "🏢",
+    }
+    for index, question in enumerate(questions, start=1):
+        question["id"] = index
+        question["sectionIcon"] = icons[str(question["sectionIcon"])]
+        question["goodSigns"] = "پاسخ مستند و دارای مثال مشخص"
+        question["redFlags"] = "پاسخ کلی و بدون شاهد عملی"
+
+    result = _parse_response(json.dumps({"questions": questions}, ensure_ascii=False))
+
+    assert [item.section_icon for item in result.questions] == [
+        "technical",
+        "technical",
+        "technical",
+        "technical",
+        "behavioral",
+        "behavioral",
+        "behavioral",
+        "intelligence",
+        "intelligence",
+        "cultural",
+        "cultural",
+    ]
+    assert result.questions[0].id == "1"
+    assert result.questions[0].good_signs == ["پاسخ مستند و دارای مثال مشخص"]
+    assert result.questions[0].red_flags == ["پاسخ کلی و بدون شاهد عملی"]
 
 
 def test_interview_response_rejects_missing_section_or_evaluation_key() -> None:
