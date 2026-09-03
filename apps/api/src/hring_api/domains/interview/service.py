@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from hashlib import sha256
+from typing import Any
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -111,6 +112,85 @@ def _user_prompt(payload: InterviewKitGenerateRequest) -> str:
 {focus_instruction}"""
 
 
+
+_EXPECTED_ICONS_BY_POSITION = (
+    "technical",
+    "technical",
+    "technical",
+    "technical",
+    "behavioral",
+    "behavioral",
+    "behavioral",
+    "intelligence",
+    "intelligence",
+    "cultural",
+    "cultural",
+)
+
+
+def _string_list(value: object) -> list[str]:
+    if isinstance(value, list):
+        rows = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+        return rows
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _section_icon(value: object, section: object, position: int) -> str:
+    if isinstance(value, str) and value in {
+        "technical",
+        "behavioral",
+        "intelligence",
+        "cultural",
+    }:
+        return value
+    hint = f"{value or ''} {section or ''}".lower()
+    if any(token in hint for token in ("technical", "تخصص", "فنی", "💻", "⚙", "🔧")):
+        return "technical"
+    if any(token in hint for token in ("behavior", "رفتار", "مهارت نرم", "🤝", "👥", "💬")):
+        return "behavioral"
+    if any(token in hint for token in ("intelligence", "هوش", "حل مسئله", "🧠", "💡", "🔍")):
+        return "intelligence"
+    if any(token in hint for token in ("cultural", "فرهنگ", "صنعت", "🏢", "🌍", "❤️")):
+        return "cultural"
+    if position < len(_EXPECTED_ICONS_BY_POSITION):
+        return _EXPECTED_ICONS_BY_POSITION[position]
+    return "technical"
+
+
+def _normalize_response_payload(value: object) -> object:
+    """Accept harmless provider formatting variants without loosening the 11-question contract."""
+
+    if not isinstance(value, dict):
+        return value
+    questions = value.get("questions")
+    if not isinstance(questions, list):
+        return value
+
+    normalized_questions: list[object] = []
+    for index, item in enumerate(questions):
+        if not isinstance(item, dict):
+            normalized_questions.append(item)
+            continue
+        normalized = dict(item)
+        raw_id = normalized.get("id")
+        if isinstance(raw_id, int) and not isinstance(raw_id, bool):
+            normalized["id"] = f"q-{raw_id}"
+        normalized["sectionIcon"] = _section_icon(
+            normalized.get("sectionIcon"),
+            normalized.get("section"),
+            index,
+        )
+        normalized["goodSigns"] = _string_list(normalized.get("goodSigns"))
+        normalized["redFlags"] = _string_list(normalized.get("redFlags"))
+        normalized_questions.append(normalized)
+
+    normalized_payload: dict[str, Any] = dict(value)
+    normalized_payload["questions"] = normalized_questions
+    return normalized_payload
+
+
 def _parse_response(content: str) -> InterviewKitResponse:
     normalized = content.strip()
     if normalized.startswith("```"):
@@ -121,7 +201,7 @@ def _parse_response(content: str) -> InterviewKitResponse:
             lines = lines[:-1]
         normalized = "\n".join(lines).strip()
     try:
-        data = json.loads(normalized)
+        data = _normalize_response_payload(json.loads(normalized))
         return InterviewKitResponse.model_validate(data)
     except (ValueError, ValidationError) as exc:
         raise InterviewError("خروجی کیت مصاحبه با قرارداد مورد انتظار مطابقت ندارد") from exc
