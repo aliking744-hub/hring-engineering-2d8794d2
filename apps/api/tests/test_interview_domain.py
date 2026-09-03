@@ -151,7 +151,7 @@ def test_interview_response_normalizes_common_provider_json_variants() -> None:
         "cultural",
         "cultural",
     ]
-    assert result.questions[0].id == "1"
+    assert result.questions[0].id == "q-1"
     assert result.questions[0].good_signs == ["پاسخ مستند و دارای مثال مشخص"]
     assert result.questions[0].red_flags == ["پاسخ کلی و بدون شاهد عملی"]
 
