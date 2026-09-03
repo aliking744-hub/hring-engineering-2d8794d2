@@ -156,6 +156,24 @@ def test_interview_response_normalizes_common_provider_json_variants() -> None:
     assert result.questions[0].red_flags == ["پاسخ کلی و بدون شاهد عملی"]
 
 
+def test_interview_response_normalizes_nested_aliases_and_extra_question() -> None:
+    questions = _questions()
+    questions.append(dict(questions[-1]))
+    for question in questions:
+        question["text"] = question.pop("question")
+        question["good_signs"] = question.pop("goodSigns")
+        question["warningSigns"] = question.pop("redFlags")
+        question.pop("sectionIcon")
+
+    result = _parse_response(
+        json.dumps({"interviewGuide": {"questions": questions}}, ensure_ascii=False)
+    )
+
+    assert len(result.questions) == 11
+    assert result.questions[0].id == "q-1"
+    assert result.questions[-1].section_icon == "cultural"
+
+
 def test_interview_response_rejects_missing_section_or_evaluation_key() -> None:
     missing_section = _questions()[:-1]
     with pytest.raises(ValidationError):
