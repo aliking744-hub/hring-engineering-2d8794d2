@@ -181,8 +181,7 @@ def _questions_payload(value: object) -> list[object] | None:
     if isinstance(direct, list):
         return direct
     for key in ("interviewKit", "interviewGuide", "data", "result"):
-        nested = value.get(key)
-        questions = _questions_payload(nested)
+        questions = _questions_payload(value.get(key))
         if questions is not None:
             return questions
     return None
@@ -252,4 +251,137 @@ def _normalize_response_payload(value: object) -> object:
     )
     normalized_payload["questions"] = normalized_questions
     return normalized_payload
+
+
+def _parse_response(content: str) -> InterviewKitResponse:
+    normalized = content.strip()
+    if normalized.startswith("```"):
+        lines = normalized.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        normalized = "\n".join(lines).strip()
+    try:
+        data = _normalize_response_payload(json.loads(normalized))
+        return InterviewKitResponse.model_validate(data)
+    except (ValueError, ValidationError) as exc:
+        raise InterviewError("خروجی کیت مصاحبه با قرارداد مورد انتظار مطابقت ندارد") from exc
+
+
+async def _generate_content(
+    *,
+    payload: InterviewKitGenerateRequest,
+    principal: Principal,
+    credits_charged: int,
+    settings: Settings,
+    session: AsyncSession,
+) -> InterviewKitResponse:
+    industry = payload.industry or "نامشخص"
+    focus_instruction = FOCUS_INSTRUCTIONS[payload.focus_area]
+
+    async def fallback() -> AiGatewayResult:
+        route = await resolve_runtime_feature_route(
+            feature_key=INTERVIEW_FEATURE_KEY,
+            default_provider=settings.interview_ai_provider,
+            default_model=settings.interview_ai_model,
+        )
+        return await generate_with_ai_gateway(
+            feature_key=INTERVIEW_FEATURE_KEY,
+            user_id=principal.user_id,
+            company_id=_company_id(principal),
+            provider=route.provider,
+            model=route.model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": _user_prompt(payload)},
+            ],
+            credits_charged=credits_charged,
+            temperature=0.2,
+            max_output_tokens=5_000,
+            response_format="json_object",
+            metadata_json={
+                "ai_route_source": route.source,
+                "prompt_key": INTERVIEW_FEATURE_KEY,
+                "prompt_mode": "embedded_fallback",
+            },
+        )
+
+    try:
+        result = await generate_with_managed_prompt(
+            session,
+            prompt_key=INTERVIEW_FEATURE_KEY,
+            variables={
+                "job_title": payload.job_title,
+                "seniority_level": SENIORITY_LABELS[payload.seniority_level],
+                "industry": industry,
+                "focus_area": FOCUS_LABELS[payload.focus_area],
+                "focus_instruction": focus_instruction,
+            },
+            user_id=principal.user_id,
+            company_id=_company_id(principal),
+            fallback=fallback,
+            credits_charged=credits_charged,
+        )
+    except (AiGatewayError, PromptRegistryError) as exc:
+        raise InterviewError("سرویس تولید کیت مصاحبه در دسترس نیست") from exc
+
+    return _parse_response(result.content)
+
+
+async def generate_interview_kit(
+    session: AsyncSession,
+    *,
+    payload: InterviewKitGenerateRequest,
+    principal: Principal,
+    idempotency_key: str,
+    request_id: str | None,
+    settings: Settings,
+) -> InterviewKitResponse:
+    cost = await feature_credit_cost(
+        session,
+        feature_key=INTERVIEW_FEATURE_KEY,
+        default_cost=INTERVIEW_DEFAULT_CREDIT_COST,
+    )
+    managed_cost = (
+        0
+        if await uses_company_byok(
+            session,
+            company_id=_company_id(principal),
+            capability_key=INTERVIEW_FEATURE_KEY,
+        )
+        else cost
+    )
+    key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
+
+    async def operation() -> InterviewKitResponse:
+        return await _generate_content(
+            payload=payload,
+            principal=principal,
+            credits_charged=managed_cost,
+            settings=settings,
+            session=session,
+        )
+
+    if managed_cost == 0:
+        return await run_with_ai_execution_guard(
+            session,
+            principal=principal,
+            company_id=_company_id(principal),
+            feature_key=INTERVIEW_FEATURE_KEY,
+            idempotency_key=f"{INTERVIEW_FEATURE_KEY}:{key_hash}",
+            request_id=request_id,
+            operation=operation,
+        )
+
+    return await run_with_credit_reservation(
+        session,
+        principal=principal,
+        amount=managed_cost,
+        idempotency_key=f"{INTERVIEW_FEATURE_KEY}:{key_hash}",
+        feature_key=INTERVIEW_FEATURE_KEY,
+        description="Generate native interview kit",
+        request_id=request_id,
+        operation=operation,
+    )
 
