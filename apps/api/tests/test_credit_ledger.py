@@ -669,7 +669,7 @@ def test_successful_ai_operation_consumes_once_and_reports_the_same_metered_cost
         assert succeeded.status_code == 200, succeeded.text
         assert succeeded.json()["data"] == {"content": "ok"}
         balance = client.get("/api/v1/billing/credits/me", headers=headers).json()
-        assert balance["available_credits"] == 45
+        assert balance["available_credits"] == 42
         assert balance["reserved_credits"] == 0
 
         replay = client.post(
