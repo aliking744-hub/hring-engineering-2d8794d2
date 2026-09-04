@@ -13,6 +13,9 @@ test('cost calculator is server-authoritative, current-year and explicitly meter
   assert.match(page, /\/costing\/calculate/);
   assert.match(page, /X-Idempotency-Key/);
   assert.match(page, /getCost\('COST_CALCULATOR'\)/);
+  assert.match(page, /حق مسکن پیشنهادی/);
+  assert.match(page, /بن خواروبار پیشنهادی/);
+  assert.equal(/حق مسکن مصوب[\\s\\S]*disabled/.test(page), false);
   assert.equal(page.includes('useMemo'), false);
   assert.match(routes, /run_with_credit_reservation/);
   assert.match(routes, /COST_CALCULATOR_DEFAULT_CREDIT_COST = 2/);
