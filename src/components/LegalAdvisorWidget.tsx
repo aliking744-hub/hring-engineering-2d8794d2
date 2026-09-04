@@ -95,6 +95,10 @@ const LegalAdvisorWidget = () => {
           </div>
         </div>
 
+        <p className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs leading-5 text-muted-foreground">
+          پاسخ‌ها راهنمای عمومی بر پایه منابع نمایش‌داده‌شده‌اند و جایگزین بررسی وکیل یا مشاور حقوقی نیستند.
+        </p>
+
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={query}
