@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Calculator, Users, Clock, Gift, Building2, Briefcase, TrendingUp, Printer, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Calculator, Users, Clock, Gift, Building2, Briefcase, TrendingUp, Printer, Loader2 } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,7 +129,6 @@ interface EmployeeCostResult {
 }
 
 export default function CostCalculator() {
-  const navigate = useNavigate();
   const { credits, getCost } = useCredits();
   const idempotencyKeyRef = useRef<string | null>(null);
   
@@ -260,40 +258,29 @@ export default function CostCalculator() {
   return (
     <div className="relative min-h-screen" dir="rtl">
       <AuroraBackground />
+      <WorkspaceHeader
+        title="محاسبه بهای تمام‌شده نیروی انسانی"
+        subtitle="محاسبه دقیق هزینه واقعی ماهانه کارمند بر اساس قوانین جاری"
+        icon={<Calculator className="h-6 w-6" />}
+        actions={(
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            disabled={!calculations}
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            <span className="hidden sm:inline">چاپ نتیجه</span>
+          </Button>
+        )}
+      />
       <div className="relative z-10 p-4 md:p-6 max-w-7xl mx-auto print:p-2 print:max-w-full">
         {/* Print Logo - only visible when printing */}
         <div className="hidden print:flex print:justify-center print:mb-6">
           <img src={logo} alt="Logo" className="h-16" />
         </div>
         
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/dashboard')} className="gap-2 print:hidden">
-              <ArrowRight className="h-5 w-5" />
-              بازگشت به داشبورد
-            </Button>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent print:text-foreground print:bg-none">
-                محاسبه بهای تمام شده نیروی انسانی
-              </h1>
-              <p className="text-muted-foreground text-sm mt-1">
-                محاسبه دقیق هزینه واقعی ماهانه کارمند بر اساس استانداردهای ایرانی
-              </p>
-            </div>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handlePrint}
-            disabled={!calculations}
-            className="print:hidden gap-2"
-          >
-            <Printer className="w-4 h-4" />
-            پرینت
-          </Button>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Input Sections */}
           <div className="lg:col-span-2 space-y-6">
