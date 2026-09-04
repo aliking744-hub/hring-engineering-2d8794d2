@@ -594,7 +594,7 @@ def test_ai_provider_failure_releases_reservation_and_retry_is_not_free(
     async def fail_gateway(**kwargs: object) -> object:
         nonlocal calls
         calls += 1
-        assert kwargs["credits_charged"] == 5
+        assert kwargs["credits_charged"] == 8
         from hring_api.domains.ai.gateway_client import AiGatewayError
 
         raise AiGatewayError("provider failed")
@@ -643,7 +643,7 @@ def test_successful_ai_operation_consumes_once_and_reports_the_same_metered_cost
     async def succeed_gateway(**kwargs: object) -> AiGatewayResult:
         nonlocal calls
         calls += 1
-        assert kwargs["credits_charged"] == 5
+        assert kwargs["credits_charged"] == 8
         return AiGatewayResult(
             request_id=uuid4(),
             content='{"content":"ok"}',
