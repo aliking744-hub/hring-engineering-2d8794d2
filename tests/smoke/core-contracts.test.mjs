@@ -345,3 +345,59 @@ test('HR dashboard history uses the native API and not a browser Supabase client
   assert.match(history, /\/hr-data\/uploads\?limit=50/);
   assert.match(history, /\/hr-data\/uploads\/\$\{id\}/);
 });
+
+
+test('smart ad preserves a provider image if client poster composition is blocked', async () => {
+  const page = await read('src/pages/SmartAdGenerator.tsx');
+  assert.match(page, /Preserve the provider image if a cross-origin host blocks client-side composition/);
+  assert.match(page, /A bad uploaded logo must not turn a paid, successful image into a failed action/);
+});
+
+
+test('smart ad keeps private image data alive through canvas composition', async () => {
+  const page = await read('src/pages/SmartAdGenerator.tsx');
+  assert.match(page, /const blobToDataUrl/);
+  assert.match(page, /await blobToDataUrl\(await apiBlobRequest\(responseImage\)\)/);
+  assert.equal(page.includes('URL.revokeObjectURL(privateObjectUrl)'), false);
+});
+
+
+test('workspace report exports are branded and reject incomplete responses', async () => {
+  const [jobProfile, interview] = await Promise.all([
+    read('src/pages/JobDescriptionGenerator.tsx'),
+    read('src/pages/InterviewAssistant.tsx'),
+  ]);
+  assert.match(jobProfile, /alt="HRing"/);
+  assert.match(jobProfile, /!data\.content\.trim\(\)/);
+  assert.match(interview, /data\.questions\.length !== 11/);
+  assert.match(interview, /data-pdf-answer/);
+  assert.match(interview, /alt="HRing"/);
+});
+
+
+test('workspace generation pages expose persistent owner-scoped history', async () => {
+  const [jobProfile, interview, smartAd] = await Promise.all([
+    read('src/pages/JobDescriptionGenerator.tsx'),
+    read('src/pages/InterviewAssistant.tsx'),
+    read('src/pages/SmartAdGenerator.tsx'),
+  ]);
+  assert.match(jobProfile, /featureKey=job_engineering\.job_profile/);
+  assert.match(interview, /featureKey=interview\.kit/);
+  assert.match(smartAd, /\/job-ads\/history/);
+  assert.match(smartAd, /featureKey=job_ads\.smart_ad_text/);
+  assert.match(smartAd, /\/job-ads\/assets\/\$\{item\.id\}/);
+});
+
+
+test('PR78 release keeps payment disabled and documents additive migrations and rollback', async () => {
+  const [runbook, workspaceMigration, smartAdMigration] = await Promise.all([
+    read('docs/operations/PR78_DEPLOY_FA.md'),
+    read('apps/api/alembic/versions/20260904_0036_workspace_output_history.py'),
+    read('apps/api/alembic/versions/20260904_0035_private_smart_ad_assets.py'),
+  ]);
+  assert.match(runbook, /PAYMENT_PROVIDER=disabled/);
+  assert.match(runbook, /20260904_0036 \(head\)/);
+  assert.match(runbook, /rollback/);
+  assert.match(workspaceMigration, /down_revision: str \| None = "20260904_0035"/);
+  assert.match(smartAdMigration, /down_revision: str \| None = "20260904_0034"/);
+});

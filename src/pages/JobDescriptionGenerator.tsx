@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Briefcase, Sparkles, Download, Loader2 } from "lucide-react";
+import { Briefcase, Sparkles, Download, Loader2, History, Trash2 } from "lucide-react";
 import AuroraBackground from "@/components/AuroraBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import jsPDF from "jspdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { Textarea } from "@/components/ui/textarea";
+import logo from "@/assets/logo.png";
 
 const seniorityLevels = [
   { value: "junior", label: "کارشناس (Junior)" },
@@ -21,6 +22,16 @@ const seniorityLevels = [
   { value: "manager", label: "مدیر (Manager)" },
 ];
 
+interface JobProfileHistoryItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  payload: {
+    input?: { jobTitle?: string; industry?: string; seniorityLevel?: string; companyName?: string | null };
+    content?: string;
+  };
+}
+
 const JobDescriptionGenerator = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [industry, setIndustry] = useState("");
@@ -28,10 +39,45 @@ const JobDescriptionGenerator = () => {
   const [companyName, setCompanyName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
+  const [history, setHistory] = useState<JobProfileHistoryItem[]>([]);
   const { toast } = useToast();
   const { credits, hasEnoughCredits, getCost } = useCredits();
   const previewRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const rows = await apiRequest<JobProfileHistoryItem[]>(
+        "/workspace/outputs?featureKey=job_engineering.job_profile&limit=20",
+      );
+      setHistory(rows);
+    } catch (error) {
+      console.warn("Job-profile history could not be loaded:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const restoreHistory = (item: JobProfileHistoryItem) => {
+    const input = item.payload.input;
+    setJobTitle(input?.jobTitle || item.title);
+    setIndustry(input?.industry || "");
+    setSeniorityLevel(input?.seniorityLevel || "");
+    setCompanyName(input?.companyName || "");
+    setGeneratedContent(item.payload.content || "");
+  };
+
+  const removeHistory = async (id: string) => {
+    try {
+      await apiRequest(`/workspace/outputs/${id}`, { method: "DELETE" });
+      setHistory((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error("Job-profile history deletion failed:", error);
+      toast({ title: "خطا", description: "حذف خروجی انجام نشد", variant: "destructive" });
+    }
+  };
 
   const downloadPDF = async () => {
     if (!previewRef.current) return;
@@ -74,10 +120,14 @@ const JobDescriptionGenerator = () => {
         headers: { "X-Idempotency-Key": requestKey },
         body: JSON.stringify({ jobTitle, industry, seniorityLevel, companyName: companyName || null }),
       });
-      setGeneratedContent(data.content);
+      if (typeof data?.content !== "string" || !data.content.trim()) {
+        throw new Error("پروفایل شغلی کامل دریافت نشد؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
+      }
+      setGeneratedContent(data.content.trim());
       idempotencyKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "پروفایل شغلی با موفقیت تولید شد." });
+      await loadHistory();
     } catch (error) {
       if (error instanceof ApiError) idempotencyKeyRef.current = null;
       console.error("Error:", error);
@@ -147,6 +197,13 @@ const JobDescriptionGenerator = () => {
             <div ref={previewRef} className="bg-secondary/30 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto">
               {generatedContent ? (
                 <div className="text-sm text-foreground leading-relaxed space-y-2" style={{ fontFamily: 'BNazanin, Tahoma, sans-serif' }}>
+                  <div className="mb-6 flex items-center justify-between border-b border-primary/30 pb-4">
+                    <div className="text-right">
+                      <h1 className="text-xl font-bold">پروفایل شغلی</h1>
+                      <p className="text-muted-foreground">{companyName || 'HRing'} — {jobTitle}</p>
+                    </div>
+                    <img src={logo} alt="HRing" className="h-12 w-12 rounded-lg object-contain" />
+                  </div>
                   {generatedContent.split('\n').map((line, index) => {
                     const trimmed = line.trim();
                     if (!trimmed || trimmed.match(/^-{3,}$/)) return null;
@@ -186,6 +243,27 @@ const JobDescriptionGenerator = () => {
             </div>
           </motion.div>
         </div>
+
+        {history.length > 0 && (
+          <div className="mt-8 glass-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+              <History className="h-5 w-5" /> تاریخچه پروفایل‌های شغلی
+            </h2>
+            <div className="space-y-2">
+              {history.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <button type="button" onClick={() => restoreHistory(item)} className="text-right hover:text-primary">
+                    <span className="block font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                  </button>
+                  <Button type="button" variant="ghost" size="icon" aria-label="حذف خروجی" onClick={() => void removeHistory(item.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

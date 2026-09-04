@@ -1,4 +1,7 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
@@ -10,17 +13,24 @@ from hring_api.domains.billing.credit_service import (
     CreditNotFoundError,
     InsufficientCreditsError,
 )
+from hring_api.domains.compat.storage import StorageCompatError, read_object
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.job_ads.schemas import (
+    SmartAdArtifactResponse,
+    SmartAdFinalizeImageRequest,
     SmartAdGenerateRequest,
     SmartAdImageResponse,
     SmartAdResponse,
     SmartAdTextResponse,
 )
+from hring_api.domains.workspace_outputs.service import save_workspace_output
 from hring_api.domains.job_ads.service import (
     SmartAdError,
     generate_smart_ad,
+    finalize_smart_ad_artifact,
     generate_smart_ad_image,
+    get_smart_ad_artifact,
+    list_smart_ad_artifacts,
 )
 
 
@@ -41,7 +51,87 @@ def _http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
 
-@router.post("/generate", response_model=SmartAdResponse)
+@router.get("/history", response_model=list[SmartAdArtifactResponse])
+async def smart_ad_history(
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[SmartAdArtifactResponse]:
+    rows = await list_smart_ad_artifacts(db, principal=principal)
+    return [SmartAdArtifactResponse.model_validate(row) for row in rows]
+
+
+@router.post(
+    "/assets/{artifact_id}/finalize",
+    response_model=SmartAdImageResponse,
+    response_model_exclude_none=True,
+)
+async def finalize_smart_ad_asset(
+    artifact_id: UUID,
+    payload: SmartAdFinalizeImageRequest,
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> SmartAdImageResponse:
+    try:
+        artifact = await finalize_smart_ad_artifact(
+            db,
+            principal=principal,
+            artifact_id=artifact_id,
+            image_data=payload.image_data,
+            settings=settings,
+        )
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="تصویر یافت نشد",
+            )
+        await db.commit()
+    except SmartAdError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return SmartAdImageResponse(
+        image_url=f"/job-ads/assets/{artifact.id}",
+        asset_id=str(artifact.id),
+    )
+
+
+@router.get("/assets/{artifact_id}")
+async def smart_ad_asset(
+    artifact_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> StreamingResponse:
+    artifact = await get_smart_ad_artifact(
+        db,
+        principal=principal,
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="تصویر یافت نشد")
+    try:
+        stream, content_type = read_object(
+            settings,
+            logical_bucket="job-ads",
+            path=artifact.storage_path,
+        )
+    except StorageCompatError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="تصویر یافت نشد",
+        ) from exc
+    return StreamingResponse(
+        stream,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'inline; filename="smart-ad-{artifact_id}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post("/generate", response_model=SmartAdResponse, response_model_exclude_none=True)
 async def create_smart_ad(
     payload: SmartAdGenerateRequest,
     request: Request,
@@ -72,7 +162,7 @@ async def create_smart_ad(
 
 
 
-@router.post("/generate-text", response_model=SmartAdTextResponse)
+@router.post("/generate-text", response_model=SmartAdTextResponse, response_model_exclude_none=True)
 async def create_smart_ad_text(
     payload: SmartAdGenerateRequest,
     request: Request,
@@ -97,6 +187,17 @@ async def create_smart_ad_text(
             request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
             settings=settings,
         )
+        await save_workspace_output(
+            db,
+            principal=principal,
+            feature_key="job_ads.smart_ad_text",
+            idempotency_key=idempotency_key,
+            title=payload.job_title,
+            payload={
+                "input": text_payload.model_dump(mode="json", by_alias=True),
+                "content": result.generated_text,
+            },
+        )
         await db.commit()
         return SmartAdTextResponse(generated_text=result.generated_text)
     except (CreditError, SmartAdError) as exc:
@@ -104,7 +205,7 @@ async def create_smart_ad_text(
         raise _http_error(exc) from exc
 
 
-@router.post("/generate-image", response_model=SmartAdImageResponse)
+@router.post("/generate-image", response_model=SmartAdImageResponse, response_model_exclude_none=True)
 async def create_smart_ad_image(
     payload: SmartAdGenerateRequest,
     request: Request,

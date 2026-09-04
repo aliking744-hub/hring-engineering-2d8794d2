@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -66,6 +68,7 @@ class SmartAdResponse(BaseModel):
         serialization_alias="imageUrl",
         max_length=20_000_000,
     )
+    asset_id: str | None = Field(default=None, serialization_alias="assetId")
 
 
 class SmartAdTextResponse(BaseModel):
@@ -82,3 +85,28 @@ class SmartAdImageResponse(BaseModel):
         min_length=1,
         max_length=20_000_000,
     )
+    asset_id: str | None = Field(default=None, serialization_alias="assetId")
+
+
+class SmartAdFinalizeImageRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    image_data: str = Field(alias="imageData", min_length=32, max_length=20_000_000)
+
+    @field_validator("image_data")
+    @classmethod
+    def validate_image_data_uri(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized.startswith("data:image/") or ";base64," not in normalized:
+            raise ValueError("Image data must be a base64 image data URI")
+        return normalized
+
+
+class SmartAdArtifactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: UUID
+    job_title: str = Field(serialization_alias="jobTitle")
+    company_name: str = Field(serialization_alias="companyName")
+    content_type: str = Field(serialization_alias="contentType")
+    created_at: datetime = Field(serialization_alias="createdAt")

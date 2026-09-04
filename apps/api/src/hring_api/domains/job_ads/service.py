@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from base64 import b64decode
+from binascii import Error as Base64DecodeError
 from hashlib import sha256
+from io import BytesIO
 from uuid import UUID, uuid4
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
@@ -23,6 +27,8 @@ from hring_api.domains.billing.credit_service import (
     run_with_credit_reservation,
 )
 from hring_api.domains.identity.dependencies import Principal
+from hring_api.domains.compat.storage import put_object
+from hring_api.domains.job_ads.models import SmartAdArtifact
 from hring_api.domains.job_ads.schemas import (
     SmartAdGenerateRequest,
     SmartAdImageResponse,
@@ -34,6 +40,12 @@ SMART_AD_TEXT_FEATURE_KEY = "job_ads.smart_ad_text"
 SMART_AD_IMAGE_FEATURE_KEY = "job_ads.smart_ad_image"
 SMART_AD_TEXT_DEFAULT_CREDIT_COST = 5
 SMART_AD_IMAGE_DEFAULT_CREDIT_COST = 50
+SMART_AD_IMAGE_MAX_BYTES = 12 * 1024 * 1024
+SMART_AD_IMAGE_EXTENSIONS = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+}
 
 PLATFORM_INSTRUCTIONS = {
     "linkedin": """- Use emojis appropriately throughout the text
@@ -364,7 +376,7 @@ async def generate_smart_ad(
     key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
 
     async def operation() -> SmartAdResponse:
-        return await _generate_content(
+        result = await _generate_content(
             payload=payload,
             principal=principal,
             text_credits=text_credits,
@@ -372,6 +384,23 @@ async def generate_smart_ad(
             settings=settings,
             session=session,
         )
+        if payload.generate_image and result.image_url:
+            artifact = _persist_image_asset(
+                image_url=result.image_url,
+                payload=payload,
+                principal=principal,
+                idempotency_key=idempotency_key,
+                settings=settings,
+                session=session,
+            )
+            if artifact is not None:
+                return result.model_copy(
+                    update={
+                        "image_url": f"/job-ads/assets/{artifact.id}",
+                        "asset_id": str(artifact.id),
+                    }
+                )
+        return result
 
     if total_cost == 0:
         return await run_with_ai_execution_guard(
@@ -398,6 +427,36 @@ async def generate_smart_ad(
 
 
 
+def _persist_image_asset(*, image_url: str, payload: SmartAdGenerateRequest, principal: Principal, idempotency_key: str, settings: Settings, session: AsyncSession) -> SmartAdArtifact | None:
+    """Persist data-URI images privately; remote provider URLs remain display-only."""
+    if not image_url.startswith("data:image/") or ";base64," not in image_url:
+        return None
+    header, encoded = image_url.split(",", 1)
+    content_type = header.removeprefix("data:").removesuffix(";base64")
+    if content_type not in SMART_AD_IMAGE_EXTENSIONS:
+        return None
+    try:
+        blob = b64decode(encoded, validate=True)
+    except (Base64DecodeError, ValueError):
+        return None
+    if not blob or len(blob) > SMART_AD_IMAGE_MAX_BYTES:
+        return None
+    extension = SMART_AD_IMAGE_EXTENSIONS[content_type]
+    artifact = SmartAdArtifact(
+        id=uuid4(),
+        owner_user_id=principal.user_id,
+        company_id=_company_id(principal),
+        idempotency_key=idempotency_key,
+        job_title=payload.job_title,
+        company_name=payload.company_name,
+        storage_path=f"{principal.user_id}/{uuid4().hex}.{extension}",
+        content_type=content_type,
+    )
+    put_object(settings, logical_bucket="job-ads", path=artifact.storage_path, stream=BytesIO(blob), content_type=content_type)
+    session.add(artifact)
+    return artifact
+
+
 async def _generate_image_content(
     *,
     payload: SmartAdGenerateRequest,
@@ -405,6 +464,7 @@ async def _generate_image_content(
     image_credits: int,
     settings: Settings,
     session: AsyncSession,
+    idempotency_key: str,
 ) -> SmartAdImageResponse:
     """Generate only the poster image; text generation is intentionally not invoked."""
     image_prompt = _image_prompt(payload, uuid4().hex[:12])
@@ -449,7 +509,14 @@ async def _generate_image_content(
 
     if not image_result.images:
         raise SmartAdError("سرویس هوش مصنوعی تصویر آگهی تولید نکرد")
-    return SmartAdImageResponse(image_url=image_result.images[0].url)
+    image_url = image_result.images[0].url
+    artifact = _persist_image_asset(image_url=image_url, payload=payload, principal=principal, idempotency_key=idempotency_key, settings=settings, session=session)
+    if artifact is not None:
+        return SmartAdImageResponse(
+            image_url=f"/job-ads/assets/{artifact.id}",
+            asset_id=str(artifact.id),
+        )
+    return SmartAdImageResponse(image_url=image_url)
 
 
 async def generate_smart_ad_image(
@@ -482,6 +549,7 @@ async def generate_smart_ad_image(
             image_credits=image_credits,
             settings=settings,
             session=session,
+            idempotency_key=idempotency_key,
         )
 
     if image_credits == 0:
@@ -505,3 +573,72 @@ async def generate_smart_ad_image(
         request_id=request_id,
         operation=operation,
     )
+
+
+async def list_smart_ad_artifacts(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    limit: int = 50,
+) -> list[SmartAdArtifact]:
+    """Return only the current user's private image history, newest first."""
+    result = await session.execute(
+        select(SmartAdArtifact)
+        .where(SmartAdArtifact.owner_user_id == principal.user_id)
+        .order_by(SmartAdArtifact.created_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def get_smart_ad_artifact(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    artifact_id: UUID,
+) -> SmartAdArtifact | None:
+    """Resolve a private artifact only when it belongs to the current user."""
+    result = await session.execute(
+        select(SmartAdArtifact).where(
+            SmartAdArtifact.id == artifact_id,
+            SmartAdArtifact.owner_user_id == principal.user_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def finalize_smart_ad_artifact(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    artifact_id: UUID,
+    image_data: str,
+    settings: Settings,
+) -> SmartAdArtifact | None:
+    """Replace a private generated background with the browser-composited final poster."""
+    artifact = await get_smart_ad_artifact(
+        session,
+        principal=principal,
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        return None
+    header, encoded = image_data.split(",", 1)
+    content_type = header.removeprefix("data:").removesuffix(";base64")
+    if content_type not in SMART_AD_IMAGE_EXTENSIONS:
+        raise SmartAdError("فرمت تصویر نهایی پشتیبانی نمی‌شود")
+    try:
+        blob = b64decode(encoded, validate=True)
+    except (Base64DecodeError, ValueError) as exc:
+        raise SmartAdError("تصویر نهایی معتبر نیست") from exc
+    if not blob or len(blob) > SMART_AD_IMAGE_MAX_BYTES:
+        raise SmartAdError("حجم تصویر نهایی مجاز نیست")
+    put_object(
+        settings,
+        logical_bucket="job-ads",
+        path=artifact.storage_path,
+        stream=BytesIO(blob),
+        content_type=content_type,
+    )
+    artifact.content_type = content_type
+    return artifact

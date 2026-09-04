@@ -26,6 +26,7 @@ from hring_api.domains.job_engineering.routes import router as job_engineering_r
 from hring_api.domains.legal.routes import router as legal_router
 from hring_api.domains.recruiting.ai_routes import router as recruiting_ai_router
 from hring_api.domains.recruiting.routes import router as recruiting_router
+from hring_api.domains.workspace_outputs.routes import router as workspace_outputs_router
 
 
 api_router = APIRouter()
@@ -54,6 +55,7 @@ api_router.include_router(job_ads_router)
 api_router.include_router(job_engineering_router)
 api_router.include_router(interview_router)
 api_router.include_router(legal_router)
+api_router.include_router(workspace_outputs_router)
 api_router.include_router(compat_router)
 
 

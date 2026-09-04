@@ -147,6 +147,9 @@ export default function LearningPath() {
         },
       );
 
+      if (!data?.result || !Array.isArray(data.result.roadmap) || !Array.isArray(data.result.hardSkills) || !Array.isArray(data.result.softSkills)) {
+        throw new Error("پاسخ مسیر یادگیری ناقص است؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
+      }
       setResult(data.result);
       setSavedRecordId(data.id);
       idempotencyKeyRef.current = null;
@@ -158,6 +161,7 @@ export default function LearningPath() {
       if (e instanceof ApiError && (e.status < 500 || e.status === 502)) {
         idempotencyKeyRef.current = null;
       }
+      console.error("Learning-path generation failed:", e);
       const msg = e instanceof ApiError && e.status === 402
         ? "اعتبار کافی برای تولید مسیر یادگیری ندارید"
         : e instanceof ApiError && e.status === 502

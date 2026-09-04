@@ -324,8 +324,8 @@ export default function CostCalculator() {
                     <RialInput label="حق جذب" value={jobAbsorption} onChange={setJobAbsorption} disabled={isNetContract} />
                     <RialInput label="حق مسئولیت" value={responsibilityAllowance} onChange={setResponsibilityAllowance} disabled={isNetContract} />
                     <RialInput label="فوق‌العاده شغل" value={jobSuperlative} onChange={setJobSuperlative} disabled={isNetContract} />
-                    <RialInput label={`حق مسکن مصوب ${statutoryYear}`} value={housingAllowance} onChange={setHousingAllowance} disabled />
-                    <RialInput label={`بن خواروبار مصوب ${statutoryYear}`} value={groceryAllowance} onChange={setGroceryAllowance} disabled />
+                    <RialInput label={`حق مسکن پیشنهادی ${statutoryYear}`} value={housingAllowance} onChange={setHousingAllowance} />
+                    <RialInput label={`بن خواروبار پیشنهادی ${statutoryYear}`} value={groceryAllowance} onChange={setGroceryAllowance} />
                     <RialInput label="حق اولاد" value={childrenAllowance} onChange={setChildrenAllowance} disabled={isNetContract} />
                     <RialInput label="سایر مزایا" value={otherBenefits} onChange={setOtherBenefits} disabled={isNetContract} />
                   </div>

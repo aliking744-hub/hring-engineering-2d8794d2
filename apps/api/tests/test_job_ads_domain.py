@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -21,7 +22,13 @@ from hring_api.domains.job_ads.schemas import (
 from hring_api.domains.job_ads.service import (
     SmartAdError,
     _generate_content,
+    _generate_image_content,
+    _persist_image_asset,
     _image_prompt,
+    finalize_smart_ad_artifact,
+    get_smart_ad_artifact,
+    generate_smart_ad,
+    list_smart_ad_artifacts,
 )
 from hring_api.main import app
 
@@ -310,3 +317,300 @@ def test_split_smart_ad_routes_are_independent(monkeypatch) -> None:
         assert image_response.json() == {
             "imageUrl": "data:image/png;base64,aGVsbG8="
         }
+
+
+def test_smart_ad_history_requires_auth_and_is_owner_scoped() -> None:
+    source = inspect.getsource(list_smart_ad_artifacts)
+    assert "SmartAdArtifact.owner_user_id == principal.user_id" in source
+
+    with TestClient(app) as client:
+        unauthorized = client.get("/api/v1/job-ads/history")
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.get(
+            "/api/v1/job-ads/history",
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == []
+
+
+
+def test_smart_ad_asset_is_private_and_owner_scoped(monkeypatch) -> None:
+    source = inspect.getsource(get_smart_ad_artifact)
+    assert "SmartAdArtifact.id == artifact_id" in source
+    assert "SmartAdArtifact.owner_user_id == principal.user_id" in source
+
+    async def missing_artifact(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.get_smart_ad_artifact",
+        missing_artifact,
+    )
+    artifact_id = uuid4()
+    with TestClient(app) as client:
+        unauthorized = client.get(f"/api/v1/job-ads/assets/{artifact_id}")
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.get(
+            f"/api/v1/job-ads/assets/{artifact_id}",
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "تصویر یافت نشد"
+
+
+def test_smart_ad_asset_streams_private_object(monkeypatch) -> None:
+    async def owned_artifact(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(storage_path="owner/image.png")
+
+    def fake_read(*_args: object, **_kwargs: object) -> tuple[object, str]:
+        return iter([b"private-image"]), "image/png"
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.get_smart_ad_artifact",
+        owned_artifact,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.read_object",
+        fake_read,
+    )
+    artifact_id = uuid4()
+    with TestClient(app) as client:
+        account = _register(client)
+        response = client.get(
+            f"/api/v1/job-ads/assets/{artifact_id}",
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.content == b"private-image"
+        assert response.headers["content-type"] == "image/png"
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["x-content-type-options"] == "nosniff"
+
+
+
+def test_combined_smart_ad_persists_private_image(monkeypatch) -> None:
+    artifact_id = uuid4()
+
+    async def fake_cost(*_args: object, **_kwargs: object) -> int:
+        return 5
+
+    async def fake_byok(*_args: object, **_kwargs: object) -> bool:
+        return False
+
+    async def fake_generate(*_args: object, **_kwargs: object) -> SmartAdResponse:
+        return SmartAdResponse(
+            generated_text="متن آگهی",
+            image_url="data:image/png;base64,aGVsbG8=",
+        )
+
+    def fake_persist(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(id=artifact_id)
+
+    async def fake_reservation(*_args: object, **kwargs: Any) -> SmartAdResponse:
+        return await kwargs["operation"]()
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.feature_credit_cost", fake_cost
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.uses_company_byok", fake_byok
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service._generate_content", fake_generate
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service._persist_image_asset", fake_persist
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.run_with_credit_reservation",
+        fake_reservation,
+    )
+
+    result = asyncio.run(
+        generate_smart_ad(
+            SimpleNamespace(),
+            payload=_payload(),
+            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+            idempotency_key="combined-smart-ad-persistence",
+            request_id="test-request",
+            settings=Settings(),
+        )
+    )
+
+    assert result.asset_id == str(artifact_id)
+    assert result.image_url == f"/job-ads/assets/{artifact_id}"
+
+
+def test_standalone_smart_ad_returns_private_asset_url(monkeypatch) -> None:
+    artifact_id = uuid4()
+
+    async def fake_managed(_session: object, **_kwargs: Any) -> AiGatewayResult:
+        return AiGatewayResult(
+            request_id=uuid4(),
+            content="",
+            provider="test",
+            model="image-model",
+            usage={},
+            provider_cost_microusd=1,
+            images=(
+                AiGeneratedImage(
+                    url="data:image/png;base64,aGVsbG8=",
+                    mime_type="image/png",
+                ),
+            ),
+        )
+
+    def fake_persist(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(id=artifact_id)
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.generate_with_managed_prompt",
+        fake_managed,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service._persist_image_asset",
+        fake_persist,
+    )
+
+    result = asyncio.run(
+        _generate_image_content(
+            payload=_payload(),
+            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+            image_credits=25,
+            settings=Settings(),
+            session=SimpleNamespace(),
+            idempotency_key="standalone-private-image",
+        )
+    )
+
+    assert result.asset_id == str(artifact_id)
+    assert result.image_url == f"/job-ads/assets/{artifact_id}"
+
+
+
+def test_smart_ad_finalization_is_private_and_replaces_source(monkeypatch) -> None:
+    artifact_id = uuid4()
+    artifact = SimpleNamespace(
+        id=artifact_id,
+        storage_path="owner/final-poster.png",
+        content_type="image/png",
+    )
+    writes: list[dict[str, object]] = []
+
+    async def fake_get(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return artifact
+
+    def fake_put(*_args: object, **kwargs: object) -> str:
+        writes.append(kwargs)
+        return "compat/job-ads/owner/final-poster.png"
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.get_smart_ad_artifact",
+        fake_get,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.put_object",
+        fake_put,
+    )
+    principal = SimpleNamespace(user_id=uuid4(), memberships=[])
+    result = asyncio.run(
+        finalize_smart_ad_artifact(
+            SimpleNamespace(),
+            principal=principal,
+            artifact_id=artifact_id,
+            image_data="data:image/png;base64,aGVsbG8gd29ybGQ=",
+            settings=Settings(),
+        )
+    )
+
+    assert result is artifact
+    assert artifact.content_type == "image/png"
+    assert writes[0]["logical_bucket"] == "job-ads"
+    assert writes[0]["path"] == "owner/final-poster.png"
+
+
+def test_smart_ad_finalization_route_requires_owner(monkeypatch) -> None:
+    artifact_id = uuid4()
+
+    async def fake_finalize(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(id=artifact_id)
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.finalize_smart_ad_artifact",
+        fake_finalize,
+    )
+    payload = {"imageData": "data:image/png;base64,aGVsbG8gd29ybGQ="}
+    with TestClient(app) as client:
+        unauthorized = client.post(
+            f"/api/v1/job-ads/assets/{artifact_id}/finalize",
+            json=payload,
+        )
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.post(
+            f"/api/v1/job-ads/assets/{artifact_id}/finalize",
+            json=payload,
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "imageUrl": f"/job-ads/assets/{artifact_id}",
+            "assetId": str(artifact_id),
+        }
+
+
+def test_smart_ad_private_asset_preserves_mime_extension(monkeypatch) -> None:
+    writes: list[dict[str, object]] = []
+    added: list[object] = []
+
+    def fake_put(*_args: object, **kwargs: object) -> str:
+        writes.append(kwargs)
+        return "stored"
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.put_object",
+        fake_put,
+    )
+    artifact = _persist_image_asset(
+        image_url="data:image/jpeg;base64,aGVsbG8=",
+        payload=_payload(),
+        principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+        idempotency_key="jpeg-extension",
+        settings=Settings(),
+        session=SimpleNamespace(add=added.append),
+    )
+
+    assert artifact is not None
+    assert artifact.storage_path.endswith(".jpg")
+    assert artifact.content_type == "image/jpeg"
+    assert writes[0]["content_type"] == "image/jpeg"
+    assert added == [artifact]
+
+
+def test_smart_ad_private_asset_rejects_oversized_source(monkeypatch) -> None:
+    writes: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.SMART_AD_IMAGE_MAX_BYTES",
+        4,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.put_object",
+        lambda *_args, **kwargs: writes.append(kwargs),
+    )
+    artifact = _persist_image_asset(
+        image_url="data:image/png;base64,aGVsbG8=",
+        payload=_payload(),
+        principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+        idempotency_key="oversized-source",
+        settings=Settings(),
+        session=SimpleNamespace(add=lambda _row: None),
+    )
+
+    assert artifact is None
+    assert writes == []

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
-import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins } from "lucide-react";
+import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins, History, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
+import logo from "@/assets/logo.png";
 
 interface InterviewQuestion {
   id: string;
@@ -19,6 +20,16 @@ interface InterviewQuestion {
   question: string;
   goodSigns: string[];
   redFlags: string[];
+}
+
+interface InterviewHistoryItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  payload: {
+    input?: { jobTitle?: string; industry?: string; seniorityLevel?: string; focusArea?: string };
+    questions?: InterviewQuestion[];
+  };
 }
 
 const seniorityLevels = [
@@ -42,23 +53,80 @@ const InterviewAssistant = () => {
   const [focusArea, setFocusArea] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
+  const [history, setHistory] = useState<InterviewHistoryItem[]>([]);
   const [openAnswerKeys, setOpenAnswerKeys] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const { credits, hasEnoughCredits, getCost } = useCredits();
   const resultRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const rows = await apiRequest<InterviewHistoryItem[]>(
+        "/workspace/outputs?featureKey=interview.kit&limit=20",
+      );
+      setHistory(rows);
+    } catch (error) {
+      console.warn("Interview history could not be loaded:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const restoreHistory = (item: InterviewHistoryItem) => {
+    const input = item.payload.input;
+    setJobTitle(input?.jobTitle || item.title);
+    setIndustry(input?.industry || "");
+    setSeniorityLevel(input?.seniorityLevel || "");
+    setFocusArea(input?.focusArea || "technical");
+    setQuestions(Array.isArray(item.payload.questions) ? item.payload.questions : []);
+  };
+
+  const removeHistory = async (id: string) => {
+    try {
+      await apiRequest(`/workspace/outputs/${id}`, { method: "DELETE" });
+      setHistory((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error("Interview history deletion failed:", error);
+      toast({ title: "خطا", description: "حذف خروجی انجام نشد", variant: "destructive" });
+    }
+  };
+
   const downloadInterviewPDF = async () => {
     if (!resultRef.current) return;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(resultRef.current, {
-      callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
-      margin: [10, 10, 10, 10],
-      autoPaging: 'text',
-      html2canvas: { scale: 0.75, useCORS: true },
-      width: 190,
-      windowWidth: 900,
+    const root = resultRef.current;
+    const controls = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-exclude]'));
+    const answers = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-answer]'));
+    const controlDisplays = controls.map((element) => element.style.display);
+    const answerState = answers.map((element) => ({
+      display: element.style.display,
+      hidden: element.hasAttribute('hidden'),
+    }));
+    controls.forEach((element) => { element.style.display = 'none'; });
+    answers.forEach((element) => {
+      element.removeAttribute('hidden');
+      element.style.display = 'block';
     });
+
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      await pdf.html(root, {
+        callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
+        margin: [10, 10, 10, 10],
+        autoPaging: 'text',
+        html2canvas: { scale: 0.75, useCORS: true },
+        width: 190,
+        windowWidth: 900,
+      });
+    } finally {
+      controls.forEach((element, index) => { element.style.display = controlDisplays[index]; });
+      answers.forEach((element, index) => {
+        element.style.display = answerState[index].display;
+        if (answerState[index].hidden) element.setAttribute('hidden', '');
+      });
+    }
   };
 
   const getSectionIcon = (icon: string) => {
@@ -112,7 +180,10 @@ const InterviewAssistant = () => {
           focusArea: focusArea || "technical",
         }),
       });
-      if (data?.questions) {
+      if (!Array.isArray(data?.questions) || data.questions.length !== 11) {
+        throw new Error("راهنمای مصاحبه ناقص است؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
+      }
+      if (data.questions) {
         setQuestions(data.questions);
         idempotencyKeyRef.current = null;
         window.dispatchEvent(new Event("hring:credits-changed"));
@@ -120,6 +191,7 @@ const InterviewAssistant = () => {
           title: "موفق",
           description: "راهنمای مصاحبه با موفقیت تولید شد.",
         });
+        await loadHistory();
         setTimeout(() => {
           resultRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 100);
@@ -241,7 +313,7 @@ const InterviewAssistant = () => {
         {questions.length > 0 && (
           <div ref={resultRef} className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between print:hidden">
+            <div data-pdf-exclude className="flex items-center justify-between print:hidden">
               <h2 className="text-2xl font-bold text-foreground">راهنمای مصاحبه</h2>
               <Button onClick={() => void downloadInterviewPDF()} variant="outline" className="gap-2">
                 <Download className="w-4 h-4" />
@@ -249,13 +321,16 @@ const InterviewAssistant = () => {
               </Button>
             </div>
 
-            {/* Print Header */}
-            <div className="hidden print:block mb-8 text-center border-b pb-4">
-              <h1 className="text-2xl font-bold">راهنمای مصاحبه</h1>
-              <p className="text-muted-foreground">
-                {jobTitle} | {seniorityLevels.find((l) => l.value === seniorityLevel)?.label}
-                {industry && ` | ${industry}`}
-              </p>
+            {/* Branded report header (also rendered in PDF) */}
+            <div className="mb-8 flex items-center justify-between border-b border-primary/30 pb-4">
+              <div className="text-right">
+                <h1 className="text-2xl font-bold">راهنمای مصاحبه</h1>
+                <p className="text-muted-foreground">
+                  {jobTitle} | {seniorityLevels.find((l) => l.value === seniorityLevel)?.label}
+                  {industry && ` | ${industry}`}
+                </p>
+              </div>
+              <img src={logo} alt="HRing" className="h-12 w-12 rounded-lg object-contain" />
             </div>
 
             {/* Questions by Section */}
@@ -293,7 +368,7 @@ const InterviewAssistant = () => {
                             )}
                           </Button>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="print:block">
+                        <CollapsibleContent data-pdf-answer className="print:block">
                           <div className="mt-4 space-y-3">
                             {/* Good Signs */}
                             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
@@ -335,6 +410,29 @@ const InterviewAssistant = () => {
               </div>
             ))}
           </div>
+        )}
+
+        {history.length > 0 && (
+          <Card className="mt-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" /> تاریخچه راهنماهای مصاحبه
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {history.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <button type="button" onClick={() => restoreHistory(item)} className="text-right hover:text-primary">
+                    <span className="block font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                  </button>
+                  <Button type="button" variant="ghost" size="icon" aria-label="حذف خروجی" onClick={() => void removeHistory(item.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

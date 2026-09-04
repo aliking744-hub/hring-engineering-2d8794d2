@@ -16,6 +16,7 @@ from hring_api.domains.interview.schemas import (
     InterviewKitResponse,
 )
 from hring_api.domains.interview.service import InterviewError, generate_interview_kit
+from hring_api.domains.workspace_outputs.service import save_workspace_output
 
 
 router = APIRouter(prefix="/interview", tags=["interview"])
@@ -57,6 +58,17 @@ async def create_interview_kit(
             idempotency_key=idempotency_key,
             request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
             settings=settings,
+        )
+        await save_workspace_output(
+            db,
+            principal=principal,
+            feature_key="interview.kit",
+            idempotency_key=idempotency_key,
+            title=payload.job_title,
+            payload={
+                "input": payload.model_dump(mode="json", by_alias=True),
+                "questions": result.model_dump(mode="json", by_alias=True)["questions"],
+            },
         )
         await db.commit()
         return result

@@ -13,6 +13,9 @@ test("legal advisor UI uses the dedicated independent endpoint", () => {
   assert.match(page, /X-Idempotency-Key/);
   assert.match(page, /sourceUrl/);
   assert.equal(page.includes('functions.invoke("legal-advisor-chat"'), false);
+
+  const widget = read("src/components/LegalAdvisorWidget.tsx");
+  assert.match(widget, /جایگزین بررسی وکیل یا مشاور حقوقی نیستند/);
 });
 
 test("native legal advisor preserves the cited RAG contract", () => {
@@ -24,4 +27,13 @@ test("native legal advisor preserves the cited RAG contract", () => {
   assert.match(advisor, /gemini-2\.5-flash|legal_advisor_ai_model/);
   assert.match(advisor, /extract_upload/);
   assert.match(advisor, /rate_limit_legal_advisor_per_minute/);
+});
+
+
+test("legal defense is unavailable until its async execution is observable", () => {
+  const defense = read("src/components/legal/DefenseBuilder.tsx");
+  assert.match(defense, /const asyncUpgradePending = true/);
+  assert.match(defense, /لایحه دفاعیه هوشمند — به‌زودی/);
+  assert.match(defense, /هیچ فایل یا اعتباری دریافت نمی‌شود/);
+  assert.match(defense, /اجرای غیرهمزمان و پیگیری‌پذیر/);
 });

@@ -82,6 +82,27 @@ const DefenseBuilder = () => {
   const complaintInputRef = useRef<HTMLInputElement>(null);
   const evidenceInputRef = useRef<HTMLInputElement>(null);
 
+  if (asyncUpgradePending) {
+    return (
+      <Card className="border-amber-500/40 bg-amber-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+            <Shield className="h-5 w-5" />
+            لایحه دفاعیه هوشمند — به‌زودی
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
+          <p>
+            تحلیل پرونده‌های حقوقی ممکن است چند دقیقه طول بکشد. برای جلوگیری از ناقص‌ماندن
+            تحلیل یا کسر اعتبار نامشخص، این قابلیت تا آماده‌شدن اجرای غیرهمزمان و پیگیری‌پذیر
+            موقتاً فعال نیست.
+          </p>
+          <p>در این نسخه هیچ فایل یا اعتباری دریافت نمی‌شود.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const handleComplaintUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

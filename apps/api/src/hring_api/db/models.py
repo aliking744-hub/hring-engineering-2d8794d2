@@ -14,7 +14,9 @@ from hring_api.domains.identity import security_models as identity_security_mode
 from hring_api.domains.identity import sms_models as identity_sms_models
 from hring_api.domains.integrations import models as integration_models
 from hring_api.domains.legal import models as legal_models
+from hring_api.domains.job_ads import models as job_ads_models
 from hring_api.domains.recruiting import models as recruiting_models
+from hring_api.domains.workspace_outputs import models as workspace_output_models
 
 
 __all__ = [
@@ -32,5 +34,7 @@ __all__ = [
     "identity_sms_models",
     "integration_models",
     "legal_models",
+    "job_ads_models",
     "recruiting_models",
+    "workspace_output_models",
 ]

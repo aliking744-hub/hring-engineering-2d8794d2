@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
-import { ApiError, apiRequest } from "@/lib/api";
-import { ArrowRight, Megaphone, Loader2, Copy, Download, Sparkles, Image as ImageIcon, Upload, X, Coins } from "lucide-react";
+import { ApiError, apiBlobRequest, apiRequest } from "@/lib/api";
+import { ArrowRight, Megaphone, Loader2, Copy, Download, Sparkles, Image as ImageIcon, Upload, X, Coins, History } from "lucide-react";
 import logo from "@/assets/logo.png";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 
@@ -33,6 +33,37 @@ const imageFormats = [
 ];
 
 type UnknownRecord = Record<string, unknown>;
+
+interface SmartAdTextHistoryItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  payload: {
+    input?: { jobTitle?: string; companyName?: string; contactMethod?: string; industry?: string; platform?: string; tone?: string };
+    content?: string;
+  };
+}
+
+interface SmartAdHistoryItem {
+  id: string;
+  jobTitle: string;
+  companyName: string;
+  contentType: string;
+  createdAt: string;
+}
+
+const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error("تصویر دریافتی قابل خواندن نیست"));
+  reader.onload = () => {
+    if (typeof reader.result === "string" && reader.result.startsWith("data:image/")) {
+      resolve(reader.result);
+      return;
+    }
+    reject(new Error("فرمت تصویر دریافتی معتبر نیست"));
+  };
+  reader.readAsDataURL(blob);
+});
 
 const formatGeneratedJobAd = (payload: unknown): string => {
   if (typeof payload === "string") return payload.trim();
@@ -85,6 +116,8 @@ const SmartAdGenerator = () => {
   const [generatedText, setGeneratedText] = useState("");
   const [editableText, setEditableText] = useState("");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [imageHistory, setImageHistory] = useState<SmartAdHistoryItem[]>([]);
+  const [textHistory, setTextHistory] = useState<SmartAdTextHistoryItem[]>([]);
   const [isTextLoading, setIsTextLoading] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -94,6 +127,54 @@ const SmartAdGenerator = () => {
   const imageRequestKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
   const { credits, getCost } = useCredits();
+
+  const loadTextHistory = useCallback(async () => {
+    try {
+      setTextHistory(await apiRequest<SmartAdTextHistoryItem[]>(
+        "/workspace/outputs?featureKey=job_ads.smart_ad_text&limit=20",
+      ));
+    } catch (error) {
+      console.warn("Smart-ad text history could not be loaded:", error);
+    }
+  }, []);
+
+  const restoreTextHistory = (item: SmartAdTextHistoryItem) => {
+    const input = item.payload.input;
+    setJobTitle(input?.jobTitle || item.title);
+    setCompanyName(input?.companyName || "");
+    setContactMethod(input?.contactMethod || "");
+    setIndustry(input?.industry || "");
+    setPlatform(input?.platform || "linkedin");
+    setTone(input?.tone || "formal");
+    setGeneratedText(item.payload.content || "");
+    setEditableText(item.payload.content || "");
+    scrollToResult();
+  };
+
+  const loadImageHistory = useCallback(async () => {
+    try {
+      setImageHistory(await apiRequest<SmartAdHistoryItem[]>("/job-ads/history"));
+    } catch (error) {
+      console.warn("Smart-ad history could not be loaded:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadImageHistory();
+    void loadTextHistory();
+  }, [loadImageHistory, loadTextHistory]);
+
+  const restoreHistoryImage = async (item: SmartAdHistoryItem) => {
+    try {
+      const imageData = await blobToDataUrl(await apiBlobRequest(`/job-ads/assets/${item.id}`));
+      setGeneratedImage(imageData);
+      setJobTitle(item.jobTitle);
+      setCompanyName(item.companyName);
+      scrollToResult();
+    } catch (error) {
+      showRequestError(error, "تصویر تاریخچه قابل بازیابی نیست.");
+    }
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -221,6 +302,7 @@ const SmartAdGenerator = () => {
       textRequestKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "متن آگهی با موفقیت تولید شد" });
+      await loadTextHistory();
       scrollToResult();
     } catch (error) {
       if (error instanceof ApiError) textRequestKeyRef.current = null;
@@ -237,7 +319,7 @@ const SmartAdGenerator = () => {
     try {
       const requestKey = imageRequestKeyRef.current || crypto.randomUUID();
       imageRequestKeyRef.current = requestKey;
-      const data = await apiRequest<{ imageUrl: string }>("/job-ads/generate-image", {
+      const data = await apiRequest<{ imageUrl: string; assetId?: string }>("/job-ads/generate-image", {
         method: "POST",
         headers: { "X-Idempotency-Key": requestKey },
         body: JSON.stringify(requestBody()),
@@ -252,8 +334,29 @@ const SmartAdGenerator = () => {
         return;
       }
 
-      setGeneratedImage(await composeRecruitmentPoster(responseImage));
+      const privateImageData = data.assetId && responseImage.startsWith("/job-ads/assets/")
+        ? await blobToDataUrl(await apiBlobRequest(responseImage))
+        : null;
+      const composedImage = await composeRecruitmentPoster(privateImageData || responseImage);
+      setGeneratedImage(composedImage);
+
+      if (data.assetId && composedImage.startsWith("data:image/")) {
+        try {
+          await apiRequest(`/job-ads/assets/${data.assetId}/finalize`, {
+            method: "POST",
+            body: JSON.stringify({ imageData: composedImage }),
+          });
+        } catch (error) {
+          console.warn("Smart-ad history persistence failed:", error);
+          toast({
+            title: "تصویر ساخته شد",
+            description: "ذخیره در تاریخچه انجام نشد؛ می‌توانید همین حالا آن را دانلود کنید.",
+            variant: "destructive",
+          });
+        }
+      }
       imageRequestKeyRef.current = null;
+      await loadImageHistory();
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "تصویر آگهی با موفقیت تولید شد" });
       scrollToResult();
@@ -283,7 +386,13 @@ const SmartAdGenerator = () => {
       image.src = src;
     });
 
-    const background = await loadImage(backgroundUrl);
+    let background: HTMLImageElement;
+    try {
+      background = await loadImage(backgroundUrl);
+    } catch {
+      // Preserve the provider image if a cross-origin host blocks client-side composition.
+      return backgroundUrl;
+    }
     context.drawImage(background, 0, 0, width, height);
     const gradient = context.createLinearGradient(0, 0, width, 0);
     gradient.addColorStop(0, 'rgba(7,12,28,.18)');
@@ -302,9 +411,14 @@ const SmartAdGenerator = () => {
     context.font = `400 ${Math.round(height * .035)}px Tahoma, sans-serif`;
     context.fillText(contactMethod, width * .9, height * .69, width * .72);
     if (companyLogo) {
-      const uploadedLogo = await loadImage(companyLogo);
-      const size = Math.min(width, height) * .16;
-      context.drawImage(uploadedLogo, width * .08, height * .08, size, size);
+      try {
+        const uploadedLogo = await loadImage(companyLogo);
+        const size = Math.min(width, height) * .16;
+        context.drawImage(uploadedLogo, width * .08, height * .08, size, size);
+      } catch {
+        // A bad uploaded logo must not turn a paid, successful image into a failed action.
+        console.warn("Smart-ad logo could not be composited");
+      }
     }
     return canvas.toDataURL('image/png', 0.95);
   };
@@ -624,6 +738,54 @@ const SmartAdGenerator = () => {
               </Card>
             )}
           </div>
+        )}
+
+        {textHistory.length > 0 && (
+          <Card className="mt-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" /> تاریخچه متن‌های آگهی
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {textHistory.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => restoreTextHistory(item)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-border p-3 text-right transition-colors hover:border-primary hover:bg-muted/40"
+                >
+                  <span className="font-medium">{item.title}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {imageHistory.length > 0 && (
+          <Card className="mt-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" /> تاریخچه تصاویر آگهی
+              </CardTitle>
+              <CardDescription>تصاویر فقط برای مالک حساب قابل مشاهده و دانلود هستند.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {imageHistory.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => void restoreHistoryImage(item)}
+                  className="rounded-lg border border-border p-3 text-right transition-colors hover:border-primary hover:bg-muted/40"
+                >
+                  <span className="block font-medium">{item.jobTitle}</span>
+                  <span className="block text-sm text-muted-foreground">{item.companyName}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
