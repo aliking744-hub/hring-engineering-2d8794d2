@@ -1,4 +1,7 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
@@ -10,6 +13,7 @@ from hring_api.domains.billing.credit_service import (
     CreditNotFoundError,
     InsufficientCreditsError,
 )
+from hring_api.domains.compat.storage import StorageCompatError, read_object
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.job_ads.schemas import (
     SmartAdArtifactResponse,
@@ -22,6 +26,7 @@ from hring_api.domains.job_ads.service import (
     SmartAdError,
     generate_smart_ad,
     generate_smart_ad_image,
+    get_smart_ad_artifact,
     list_smart_ad_artifacts,
 )
 
@@ -50,6 +55,42 @@ async def smart_ad_history(
 ) -> list[SmartAdArtifactResponse]:
     rows = await list_smart_ad_artifacts(db, principal=principal)
     return [SmartAdArtifactResponse.model_validate(row) for row in rows]
+
+
+@router.get("/assets/{artifact_id}")
+async def smart_ad_asset(
+    artifact_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> StreamingResponse:
+    artifact = await get_smart_ad_artifact(
+        db,
+        principal=principal,
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="تصویر یافت نشد")
+    try:
+        stream, content_type = read_object(
+            settings,
+            logical_bucket="job-ads",
+            path=artifact.storage_path,
+        )
+    except StorageCompatError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="تصویر یافت نشد",
+        ) from exc
+    return StreamingResponse(
+        stream,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "Content-Disposition": f'inline; filename="smart-ad-{artifact_id}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/generate", response_model=SmartAdResponse, response_model_exclude_none=True)
