@@ -23,6 +23,7 @@ from hring_api.domains.job_ads.service import (
     SmartAdError,
     _generate_content,
     _image_prompt,
+    get_smart_ad_artifact,
     list_smart_ad_artifacts,
 )
 from hring_api.main import app
@@ -329,3 +330,59 @@ def test_smart_ad_history_requires_auth_and_is_owner_scoped() -> None:
         )
         assert response.status_code == 200, response.text
         assert response.json() == []
+
+
+
+def test_smart_ad_asset_is_private_and_owner_scoped(monkeypatch) -> None:
+    source = inspect.getsource(get_smart_ad_artifact)
+    assert "SmartAdArtifact.id == artifact_id" in source
+    assert "SmartAdArtifact.owner_user_id == principal.user_id" in source
+
+    async def missing_artifact(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.get_smart_ad_artifact",
+        missing_artifact,
+    )
+    artifact_id = uuid4()
+    with TestClient(app) as client:
+        unauthorized = client.get(f"/api/v1/job-ads/assets/{artifact_id}")
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.get(
+            f"/api/v1/job-ads/assets/{artifact_id}",
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "تصویر یافت نشد"
+
+
+def test_smart_ad_asset_streams_private_object(monkeypatch) -> None:
+    async def owned_artifact(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(storage_path="owner/image.png")
+
+    def fake_read(*_args: object, **_kwargs: object) -> tuple[object, str]:
+        return iter([b"private-image"]), "image/png"
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.get_smart_ad_artifact",
+        owned_artifact,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.read_object",
+        fake_read,
+    )
+    artifact_id = uuid4()
+    with TestClient(app) as client:
+        account = _register(client)
+        response = client.get(
+            f"/api/v1/job-ads/assets/{artifact_id}",
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.content == b"private-image"
+        assert response.headers["content-type"] == "image/png"
+        assert response.headers["cache-control"] == "private, max-age=300"
+        assert response.headers["x-content-type-options"] == "nosniff"
