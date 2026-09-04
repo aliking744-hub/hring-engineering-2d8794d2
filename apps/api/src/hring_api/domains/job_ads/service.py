@@ -557,3 +557,19 @@ async def list_smart_ad_artifacts(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def get_smart_ad_artifact(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    artifact_id: UUID,
+) -> SmartAdArtifact | None:
+    """Resolve a private artifact only when it belongs to the current user."""
+    result = await session.execute(
+        select(SmartAdArtifact).where(
+            SmartAdArtifact.id == artifact_id,
+            SmartAdArtifact.owner_user_id == principal.user_id,
+        )
+    )
+    return result.scalar_one_or_none()
