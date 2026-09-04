@@ -11,6 +11,7 @@ from hring_api.domains.workspace_outputs.models import WorkspaceOutput
 ALLOWED_FEATURES = {
     "job_engineering.job_profile",
     "interview.kit",
+    "job_ads.smart_ad_text",
 }
 
 
