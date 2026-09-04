@@ -384,5 +384,6 @@ test('workspace generation pages expose persistent owner-scoped history', async 
   assert.match(jobProfile, /featureKey=job_engineering\.job_profile/);
   assert.match(interview, /featureKey=interview\.kit/);
   assert.match(smartAd, /\/job-ads\/history/);
+  assert.match(smartAd, /featureKey=job_ads\.smart_ad_text/);
   assert.match(smartAd, /\/job-ads\/assets\/\$\{item\.id\}/);
 });
