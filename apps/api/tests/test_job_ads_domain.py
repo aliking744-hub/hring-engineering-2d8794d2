@@ -24,6 +24,7 @@ from hring_api.domains.job_ads.service import (
     _generate_content,
     _generate_image_content,
     _image_prompt,
+    finalize_smart_ad_artifact,
     get_smart_ad_artifact,
     generate_smart_ad,
     list_smart_ad_artifacts,
@@ -488,3 +489,76 @@ def test_standalone_smart_ad_returns_private_asset_url(monkeypatch) -> None:
 
     assert result.asset_id == str(artifact_id)
     assert result.image_url == f"/job-ads/assets/{artifact_id}"
+
+
+
+def test_smart_ad_finalization_is_private_and_replaces_source(monkeypatch) -> None:
+    artifact_id = uuid4()
+    artifact = SimpleNamespace(
+        id=artifact_id,
+        storage_path="owner/final-poster.png",
+        content_type="image/png",
+    )
+    writes: list[dict[str, object]] = []
+
+    async def fake_get(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return artifact
+
+    def fake_put(*_args: object, **kwargs: object) -> str:
+        writes.append(kwargs)
+        return "compat/job-ads/owner/final-poster.png"
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.get_smart_ad_artifact",
+        fake_get,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.put_object",
+        fake_put,
+    )
+    principal = SimpleNamespace(user_id=uuid4(), memberships=[])
+    result = asyncio.run(
+        finalize_smart_ad_artifact(
+            SimpleNamespace(),
+            principal=principal,
+            artifact_id=artifact_id,
+            image_data="data:image/png;base64,aGVsbG8gd29ybGQ=",
+            settings=Settings(),
+        )
+    )
+
+    assert result is artifact
+    assert artifact.content_type == "image/png"
+    assert writes[0]["logical_bucket"] == "job-ads"
+    assert writes[0]["path"] == "owner/final-poster.png"
+
+
+def test_smart_ad_finalization_route_requires_owner(monkeypatch) -> None:
+    artifact_id = uuid4()
+
+    async def fake_finalize(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(id=artifact_id)
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.routes.finalize_smart_ad_artifact",
+        fake_finalize,
+    )
+    payload = {"imageData": "data:image/png;base64,aGVsbG8gd29ybGQ="}
+    with TestClient(app) as client:
+        unauthorized = client.post(
+            f"/api/v1/job-ads/assets/{artifact_id}/finalize",
+            json=payload,
+        )
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.post(
+            f"/api/v1/job-ads/assets/{artifact_id}/finalize",
+            json=payload,
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "imageUrl": f"/job-ads/assets/{artifact_id}",
+            "assetId": str(artifact_id),
+        }
