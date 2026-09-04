@@ -57,9 +57,15 @@ test('dashboard modules expose a visible return to the dashboard home', async ()
     read('src/pages/LegalAdvisor.tsx'),
   ]);
 
+  const workspaceHeader = await read('src/components/WorkspaceHeader.tsx');
+  assert.match(workspaceHeader, /["']\/dashboard["']/);
+  assert.match(workspaceHeader, /بازگشت به داشبورد/);
+
   for (const page of modulePages) {
-    assert.match(page, /["']\/dashboard["']/);
-    assert.match(page, /بازگشت به داشبورد/);
+    assert.match(page, /["']\/dashboard["']|<WorkspaceHeader/);
+    if (!/<WorkspaceHeader/.test(page)) {
+      assert.match(page, /بازگشت به داشبورد/);
+    }
   }
 });
 
@@ -300,8 +306,8 @@ test('smart ad preserves independent text and image results and rejects empty su
   assert.match(page, /generated_job_ad/);
   assert.match(page, /if \(!responseText\)/);
   assert.match(page, /if \(!responseImage\)/);
-  assert.match(page, /generate-job-ad-text/);
-  assert.match(page, /generate-job-ad-image/);
+  assert.match(page, /\/job-ads\/generate-text/);
+  assert.match(page, /\/job-ads\/generate-image/);
   assert.match(page, /generatedText \|\| generatedImage/);
   assert.match(page, /اعتباری نباید مصرف شود/);
 });
