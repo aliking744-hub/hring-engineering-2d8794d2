@@ -123,7 +123,8 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
         )
     )
 
-    assert result.generated_text.startswith("فرصتی")
+    assert result.generated_text.startswith("شرکت آزمایشی")
+    assert "فرصتی برای ساختن آینده" in result.generated_text
     assert result.image_url == "data:image/png;base64,aGVsbG8="
     text_prompt = "\n".join(
         message["content"]
