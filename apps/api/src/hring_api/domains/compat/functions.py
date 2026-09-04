@@ -213,7 +213,7 @@ async def invoke_ai_function(
                 {"role": "user", "content": user_prompt},
             ],
             credits_charged=managed_cost,
-            max_output_tokens=4_000 if labor_context is not None else 12_000,
+            max_output_tokens=4_000 if labor_context is not None else 5_000,
             response_format="json_object" if labor_context is not None else "text",
             metadata_json={
                 "ai_route_source": route.source,
@@ -240,7 +240,11 @@ async def invoke_ai_function(
             return normalize_result(value, labor_context)
         if support_context is not None:
             try:
-                return {"content": support_text(value)}
+                return {
+                    "content": support_text(
+                        value, allowed_phone=support_context.support_phone
+                    )
+                }
             except SupportInputError as exc:
                 raise CompatFunctionError(str(exc)) from exc
         return value

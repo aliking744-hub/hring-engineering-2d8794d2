@@ -32,8 +32,14 @@ from hring_api.domains.identity.dependencies import Principal, get_current_princ
 router = APIRouter(prefix="/hr-data", tags=["hr-data"])
 HR_DASHBOARD_DEMO_FEATURE_KEY = "hr_data.dashboard_demo"
 HR_DASHBOARD_UPLOAD_FEATURE_KEY = "hr_data.dashboard_upload"
-HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 25
-HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 50
+HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 5
+HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 15
+
+
+def dashboard_upload_credit_cost(base_cost: int, row_count: int) -> int:
+    """Base includes 500 rows; each additional started 500-row block costs 2 credits."""
+    extra_rows = max(0, row_count - 500)
+    return base_cost + ((extra_rows + 499) // 500) * 2
 
 
 def _company_id(principal: Principal) -> UUID | None:
@@ -100,7 +106,8 @@ async def create_hr_upload(
         if payload.is_demo
         else HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST
     )
-    cost = await feature_credit_cost(db, feature_key=feature_key, default_cost=default_cost)
+    base_cost = await feature_credit_cost(db, feature_key=feature_key, default_cost=default_cost)
+    cost = base_cost if payload.is_demo else dashboard_upload_credit_cost(base_cost, len(payload.records))
     key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
 
     async def operation() -> HrDataUploadResponse:

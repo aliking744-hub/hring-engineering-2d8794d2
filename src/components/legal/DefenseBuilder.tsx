@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import { useCredits } from "@/hooks/useCredits";
 
 interface Claim {
   claim_type: string;
@@ -69,6 +70,8 @@ interface AnalysisResult {
 type AnalysisPhase = 'upload' | 'analyzing' | 'gap_analysis' | 'verdict';
 
 const DefenseBuilder = () => {
+  const { getCost } = useCredits();
+  const asyncUpgradePending = true;
   const [phase, setPhase] = useState<AnalysisPhase>('upload');
   const [complaint, setComplaint] = useState<{ file: File; content: string } | null>(null);
   const [evidence, setEvidence] = useState<{ file: File; name: string; type: string; content?: string }[]>([]);
@@ -482,10 +485,12 @@ const DefenseBuilder = () => {
               size="lg" 
               className="w-full gap-2"
               onClick={startAnalysis}
-              disabled={!complaint}
+              disabled={!complaint || asyncUpgradePending}
             >
               <Sparkles className="w-5 h-5" />
-              شروع تحلیل پرونده
+              {asyncUpgradePending
+                ? 'در حال بهسازی اجرای طولانی‌مدت'
+                : `شروع تحلیل پرونده (${getCost('LEGAL_DEFENSE')} جم)`}
             </Button>
           </motion.div>
         )}

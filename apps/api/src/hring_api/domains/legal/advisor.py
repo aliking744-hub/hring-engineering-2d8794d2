@@ -86,6 +86,10 @@ class LegalAdvisorRateLimitError(LegalAdvisorError):
     pass
 
 
+class LegalAdvisorNoSourcesError(LegalAdvisorError):
+    pass
+
+
 def _company_id(principal: Principal) -> UUID | None:
     for membership in principal.memberships:
         if membership.is_active:
@@ -183,17 +187,16 @@ async def generate_legal_advice(
             match_threshold=0.3,
         ),
     )
-    if results:
-        legal_context = "\n\n---\n\n".join(
+    if not results:
+        raise LegalAdvisorNoSourcesError(
+            "منبع قانونی مرتبطی در پایگاه دانش پیدا نشد؛ اعتباری کسر نشد. "
+            "پرسش را دقیق‌تر کنید یا پس از تکمیل منابع قانونی دوباره تلاش کنید."
+        )
+    legal_context = "\n\n---\n\n".join(
             f"[{index}] "
             f"{'ماده ' + item.article_number if item.article_number else item.title}\n"
             f"{item.content[:1500]}"
             for index, item in enumerate(results, start=1)
-        )
-    else:
-        legal_context = (
-            "متن قانونی مرتبطی یافت نشد. بر اساس دانش عمومی حقوقی پاسخ دهید و "
-            "صریحاً بگویید برای پاسخ دقیق‌تر باید متن قانون بررسی شود."
         )
     variables = {
         "legal_context": legal_context,

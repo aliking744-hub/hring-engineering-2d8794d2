@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { useCredits, CREDIT_COSTS, DIAMOND_COSTS } from "@/hooks/useCredits";
-import { supabase } from "@/integrations/supabase/client";
+import { useCredits } from "@/hooks/useCredits";
 import { ArrowRight, Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
+import jsPDF from "jspdf";
+import { ApiError, apiRequest } from "@/lib/api";
+import WorkspaceHeader from "@/components/WorkspaceHeader";
 
 interface InterviewQuestion {
   id: string;
@@ -29,9 +31,9 @@ const seniorityLevels = [
 ];
 
 const focusAreas = [
-  { value: "general", label: "عمومی" },
   { value: "technical", label: "تخصصی و فنی" },
-  { value: "leadership", label: "رهبری و مدیریت" },
+  { value: "behavioral", label: "رفتاری و مهارت‌های نرم" },
+  { value: "intelligence", label: "هوش و حل مسئله" },
   { value: "cultural", label: "تناسب فرهنگی" },
 ];
 
@@ -44,8 +46,22 @@ const InterviewAssistant = () => {
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [openAnswerKeys, setOpenAnswerKeys] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  const { credits, hasEnoughCredits } = useCredits();
+  const { credits, hasEnoughCredits, getCost } = useCredits();
   const resultRef = useRef<HTMLDivElement>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
+
+  const downloadInterviewPDF = async () => {
+    if (!resultRef.current) return;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await pdf.html(resultRef.current, {
+      callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
+      margin: [10, 10, 10, 10],
+      autoPaging: 'text',
+      html2canvas: { scale: 0.75, useCORS: true },
+      width: 190,
+      windowWidth: 900,
+    });
+  };
 
   const getSectionIcon = (icon: string) => {
     switch (icon) {
@@ -76,7 +92,7 @@ const InterviewAssistant = () => {
     if (!hasEnoughCredits('INTERVIEW_KIT')) {
       toast({
         title: "اعتبار ناکافی",
-        description: `برای این عملیات ${CREDIT_COSTS.INTERVIEW_KIT} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        description: `برای این عملیات ${getCost('INTERVIEW_KIT')} جم نیاز دارید. اعتبار فعلی: ${credits}`,
         variant: "destructive",
       });
       return;
@@ -86,19 +102,22 @@ const InterviewAssistant = () => {
     setQuestions([]);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-interview-kit", {
-        body: {
+      const requestKey = idempotencyKeyRef.current || crypto.randomUUID();
+      idempotencyKeyRef.current = requestKey;
+      const data = await apiRequest<{ questions: InterviewQuestion[] }>("/interview/kits/generate", {
+        method: "POST",
+        headers: { "X-Idempotency-Key": requestKey },
+        body: JSON.stringify({
           jobTitle,
           industry,
           seniorityLevel,
-          focusArea: focusArea || "general",
-        },
+          focusArea: focusArea || "technical",
+        }),
       });
-
-      if (error) throw error;
-
       if (data?.questions) {
         setQuestions(data.questions);
+        idempotencyKeyRef.current = null;
+        window.dispatchEvent(new Event("hring:credits-changed"));
         toast({
           title: "موفق",
           description: "راهنمای مصاحبه با موفقیت تولید شد.",
@@ -108,6 +127,7 @@ const InterviewAssistant = () => {
         }, 100);
       }
     } catch (error: unknown) {
+      if (error instanceof ApiError) idempotencyKeyRef.current = null;
       console.error("Error generating interview kit:", error);
       toast({
         title: "خطا",
@@ -355,22 +375,7 @@ const InterviewAssistant = () => {
         </div>
       </div>
 
-      {/* Hero Section */}
-      <div className="bg-gradient-to-l from-primary to-primary/80 text-primary-foreground py-12 px-4 print:hidden">
-        <div className="container max-w-4xl mx-auto">
-          <Link to="/dashboard" className="inline-flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground mb-6 transition-colors">
-            <ArrowRight className="w-4 h-4" />
-            بازگشت به داشبورد
-          </Link>
-          <div className="flex items-center gap-4 mb-4">
-            <img src={logo} alt="لوگو" className="w-16 h-16" />
-            <div>
-              <h1 className="text-3xl font-bold">دستیار مصاحبه</h1>
-              <p className="text-primary-foreground/80">تولید راهنمای جامع مصاحبه با کلید ارزیابی</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <WorkspaceHeader title="دستیار مصاحبه" subtitle="تولید راهنمای جامع مصاحبه با کلید ارزیابی" icon={<Briefcase className="h-6 w-6" />} />
 
       {/* Main Content */}
       <div className="container max-w-4xl mx-auto py-8 px-4">
@@ -437,7 +442,7 @@ const InterviewAssistant = () => {
 
             <Button
               onClick={handleGenerate}
-              disabled={isLoading}
+              disabled={isLoading || !hasEnoughCredits('INTERVIEW_KIT')}
               className="w-full h-12 text-lg"
             >
               {isLoading ? (
@@ -446,7 +451,7 @@ const InterviewAssistant = () => {
                   در حال تولید سوالات...
                 </>
               ) : (
-                "تولید راهنمای مصاحبه"
+                `تولید راهنمای مصاحبه (${getCost('INTERVIEW_KIT')} جم)`
               )}
             </Button>
           </CardContent>
@@ -458,7 +463,7 @@ const InterviewAssistant = () => {
             {/* Header */}
             <div className="flex items-center justify-between print:hidden">
               <h2 className="text-2xl font-bold text-foreground">راهنمای مصاحبه</h2>
-              <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
+              <Button onClick={() => void downloadInterviewPDF()} variant="outline" className="gap-2">
                 <Download className="w-4 h-4" />
                 دانلود PDF
               </Button>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   AlertTriangle, 
   CheckCircle2, 
   FileText, 
@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import { useCredits } from "@/hooks/useCredits";
 
 // Claim types
 const CLAIM_TYPES = [
@@ -76,6 +77,7 @@ interface AnalysisResult {
 }
 
 const LaborComplaintAssistant = () => {
+  const { credits, getCost } = useCredits();
   const [step, setStep] = useState(1);
   const [selectedClaim, setSelectedClaim] = useState<string | null>(null);
   const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
@@ -553,7 +555,7 @@ const LaborComplaintAssistant = () => {
                     <ArrowRight className="w-4 h-4 ml-2" />
                     بازگشت
                   </Button>
-                  <Button onClick={handleAnalyze} disabled={isLoading}>
+                  <Button onClick={handleAnalyze} disabled={isLoading || credits < getCost('LABOR_COMPLAINT')}>
                     {isLoading ? (
                       <>
                         <Loader2 className="w-4 h-4 ml-2 animate-spin" />
@@ -561,7 +563,7 @@ const LaborComplaintAssistant = () => {
                       </>
                     ) : (
                       <>
-                        تحلیل پرونده
+                        تحلیل پرونده ({getCost('LABOR_COMPLAINT')} جم)
                         <ArrowLeft className="w-4 h-4 mr-2" />
                       </>
                     )}

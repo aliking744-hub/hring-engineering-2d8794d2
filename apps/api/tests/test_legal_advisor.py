@@ -3,11 +3,16 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiGatewayResult
-from hring_api.domains.legal.advisor import _decode_data_url, generate_legal_advice
+from hring_api.domains.legal.advisor import (
+    LegalAdvisorNoSourcesError,
+    _decode_data_url,
+    generate_legal_advice,
+)
 from hring_api.domains.legal.schemas import (
     LegalAdvisorRequest,
     LegalAdvisorResponse,
@@ -111,6 +116,22 @@ def test_attachment_data_url_is_strictly_validated() -> None:
     assert suffix == ".png"
     assert raw.startswith(b"\x89PNG")
     assert mime_type == "image/png"
+
+
+def test_legal_advisor_refuses_to_generate_without_retrieved_sources(monkeypatch) -> None:
+    async def fake_search(*_args: object, **_kwargs: object) -> list[LegalSearchResult]:
+        return []
+
+    monkeypatch.setattr("hring_api.domains.legal.advisor.search_legal_knowledge", fake_search)
+    with pytest.raises(LegalAdvisorNoSourcesError):
+        asyncio.run(
+            generate_legal_advice(
+                SimpleNamespace(),
+                payload=LegalAdvisorRequest(query="پرسش بدون منبع"),
+                principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+                settings=Settings(),
+            )
+        )
 
 
 def test_legal_advisor_route_requires_auth_and_preserves_ui_contract(monkeypatch) -> None:

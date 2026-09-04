@@ -114,8 +114,7 @@ def test_interview_prompt_preserves_exact_lovable_contract(monkeypatch) -> None:
     prompt = "\n".join(item["content"] for item in captured)
     assert 'هرگز سوالات کلیشه‌ای مثل "درباره خودتان بگویید" نپرس' in prompt
     assert "برای سوالات رفتاری از متد STAR استفاده کن" in prompt
-    assert "**بخش ۱: سوالات تخصصی و فنی (۴ سوال)**" in prompt
-    assert "**بخش ۲: سوالات رفتاری و مهارت‌های نرم (۳ سوال)**" in prompt
+    assert "دقیقاً ۵ سؤال برای بخش behavioral" in prompt
     assert "**بخش ۳: سوالات هوش و حل مسئله (۲ سوال)**" in prompt
     assert "**بخش ۴: سوالات صنعت و تناسب فرهنگی (۲ سوال)**" in prompt
     assert "تأکید بیشتر روی سوالات رهبری و مدیریت" in prompt
@@ -143,7 +142,7 @@ def test_interview_response_normalizes_common_provider_json_variants() -> None:
         "technical",
         "technical",
         "technical",
-        "behavioral",
+        "technical",
         "behavioral",
         "behavioral",
         "intelligence",
@@ -172,6 +171,19 @@ def test_interview_response_normalizes_nested_aliases_and_extra_question() -> No
     assert len(result.questions) == 11
     assert result.questions[0].id == "q-1"
     assert result.questions[-1].section_icon == "cultural"
+
+
+def test_interview_focus_distribution_is_exactly_five_plus_two_each() -> None:
+    for focus in ("technical", "behavioral", "intelligence", "cultural"):
+        result = _parse_response(
+            json.dumps({"questions": _questions()}, ensure_ascii=False),
+            focus_area=focus,
+        )
+        counts = {icon: 0 for icon in ("technical", "behavioral", "intelligence", "cultural")}
+        for question in result.questions:
+            counts[question.section_icon] += 1
+        assert counts[focus] == 5
+        assert sorted(count for icon, count in counts.items() if icon != focus) == [2, 2, 2]
 
 
 def test_interview_response_rejects_missing_section_or_evaluation_key() -> None:

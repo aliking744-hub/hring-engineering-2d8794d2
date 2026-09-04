@@ -7,6 +7,7 @@ from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiCitation
 from hring_api.domains.compat.access import PERSONAL_OPERATION_RULES
 from hring_api.domains.compat.functions import _response_with_citations
+from hring_api.domains.compat.support import support_text
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
 from hring_api.domains.compat.storage_policy import (
@@ -275,3 +276,11 @@ def test_production_settings_still_require_real_independent_secrets() -> None:
                 "development-security-token-pepper-change-me"
             ),
         )
+def test_support_removes_unconfigured_phone_numbers() -> None:
+    assert "09123456789" not in support_text(
+        {"content": "با 09123456789 تماس بگیرید"}, allowed_phone=None
+    )
+    assert "09111111111" in support_text(
+        "با 09111111111 تماس بگیرید", allowed_phone="09111111111"
+    )
+

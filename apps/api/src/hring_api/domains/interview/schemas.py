@@ -6,14 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 SectionIcon = Literal["technical", "behavioral", "intelligence", "cultural"]
 SeniorityLevel = Literal["junior", "senior", "lead", "manager"]
-FocusArea = Literal["general", "technical", "leadership", "cultural"]
-
-EXPECTED_SECTION_COUNTS = {
-    "technical": 4,
-    "behavioral": 3,
-    "intelligence": 2,
-    "cultural": 2,
-}
+FocusArea = Literal[
+    "general", "technical", "leadership", "behavioral", "intelligence", "cultural"
+]
 
 
 class InterviewKitGenerateRequest(BaseModel):
@@ -71,11 +66,8 @@ class InterviewKitResponse(BaseModel):
     @model_validator(mode="after")
     def validate_exact_lovable_contract(self) -> "InterviewKitResponse":
         counts = Counter(question.section_icon for question in self.questions)
-        if counts != Counter(EXPECTED_SECTION_COUNTS):
-            raise ValueError(
-                "Interview kit must contain exactly 4 technical, 3 behavioral, "
-                "2 intelligence, and 2 cultural questions"
-            )
+        if set(counts) != {"technical", "behavioral", "intelligence", "cultural"}:
+            raise ValueError("Interview kit must cover all four assessment sections")
         ids = [question.id for question in self.questions]
         if len(ids) != len(set(ids)):
             raise ValueError("Interview question identifiers must be unique")

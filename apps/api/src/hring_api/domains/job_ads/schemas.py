@@ -27,6 +27,8 @@ class SmartAdGenerateRequest(BaseModel):
     image_format: ImageFormat = Field(default="16:9", alias="imageFormat")
     image_width: int | None = Field(default=None, alias="imageWidth")
     image_height: int | None = Field(default=None, alias="imageHeight")
+    approved_text: str | None = Field(default=None, alias="approvedText", max_length=40_000)
+    company_logo: str | None = Field(default=None, alias="companyLogo", max_length=3_000_000)
 
     @field_validator("job_title", "company_name", "contact_method")
     @classmethod

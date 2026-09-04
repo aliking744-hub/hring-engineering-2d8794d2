@@ -26,8 +26,9 @@ test('HR dashboard charges demo and spreadsheet differently before reveal', asyn
   const upload = await read('src/components/hr-dashboard/UploadPage.tsx');
   const routes = await read('apps/api/src/hring_api/domains/hr_data/routes.py');
 
-  assert.match(routes, /HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 25/);
-  assert.match(routes, /HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 50/);
+  assert.match(routes, /HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 5/);
+  assert.match(routes, /HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 15/);
+  assert.match(routes, /dashboard_upload_credit_cost/);
   assert.match(routes, /run_with_credit_reservation/);
   assert.match(routes, /X-Idempotency-Key/);
   assert.ok(page.indexOf('const id = await persistUpload') < page.indexOf('setData(employees)'));

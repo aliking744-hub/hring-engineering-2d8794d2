@@ -6,22 +6,27 @@ import { apiRequest } from '@/lib/api';
 // Diamond costs for different AI operations
 export const DIAMOND_COSTS = {
   // Simple Text Generation - 5 Diamonds
-  JOB_PROFILE: 5,
-  INTERVIEW_GUIDE: 5,
-  INTERVIEW_KIT: 5,
+  JOB_PROFILE: 8,
+  INTERVIEW_GUIDE: 10,
+  INTERVIEW_KIT: 10,
   SMART_AD_TEXT: 5,
 
   // Medium Text Generation - 15 Diamonds
-  ONBOARDING_PLAN: 15,
+  ONBOARDING_PLAN: 12,
+  LEARNING_PATH: 12,
+  LEGAL_ADVISOR: 5,
+  LABOR_COMPLAINT: 25,
+  LEGAL_DEFENSE: 35,
+  HR_SUPPORT: 1,
 
   // Complex Analysis - 20 Diamonds
   STRATEGIC_ANALYSIS: 20,
 
   // Image Generation - 25 Diamonds
-  SMART_AD_IMAGE: 25,
-  HR_DASHBOARD: 25,
-  HR_DASHBOARD_UPLOAD: 50,
-  COST_CALCULATOR: 5,
+  SMART_AD_IMAGE: 50,
+  HR_DASHBOARD: 5,
+  HR_DASHBOARD_UPLOAD: 15,
+  COST_CALCULATOR: 2,
   ANALYTICS_HUB: 25,
 
   // Premium Deep Search (Perplexity + Gemini Pro) - 60 Diamonds
@@ -35,6 +40,11 @@ export const DIAMOND_COST_LABELS: Record<keyof typeof DIAMOND_COSTS, string> = {
   INTERVIEW_KIT: 'کیت مصاحبه',
   SMART_AD_TEXT: 'متن آگهی هوشمند',
   ONBOARDING_PLAN: 'برنامه آنبوردینگ ۹۰ روزه',
+  LEARNING_PATH: 'مسیر یادگیری',
+  LEGAL_ADVISOR: 'مشاور حقوقی',
+  LABOR_COMPLAINT: 'تنظیم شکایت کار',
+  LEGAL_DEFENSE: 'دفاعیه حقوقی',
+  HR_SUPPORT: 'پشتیبانی هوشمند',
   STRATEGIC_ANALYSIS: 'تحلیل قطب‌نمای استراتژیک',
   SMART_AD_IMAGE: 'تصویر آگهی هوشمند',
   HR_DASHBOARD: 'داشبورد منابع انسانی (دمو)',
@@ -64,9 +74,12 @@ interface CreditPreflight {
   available_credits: number;
 }
 
+interface CreditRateCard { rates: Partial<Record<CreditOperation, number>>; }
+
 export const useCredits = () => {
   const [credits, setCredits] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [costs, setCosts] = useState<Record<CreditOperation, number>>({ ...DIAMOND_COSTS });
   const { user } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
 
@@ -84,6 +97,12 @@ export const useCredits = () => {
     try {
       const balance = await apiRequest<CreditBalance>('/billing/credits/me');
       setCredits(balance.available_credits);
+      try {
+        const rateCard = await apiRequest<CreditRateCard>('/billing/credits/rate-card');
+        setCosts((current) => ({ ...current, ...rateCard.rates }));
+      } catch (error) {
+        console.error('Credit rate card fetch failed; using release defaults:', error);
+      }
     } catch (error) {
       console.error('Error fetching credits:', error);
       setCredits(0);
@@ -116,11 +135,11 @@ export const useCredits = () => {
   }, []);
 
   const hasEnoughCredits = (operation: CreditOperation): boolean => {
-    return credits >= CREDIT_COSTS[operation];
+    return credits >= costs[operation];
   };
 
   const getCost = (operation: CreditOperation): number => {
-    return CREDIT_COSTS[operation];
+    return costs[operation];
   };
 
   const getLabel = (operation: CreditOperation): string => {
@@ -132,7 +151,7 @@ export const useCredits = () => {
   };
 
   const deductForOperation = async (operation: CreditOperation): Promise<boolean> => {
-    const cost = CREDIT_COSTS[operation];
+    const cost = costs[operation];
     if (credits < cost) {
       return false;
     }
@@ -152,6 +171,7 @@ export const useCredits = () => {
     getCost,
     getLabel,
     getTooltip,
+    costs,
     refetch: fetchCredits,
     isFatherAdmin,
   };

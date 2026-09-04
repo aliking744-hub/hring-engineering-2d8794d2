@@ -36,6 +36,7 @@ from hring_api.domains.identity.dependencies import Principal, get_current_princ
 from hring_api.domains.legal.advisor import (
     LegalAdvisorError,
     LegalAdvisorInputError,
+    LegalAdvisorNoSourcesError,
     LegalAdvisorRateLimitError,
     enforce_legal_advisor_rate_limit,
     generate_legal_advice,
@@ -194,6 +195,11 @@ async def legal_advisor_chat(
     except LegalAdvisorInputError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except LegalAdvisorNoSourcesError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_424_FAILED_DEPENDENCY,
             detail=str(exc),
         ) from exc
     except LegalAdvisorError as exc:

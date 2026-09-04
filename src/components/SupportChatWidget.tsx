@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useCredits } from '@/hooks/useCredits';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -15,6 +16,7 @@ interface Message {
 }
 
 const SupportChatWidget = () => {
+  const { credits, getCost } = useCredits();
   const [isOpen, setIsOpen] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -481,10 +483,12 @@ const SupportChatWidget = () => {
                 />
                 <Button
                   onClick={handleSend}
-                  disabled={!input.trim() || isLoading}
-                  size="icon"
+                  disabled={!input.trim() || isLoading || credits < getCost('HR_SUPPORT')}
+                  size="sm"
+                  className="gap-1"
                 >
                   <Send className="w-4 h-4" />
+                  <span className="text-xs">{getCost('HR_SUPPORT')} جم</span>
                 </Button>
               </div>
             </div>

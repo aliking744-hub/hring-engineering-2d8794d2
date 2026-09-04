@@ -197,7 +197,37 @@ def fallback_result(context: LaborComplaintContext) -> dict[str, object]:
 def normalize_result(value: Any, context: LaborComplaintContext) -> dict[str, object]:
     if not isinstance(value, dict):
         return fallback_result(context)
-    result: dict[str, object] = {str(key): item for key, item in value.items()}
+    source = value
+    for key in ("data", "result", "analysis", "complaint"):
+        nested = source.get(key)
+        if isinstance(nested, dict):
+            source = nested
+            break
+    aliases = {
+        "winProbability": ("winProbability", "win_probability", "successProbability", "probability"),
+        "riskLevel": ("riskLevel", "risk_level", "risk"),
+        "strongPoints": ("strongPoints", "strong_points", "strengths"),
+        "weakPoints": ("weakPoints", "weak_points", "weaknesses"),
+        "missingEvidence": ("missingEvidence", "missing_evidence", "missingDocuments"),
+        "recommendation": ("recommendation", "advice", "nextStep"),
+        "complaintText": ("complaintText", "complaint_text", "petitionText", "draft"),
+        "relevantArticles": ("relevantArticles", "relevant_articles", "articles"),
+    }
+    result: dict[str, object] = {}
+    for canonical, candidates in aliases.items():
+        candidate = next((source.get(key) for key in candidates if source.get(key) is not None), None)
+        if candidate is not None:
+            result[canonical] = candidate
+    probability = result.get("winProbability")
+    if isinstance(probability, str):
+        try:
+            result["winProbability"] = max(0, min(100, int(float(probability.strip().rstrip("%")))))
+        except ValueError:
+            return fallback_result(context)
+    for key in ("strongPoints", "weakPoints", "missingEvidence", "relevantArticles"):
+        item = result.get(key)
+        if isinstance(item, str):
+            result[key] = [line.strip(" -•\t") for line in item.splitlines() if line.strip(" -•\t")]
     required = {
         "winProbability",
         "riskLevel",
@@ -210,4 +240,5 @@ def normalize_result(value: Any, context: LaborComplaintContext) -> dict[str, ob
         return fallback_result(context)
     if not result.get("relevantArticles"):
         result["relevantArticles"] = context.relevant_articles
+    result.setdefault("complaintText", None)
     return result

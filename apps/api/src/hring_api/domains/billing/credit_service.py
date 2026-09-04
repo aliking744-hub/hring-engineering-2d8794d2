@@ -986,13 +986,42 @@ async def run_with_credit_reservation(
 
 
 _COMPAT_CREDIT_COSTS = {
-    "generate-job-profile": 5,
-    "generate-interview-kit": 5,
-    "generate-onboarding-plan": 15,
-    "generate-learning-path": 15,
-    "hring-support": 5,
-    "labor-complaint-assistant": 20,
+    "generate-job-profile": 8,
+    "generate-interview-kit": 10,
+    "generate-onboarding-plan": 12,
+    "generate-learning-path": 12,
+    "hring-support": 1,
+    "labor-complaint-assistant": 25,
 }
+
+# Stable browser operation names mapped to the authoritative database feature keys.
+# The defaults only apply when an administrator has not configured an active row.
+PUBLIC_RATE_CARD: dict[str, tuple[str, int]] = {
+    "JOB_PROFILE": ("job_engineering.job_profile", 8),
+    "INTERVIEW_GUIDE": ("interview.kit", 10),
+    "INTERVIEW_KIT": ("interview.kit", 10),
+    "SMART_AD_TEXT": ("job_ads.smart_ad_text", 5),
+    "SMART_AD_IMAGE": ("job_ads.smart_ad_image", 50),
+    "ONBOARDING_PLAN": ("development.onboarding_plan", 12),
+    "LEARNING_PATH": ("development.learning_path", 12),
+    "LEGAL_ADVISOR": ("legal.advisor", 5),
+    "LABOR_COMPLAINT": ("compat.labor-complaint-assistant", 25),
+    "LEGAL_DEFENSE": ("legal.defense", 35),
+    "HR_SUPPORT": ("compat.hring-support", 1),
+    "COST_CALCULATOR": ("costing.employee_cost_calculator", 2),
+    "HR_DASHBOARD": ("hr_data.dashboard_demo", 5),
+    "HR_DASHBOARD_UPLOAD": ("hr_data.dashboard_upload", 15),
+    "HEADHUNTING": ("recruiting.headhunting", 60),
+}
+
+
+async def public_credit_rate_card(session: AsyncSession) -> dict[str, int]:
+    return {
+        operation: await feature_credit_cost(
+            session, feature_key=feature_key, default_cost=default_cost
+        )
+        for operation, (feature_key, default_cost) in PUBLIC_RATE_CARD.items()
+    }
 
 
 async def feature_credit_cost(

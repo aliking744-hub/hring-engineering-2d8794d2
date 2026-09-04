@@ -9,7 +9,10 @@ from pydantic import ValidationError
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiGatewayResult
-from hring_api.domains.development.ai_service import generate_learning_path_content
+from hring_api.domains.development.ai_service import (
+    _normalize_learning_payload,
+    generate_learning_path_content,
+)
 from hring_api.domains.development.email import build_learning_path_html
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
@@ -154,6 +157,24 @@ def test_learning_request_rejects_invalid_employee_email() -> None:
             education_level="Bachelor",
             experience_years=5,
         )
+
+
+def test_learning_path_normalizes_wrappers_aliases_and_string_skills() -> None:
+    normalized = _normalize_learning_payload(
+        {
+            "data": {
+                "analysis": "شکاف روشن",
+                "hard_skills": ["Python", {"name": "SQL", "why": "تحلیل"}],
+                "soft_skills": ["ارتباط"],
+                "learningRoadmap": [
+                    {"period": "ماه اول", "mainFocus": "پایه", "tasks": "تمرین روزانه"}
+                ],
+            }
+        }
+    )
+    assert normalized["skillGapAnalysis"] == "شکاف روشن"
+    assert normalized["hardSkills"][0]["skill"] == "Python"
+    assert normalized["roadmap"][0]["actionItems"] == ["تمرین روزانه"]
 
 
 def test_native_development_records_are_owner_scoped_and_idempotent(monkeypatch) -> None:

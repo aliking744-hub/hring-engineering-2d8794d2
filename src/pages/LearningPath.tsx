@@ -19,6 +19,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ApiError, apiRequest } from "@/lib/api";
 import AuroraBackground from "@/components/AuroraBackground";
 import { useSiteName } from "@/hooks/useSiteSettings";
+import { useCredits } from "@/hooks/useCredits";
+import jsPDF from "jspdf";
+import WorkspaceHeader from "@/components/WorkspaceHeader";
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface HardSoftSkill { skill: string; reason: string; }
@@ -66,6 +69,7 @@ const EDUCATION_LEVELS = [
 export default function LearningPath() {
   const { toast } = useToast();
   const siteName = useSiteName();
+  const { credits, getCost } = useCredits();
   const printRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
 
@@ -214,6 +218,18 @@ export default function LearningPath() {
   };
 
   const handlePrint = () => window.print();
+  const handleDownload = async () => {
+    if (!printRef.current) return;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await pdf.html(printRef.current, {
+      callback: (document) => document.save('HRing-learning-path.pdf'),
+      margin: [10, 10, 10, 10],
+      autoPaging: 'text',
+      html2canvas: { scale: 0.75, useCORS: true },
+      width: 190,
+      windowWidth: 900,
+    });
+  };
 
   /* ── Render ────────────────────────────────────────────── */
   return (
@@ -252,24 +268,8 @@ export default function LearningPath() {
 
       <div className="relative min-h-screen" dir="rtl">
         <AuroraBackground />
-        <Link to="/dashboard" className="fixed right-6 top-6 z-50 no-print">
-          <Button variant="outline" className="gap-2 border-border bg-secondary/80 shadow-lg backdrop-blur-sm">
-            <ArrowRight className="h-4 w-4" />
-            بازگشت به داشبورد
-          </Button>
-        </Link>
+        <WorkspaceHeader title="طراح مسیر یادگیری" subtitle="نیازسنجی و تولید برنامه آموزشی هوشمند با هوش مصنوعی" icon={<GraduationCap className="h-6 w-6" />} />
         <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-
-          {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30 shrink-0">
-              <GraduationCap className="w-6 h-6 text-primary" />
-            </div>
-            <div className="text-right">
-              <h1 className="text-2xl font-bold text-foreground">طراح مسیر یادگیری</h1>
-              <p className="text-sm text-muted-foreground">نیازسنجی و تولید برنامه آموزشی هوشمند با هوش مصنوعی</p>
-            </div>
-          </motion.div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mb-6 no-print">
@@ -321,7 +321,7 @@ export default function LearningPath() {
                               ارسال به ایمیل
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2">
+                          <Button variant="outline" size="sm" onClick={() => void handleDownload()} className="gap-2">
                             <Download className="w-4 h-4" /> دانلود PDF
                           </Button>
                         </div>
@@ -445,9 +445,9 @@ export default function LearningPath() {
                         </div>
                       </div>
 
-                      <Button onClick={handleSubmit} disabled={loading || !isFormValid} className="w-full mt-2" size="lg">
+                      <Button onClick={handleSubmit} disabled={loading || !isFormValid || credits < getCost('LEARNING_PATH')} className="w-full mt-2" size="lg">
                         {loading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید نقشه راه...</> :
-                          <><GraduationCap className="w-4 h-4 ml-2" />تولید نقشه راه آموزشی با هوش مصنوعی</>}
+                          <><GraduationCap className="w-4 h-4 ml-2" />تولید نقشه راه آموزشی ({getCost('LEARNING_PATH')} جم)</>}
                       </Button>
                     </CardContent>
                   </Card>
