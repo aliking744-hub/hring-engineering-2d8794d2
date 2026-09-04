@@ -33,7 +33,7 @@ test("native smart ad preserves Lovable text and image behavior", () => {
   assert.match(service, /Challenge and growth-oriented tone/);
   assert.match(service, /modalities=\["image", "text"\]/);
   assert.match(service, /SMART_AD_TEXT_DEFAULT_CREDIT_COST = 5/);
-  assert.match(service, /SMART_AD_IMAGE_DEFAULT_CREDIT_COST = 25/);
+  assert.match(service, /SMART_AD_IMAGE_DEFAULT_CREDIT_COST = 50/);
   assert.match(schemas, /"16:9": \(1920, 1080\)/);
   assert.match(schemas, /"1:1": \(1080, 1080\)/);
   assert.match(schemas, /"9:16": \(1080, 1920\)/);

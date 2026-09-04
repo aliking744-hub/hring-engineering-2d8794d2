@@ -7,6 +7,7 @@ import * as XLSX from '@e965/xlsx';
 import { Employee } from '@/types/employee';
 import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
+import { useCredits } from '@/hooks/useCredits';
 
 interface UploadPageProps {
   onDataLoaded: (data: Employee[], name: string) => Promise<void>;
@@ -17,6 +18,9 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { credits, getCost } = useCredits();
+  const uploadBaseCost = getCost('HR_DASHBOARD_UPLOAD');
+  const demoCost = getCost('HR_DASHBOARD');
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
@@ -181,6 +185,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
             onChange={handleFileInput}
             className="hidden"
             id="file-input"
+            disabled={isLoading || credits < uploadBaseCost}
           />
 
           <label htmlFor="file-input" className="cursor-pointer">
@@ -205,6 +210,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <FileSpreadsheet className="w-4 h-4" />
               <span>فرمت‌های پشتیبانی شده: XLSX, XLS</span>
+              <span>— هزینه از {uploadBaseCost} اعتبار، متناسب با تعداد ردیف‌ها</span>
             </div>
           </label>
         </div>
@@ -224,14 +230,15 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
           {/* Demo Button */}
           <Button
             onClick={handleDemoData}
+            disabled={isLoading || credits < demoCost}
             className="gap-2 px-6 py-3"
           >
             <Sparkles className="w-4 h-4" />
-            <span>مشاهده با داده نمونه</span>
+            <span>مشاهده با داده نمونه ({demoCost} اعتبار)</span>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-3 text-center">
-          فایل نمونه را دانلود کنید، اطلاعات کارمندان را پر کنید و آپلود کنید
+          فایل نمونه را دانلود کنید، اطلاعات کارمندان را پر کنید و آپلود کنید. هزینه اکسل: {uploadBaseCost} اعتبار برای ۵۰۰ ردیف اول و ۲ اعتبار برای هر ۵۰۰ ردیف اضافه.
         </p>
 
         {/* Features */}

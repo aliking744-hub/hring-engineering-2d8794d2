@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
-import { Scale, Send, Paperclip, FileText, X, Loader2, Bot, User, ArrowRight, Sparkles, Plus, MessageSquare, Trash2, Clock, Lock, Shield, MessageCircle, Gavel } from "lucide-react";
+import { Scale, Send, Paperclip, FileText, X, Loader2, Bot, User, ArrowRight, Sparkles, Plus, MessageSquare, Trash2, Clock, Lock, Shield, MessageCircle, Gavel, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +20,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserContext } from "@/hooks/useUserContext";
 import { formatDistanceToNow } from "date-fns";
 import { faIR } from "date-fns/locale";
+import { ApiError, apiRequest } from "@/lib/api";
+import { useCredits } from "@/hooks/useCredits";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   attachments?: { type: "image" | "pdf"; name: string; preview?: string }[];
-  sources?: { articleNumber: string | null; category: string; similarity: number }[];
+  sources?: { articleNumber: string | null; category: string; similarity: number; title: string; sourceUrl?: string | null }[];
 }
 
 interface Conversation {
@@ -39,6 +41,7 @@ interface Conversation {
 const LegalAdvisor = () => {
   const { user } = useAuth();
   const { context } = useUserContext();
+  const { credits, getCost } = useCredits();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -48,6 +51,7 @@ const LegalAdvisor = () => {
   const [attachments, setAttachments] = useState<{ file: File; type: "image" | "pdf"; preview?: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const requestKeyRef = useRef<string | null>(null);
 
   // Check if user can save history (Plus or Corporate users)
   const canSaveHistory = () => {
@@ -281,8 +285,15 @@ const LegalAdvisor = () => {
         }
       }
 
-      const { data, error } = await supabase.functions.invoke("legal-advisor-chat", {
-        body: { 
+      const requestKey = requestKeyRef.current || crypto.randomUUID();
+      requestKeyRef.current = requestKey;
+      const data = await apiRequest<{
+        answer: string;
+        sources: { articleNumber: string | null; category: string; similarity: number; title: string; sourceUrl?: string | null }[];
+      }>("/legal/advisor/chat", {
+        method: "POST",
+        headers: { "X-Idempotency-Key": requestKey },
+        body: JSON.stringify({
           query: fullQuery,
           images: attachmentData.images,
           pdfs: attachmentData.pdfs,
@@ -290,10 +301,10 @@ const LegalAdvisor = () => {
             role: m.role,
             content: m.content
           }))
-        },
+        }),
       });
-
-      if (error) throw error;
+      requestKeyRef.current = null;
+      window.dispatchEvent(new Event("hring:credits-changed"));
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -314,8 +325,10 @@ const LegalAdvisor = () => {
       }, 100);
 
     } catch (error) {
+      if (error instanceof ApiError) requestKeyRef.current = null;
+      window.dispatchEvent(new Event("hring:credits-changed"));
       console.error("Error:", error);
-      toast.error("خطا در ارسال پیام");
+      toast.error(error instanceof Error ? error.message : "خطا در ارسال پیام");
       
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -608,8 +621,15 @@ const LegalAdvisor = () => {
                           {message.sources && message.sources.length > 0 && (
                             <div className="flex gap-1 mt-2 flex-wrap">
                               {message.sources.map((source, i) => (
-                                <Badge key={i} variant="outline" className="text-xs">
-                                  {getCategoryLabel(source.category)}
+                                <Badge key={i} variant="outline" className="gap-1 text-xs">
+                                  {source.sourceUrl ? (
+                                    <a href={source.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
+                                      {source.title || getCategoryLabel(source.category)}
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  ) : (
+                                    <span>{source.title || getCategoryLabel(source.category)}</span>
+                                  )}
                                   {source.articleNumber && ` - ماده ${source.articleNumber}`}
                                 </Badge>
                               ))}
@@ -694,11 +714,11 @@ const LegalAdvisor = () => {
                   />
                   <Button 
                     onClick={sendMessage} 
-                    disabled={isLoading || (!input.trim() && attachments.length === 0)}
-                    size="icon"
-                    className="shrink-0"
+                    disabled={isLoading || credits < getCost('LEGAL_ADVISOR') || (!input.trim() && attachments.length === 0)}
+                    className="shrink-0 gap-2"
                   >
                     <Send className="w-5 h-5" />
+                    <span>{getCost('LEGAL_ADVISOR')} جم</span>
                   </Button>
                 </div>
               </div>

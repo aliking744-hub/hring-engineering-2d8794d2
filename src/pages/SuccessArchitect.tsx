@@ -7,10 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ApiError, apiRequest } from "@/lib/api";
-import { ArrowRight, Route, Loader2, Sparkles, Copy, Mail } from "lucide-react";
+import { ArrowRight, Route, Loader2, Sparkles, Copy, Mail, Download } from "lucide-react";
 import logo from "@/assets/logo.png";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useCredits } from "@/hooks/useCredits";
+import WorkspaceHeader from "@/components/WorkspaceHeader";
+import jsPDF from "jspdf";
 
 const seniorityLevels = [
   { value: "junior", label: "جونیور (۰-۲ سال)" },
@@ -34,7 +37,8 @@ interface OnboardingPlanResponse {
 const SuccessArchitect = () => {
   const [employeeName, setEmployeeName] = useState("");
   const [employeeEmail, setEmployeeEmail] = useState("");
-  const [startsOn, setStartsOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startsOn, setStartsOn] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [seniority, setSeniority] = useState("");
   const [expectation, setExpectation] = useState("");
@@ -45,6 +49,7 @@ const SuccessArchitect = () => {
   const resultRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
+  const { credits, getCost } = useCredits();
 
   const handleGenerate = async () => {
     if (!employeeName.trim() || !jobTitle || !seniority || !expectation) {
@@ -71,7 +76,9 @@ const SuccessArchitect = () => {
           body: JSON.stringify({
             employee_name: employeeName.trim(),
             employee_email: employeeEmail.trim() || null,
-            starts_on: startsOn || null,
+            starts_on: /^\d{4}-\d{2}-\d{2}$/.test(startsOn) ? startsOn : null,
+            starts_on_display: startsOn.trim() || null,
+            company_name: companyName.trim() || null,
             job_title: jobTitle,
             seniority,
             expectation,
@@ -138,31 +145,19 @@ const SuccessArchitect = () => {
     }
   };
 
+  const handleDownload = async () => {
+    if (!resultRef.current) return;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    await pdf.html(resultRef.current, {
+      callback: (document) => document.save(`HRing-onboarding-${employeeName || 'report'}.pdf`),
+      margin: [10, 10, 10, 10], autoPaging: 'text',
+      html2canvas: { scale: 0.75, useCORS: true }, width: 190, windowWidth: 900,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground py-12 px-4">
-        <div className="container max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <Link to="/dashboard" className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors">
-              <ArrowRight className="w-5 h-5" />
-              <span>بازگشت به داشبورد</span>
-            </Link>
-            <img src={logo} alt="لوگو" className="w-12 h-12" />
-          </div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-primary-foreground/20 flex items-center justify-center">
-              <Route className="w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold">معمار موفقیت ۹۰ روزه</h1>
-              <p className="text-primary-foreground/80 mt-1">
-                طراحی نقشه راه جامع برای آنبوردینگ نیروی جدید
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <WorkspaceHeader title="معمار موفقیت ۹۰ روزه" subtitle="طراحی نقشه راه جامع برای آنبوردینگ نیروی جدید" icon={<Route className="h-6 w-6" />} />
 
       {/* Form Section */}
       <div className="container max-w-4xl mx-auto py-10 px-4">
@@ -188,12 +183,16 @@ const SuccessArchitect = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="startsOn">تاریخ شروع</Label>
-                <Input id="startsOn" type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+                <Label htmlFor="startsOn">تاریخ شروع (شمسی یا میلادی)</Label>
+                <Input id="startsOn" placeholder="مثال: ۱۴۰۵/۰۶/۱۵" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">نام سازمان</Label>
+                <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="مثال: HRing" />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="jobTitle">عنوان شغل *</Label>
                 <Input
@@ -260,7 +259,7 @@ const SuccessArchitect = () => {
 
             <Button
               onClick={handleGenerate}
-              disabled={isLoading}
+              disabled={isLoading || credits < getCost('ONBOARDING_PLAN')}
               className="w-full h-12 text-lg gap-2"
             >
               {isLoading ? (
@@ -271,7 +270,7 @@ const SuccessArchitect = () => {
               ) : (
                 <>
                   <Route className="w-5 h-5" />
-                  تولید نقشه راه ۹۰ روزه
+                  تولید نقشه راه ۹۰ روزه و ایمیل خوش‌آمدگویی ({getCost('ONBOARDING_PLAN')} جم)
                 </>
               )}
             </Button>
@@ -281,6 +280,11 @@ const SuccessArchitect = () => {
         {/* Result Section */}
         {generatedPlan && (
           <div ref={resultRef} className="mt-8 space-y-6">
+            <div className="flex justify-end no-print">
+              <Button variant="outline" onClick={() => void handleDownload()} className="gap-2">
+                <Download className="h-4 w-4" /> دانلود PDF
+              </Button>
+            </div>
             {/* 90-Day Plan */}
             <Card className="shadow-lg border-0">
               <CardHeader>

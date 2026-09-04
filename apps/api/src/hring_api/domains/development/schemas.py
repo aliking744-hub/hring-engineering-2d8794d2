@@ -11,12 +11,14 @@ class OnboardingGenerateRequest(BaseModel):
     employee_name: str | None = Field(default=None, max_length=240)
     employee_email: str | None = Field(default=None, max_length=320)
     starts_on: date | None = None
+    starts_on_display: str | None = Field(default=None, max_length=80)
+    company_name: str | None = Field(default=None, max_length=240)
     job_title: str = Field(min_length=2, max_length=240)
     seniority: Literal["junior", "mid", "senior", "lead"]
     expectation: Literal["quick_delivery", "learning", "leadership", "innovation"]
     mentor_role: str | None = Field(default=None, max_length=240)
 
-    @field_validator("employee_name", "mentor_role")
+    @field_validator("employee_name", "mentor_role", "starts_on_display", "company_name")
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:

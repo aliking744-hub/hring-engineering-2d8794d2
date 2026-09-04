@@ -30,7 +30,7 @@ from hring_api.domains.job_engineering.schemas import (
 
 
 JOB_PROFILE_FEATURE_KEY = "job_engineering.job_profile"
-JOB_PROFILE_DEFAULT_CREDIT_COST = 5
+JOB_PROFILE_DEFAULT_CREDIT_COST = 8
 
 SYSTEM_PROMPT = """You are a Senior HR Consultant specializing in Organizational Development and Job Engineering. Based on the user's input, create a comprehensive 'Job Identity & Specification Document'. You MUST follow this exact Markdown structure and use Tables where specified.
 
@@ -78,6 +78,17 @@ Tone: Highly formal, technical, and suitable for legal/contractual use.
 Language: Persian (Farsi).
 Output Format: Clean Markdown with headers and tables. NO HTML TAGS.
 Important: Generate realistic and comprehensive content appropriate for a professional HR classification handbook."""
+
+# Release quality additions are kept separate so managed prompt versions can use
+# the same variables while the embedded fallback remains explicit and auditable.
+SYSTEM_PROMPT += """
+
+QUALITY REQUIREMENTS:
+- Use O*NET occupational families only as a transparent benchmark; never claim an exact O*NET code unless certain.
+- Localize employment terminology, working context and compliance assumptions for Iran.
+- Add measurable mission outcomes and KPIs, qualifications, work context, career path, and a revision/version section.
+- Clearly mark organization-specific facts that were not supplied as «نیازمند تکمیل توسط سازمان» instead of inventing them.
+"""
 
 
 class JobEngineeringError(RuntimeError):
@@ -128,7 +139,7 @@ async def _generate_content(
                 {"role": "user", "content": user_prompt},
             ],
             credits_charged=credits_charged,
-            max_output_tokens=12_000,
+            max_output_tokens=5_000,
             metadata_json={
                 "ai_route_source": route.source,
                 "prompt_key": JOB_PROFILE_FEATURE_KEY,

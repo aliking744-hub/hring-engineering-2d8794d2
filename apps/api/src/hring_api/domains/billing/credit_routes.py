@@ -15,6 +15,7 @@ from hring_api.domains.billing.credit_schemas import (
     CreditLedgerEntryResponse,
     CreditPreflightRequest,
     CreditPreflightResponse,
+    CreditRateCardResponse,
     CreditReconciliationResponse,
     OwnerType,
 )
@@ -28,6 +29,7 @@ from hring_api.domains.billing.credit_service import (
     get_credit_balance,
     list_credit_accounts_for_admin,
     list_credit_ledger_entries,
+    public_credit_rate_card,
     reconcile_credit_accounts,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
@@ -95,6 +97,15 @@ async def credit_preflight(
         raise _credit_http_error(exc) from exc
     available = int(balance.account.available_credits)
     return CreditPreflightResponse(allowed=available >= payload.amount, available_credits=available)
+
+
+@router.get("/billing/credits/rate-card", response_model=CreditRateCardResponse)
+async def credit_rate_card(
+    _principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> CreditRateCardResponse:
+    """Expose display prices from the same rows used for server-side charging."""
+    return CreditRateCardResponse(rates=await public_credit_rate_card(db))
 
 
 @router.get(

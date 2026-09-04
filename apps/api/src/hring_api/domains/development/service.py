@@ -53,8 +53,8 @@ from hring_api.domains.development.schemas import (
 from hring_api.domains.identity.dependencies import Principal
 
 
-ONBOARDING_DEFAULT_CREDIT_COST = 15
-LEARNING_PATH_DEFAULT_CREDIT_COST = 15
+ONBOARDING_DEFAULT_CREDIT_COST = 12
+LEARNING_PATH_DEFAULT_CREDIT_COST = 12
 
 
 class DevelopmentError(RuntimeError):
@@ -112,28 +112,33 @@ async def _seed_onboarding_tasks(
     owner = plan.mentor_role or "مدیر مستقیم"
     seeds = [
         (
+            "پیش از شروع: آماده‌سازی تجهیزات، دسترسی‌ها و برنامه روز اول",
+            "خروجی: چک‌لیست آماده‌سازی تکمیل‌شده. معیار موفقیت: همه دسترسی‌های ضروری پیش از شروع فعال باشد.",
+            -3,
+        ),
+        (
             "روز اول: خوش‌آمدگویی، معرفی تیم و دسترسی‌ها",
-            "تجهیزات، حساب‌ها و مسیر ارتباط با تیم را تأیید کنید.",
-            1,
+            "خروجی: صورت‌جلسه معرفی و دسترسی‌ها. معیار موفقیت: کارمند بتواند بدون مانع وارد ابزارهای کاری شود.",
+            0,
         ),
         (
             "هفتهٔ اول: مرور نقش، اهداف و مستندات",
-            "جلسهٔ هم‌راستاسازی با مدیر و مرور مستندات کلیدی نقش.",
+            "خروجی: اهداف و برنامه هفته اول. معیار موفقیت: نقش، خروجی‌ها و کانال‌های ارتباطی روشن باشد.",
             7,
         ),
         (
             "پایان ماه اول: بازخورد و تثبیت برنامه",
-            "بازخورد ساختاریافته بگیرید و اهداف ماه دوم را قطعی کنید.",
+            "خروجی: گزارش بازخورد ۳۰روزه. معیار موفقیت: نخستین خروجی شغلی تحویل و موانع ثبت شده باشد.",
             30,
         ),
         (
-            "پایان ماه دوم: بررسی مشارکت و موانع",
-            "پیشرفت عملی، موانع و نیازهای آموزشی را با مدیر مرور کنید.",
+            "روزهای ۳۱ تا ۶۰: بررسی مشارکت و موانع",
+            "خروجی: مرور پیشرفت و برنامه رفع موانع. معیار موفقیت: مسئولیت‌های اصلی با نظارت محدود انجام شود.",
             60,
         ),
         (
-            "پایان ماه سوم: ارزیابی ۹۰ روزه",
-            "جمع‌بندی اهداف، نتیجهٔ دوره و گام‌های بعدی توسعه.",
+            "روزهای ۶۱ تا ۹۰: ارزیابی استقلال و گام بعدی",
+            "خروجی: ارزیابی ۹۰روزه و برنامه توسعه. معیار موفقیت: اهداف دوره جمع‌بندی و گام بعدی تأیید شود.",
             90,
         ),
     ]
@@ -248,6 +253,10 @@ async def generate_onboarding_plan(
 
     async def operation() -> OnboardingPlan:
         plan, welcome_email = await generate_onboarding_content(
+            employee_name=payload.employee_name,
+            starts_on=payload.starts_on,
+            starts_on_display=payload.starts_on_display,
+            company_name=payload.company_name,
             job_title=payload.job_title,
             seniority=payload.seniority,
             expectation=payload.expectation,

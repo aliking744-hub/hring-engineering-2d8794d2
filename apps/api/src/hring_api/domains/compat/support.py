@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,13 +12,11 @@ from hring_api.domains.admin.models import SiteSetting
 from hring_api.domains.ai.feature_catalog import AI_FEATURES
 
 
-DEFAULT_PHONE = "09123456789"
-
-
 @dataclass(frozen=True)
 class SupportContext:
     system_prompt: str
     conversation_json: str
+    support_phone: str | None
 
     def prompt_variables(self) -> dict[str, str]:
         return {
@@ -54,7 +53,7 @@ async def build_support_context(session: AsyncSession, body: Any) -> SupportCont
     for row in rows.all():
         if row.value:
             settings[row.key] = row.value
-    phone = settings.get("support_phone", DEFAULT_PHONE)
+    phone = settings.get("support_phone", "").strip() or None
     feature_lines = "\n".join(
         f"- {feature.display_name}: {feature.description}"
         for feature in AI_FEATURES
@@ -74,7 +73,7 @@ async def build_support_context(session: AsyncSession, body: Any) -> SupportCont
 - جست‌وجوی مستند قوانین: /legal-search
 
 ### شماره پشتیبانی
-{phone}
+{phone or 'در CMS ثبت نشده است؛ کاربر را به /support یا /contact هدایت کن.'}
 
 اگر درباره قیمت، سهمیه یا سطح دسترسی پرسیده شد و عدد قطعی در این دانش‌نامه نبود، عدد نساز و کاربر را به /upgrade یا پشتیبانی انسانی هدایت کن."""
     default_prompt = f"""تو دستیار پشتیبانی HRing هستی؛ بسیار مودب، فروتن و صمیمی باش و به فارسی محاوره‌ای محترمانه پاسخ بده.
@@ -86,21 +85,33 @@ async def build_support_context(session: AsyncSession, body: Any) -> SupportCont
 - برای قیمت و ارتقا به /upgrade هدایت کن
 - برای قانون کار و مشاوره حقوقی به /legal-advisor هدایت کن
 - پاسخ را کوتاه، روشن و عملی نگه دار
-- اگر پاسخ در اطلاعات بالا نبود بگو مطمئن نیستی و شماره پشتیبانی {phone} را بده"""
+- اگر پاسخ در اطلاعات بالا نبود بگو مطمئن نیستی؛ فقط اگر شماره‌ای بالا ثبت شده همان را بده، وگرنه کاربر را به /support یا /contact هدایت کن
+- هرگز شماره تلفن، قیمت یا راه ارتباطی نساز"""
     configured = settings.get("support_system_prompt")
-    system_prompt = (configured or default_prompt).replace("{SUPPORT_PHONE}", phone)
+    system_prompt = (configured or default_prompt).replace(
+        "{SUPPORT_PHONE}", phone or "در CMS ثبت نشده؛ از /support استفاده کنید"
+    )
     return SupportContext(
         system_prompt=system_prompt,
         conversation_json=json.dumps(messages, ensure_ascii=False),
+        support_phone=phone,
     )
 
 
-def support_text(value: Any) -> str:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    if isinstance(value, dict):
+def support_text(value: Any, *, allowed_phone: str | None = None) -> str:
+    text: str | None = None
+    if isinstance(value, str):
+        text = value.strip() or None
+    elif isinstance(value, dict):
         for key in ("content", "answer", "message"):
             candidate = value.get(key)
             if isinstance(candidate, str) and candidate.strip():
-                return candidate.strip()
-    raise SupportInputError("پاسخ معتبری از دستیار پشتیبانی دریافت نشد")
+                text = candidate.strip()
+                break
+    if text is None:
+        raise SupportInputError("پاسخ معتبری از دستیار پشتیبانی دریافت نشد")
+    phones = set(re.findall(r"(?<!\d)09\d{9}(?!\d)", text))
+    unauthorized = phones - ({allowed_phone} if allowed_phone else set())
+    for phone in unauthorized:
+        text = text.replace(phone, "مسیر پشتیبانی /support")
+    return text

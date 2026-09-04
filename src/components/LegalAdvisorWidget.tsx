@@ -1,16 +1,26 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Scale, Send, X, Loader2, MessageSquare, Bot, User } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Scale, Send, Loader2, MessageSquare, Bot, User, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ApiError, apiRequest } from '@/lib/api';
+import { useCredits } from '@/hooks/useCredits';
+
+interface LegalSource {
+  articleNumber?: string | null;
+  category: string;
+  similarity: number;
+  title: string;
+  sourceUrl?: string | null;
+}
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  sources?: LegalSource[];
 }
 
 const LegalAdvisorWidget = () => {
@@ -18,6 +28,8 @@ const LegalAdvisorWidget = () => {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [requestKey, setRequestKey] = useState<string | null>(null);
+  const { credits, getCost } = useCredits();
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -30,18 +42,23 @@ const LegalAdvisorWidget = () => {
     setIsOpen(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('legal-advisor-chat', {
-        body: { query: userMessage }
+      const key = requestKey || crypto.randomUUID();
+      setRequestKey(key);
+      const data = await apiRequest<{ answer: string; sources: LegalSource[] }>('/legal/advisor/chat', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': key },
+        body: JSON.stringify({ query: userMessage, conversationHistory: messages.slice(-6) }),
       });
 
-      if (error) throw error;
-
       if (data.answer) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: data.answer, sources: data.sources }]);
+        setRequestKey(null);
+        window.dispatchEvent(new Event('hring:credits-changed'));
       } else {
         throw new Error('پاسخی دریافت نشد');
       }
     } catch (error) {
+      if (error instanceof ApiError) setRequestKey(null);
       console.error('Legal advisor error:', error);
       toast.error('خطا در دریافت پاسخ');
       setMessages(prev => [...prev, { 
@@ -87,11 +104,11 @@ const LegalAdvisorWidget = () => {
             className="flex-1"
             disabled={isLoading}
           />
-          <Button type="submit" disabled={isLoading || !query.trim()}>
+          <Button type="submit" disabled={isLoading || !query.trim() || credits < getCost('LEGAL_ADVISOR')} className="gap-1">
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Send className="w-4 h-4" />
+              <><Send className="w-4 h-4" /><span className="text-xs">{getCost('LEGAL_ADVISOR')} جم</span></>
             )}
           </Button>
         </form>
@@ -155,6 +172,34 @@ const LegalAdvisorWidget = () => {
                     <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                       {msg.content}
                     </p>
+                    {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                      <div className="mt-4 border-t border-border/60 pt-3">
+                        <p className="mb-2 text-xs font-semibold text-muted-foreground">منابع پاسخ</p>
+                        <ul className="space-y-2">
+                          {msg.sources.map((source, sourceIndex) => (
+                            <li key={`${source.title}-${sourceIndex}`} className="rounded-lg bg-background/60 p-2 text-xs">
+                              {source.sourceUrl ? (
+                                <a
+                                  href={source.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                                >
+                                  {source.title}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="font-medium">{source.title}</span>
+                              )}
+                              <span className="mt-1 block text-muted-foreground">
+                                {source.category}
+                                {source.articleNumber ? ` — ماده ${source.articleNumber}` : ''}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -189,11 +234,11 @@ const LegalAdvisorWidget = () => {
                 className="flex-1"
                 disabled={isLoading}
               />
-              <Button type="submit" disabled={isLoading || !query.trim()}>
+              <Button type="submit" disabled={isLoading || !query.trim() || credits < getCost('LEGAL_ADVISOR')} className="gap-1">
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <><Send className="w-4 h-4" /><span className="text-xs">{getCost('LEGAL_ADVISOR')} جم</span></>
                 )}
               </Button>
             </form>

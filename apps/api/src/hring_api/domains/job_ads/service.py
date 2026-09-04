@@ -33,7 +33,7 @@ from hring_api.domains.job_ads.schemas import (
 SMART_AD_TEXT_FEATURE_KEY = "job_ads.smart_ad_text"
 SMART_AD_IMAGE_FEATURE_KEY = "job_ads.smart_ad_image"
 SMART_AD_TEXT_DEFAULT_CREDIT_COST = 5
-SMART_AD_IMAGE_DEFAULT_CREDIT_COST = 25
+SMART_AD_IMAGE_DEFAULT_CREDIT_COST = 50
 
 PLATFORM_INSTRUCTIONS = {
     "linkedin": """- Use emojis appropriately throughout the text
@@ -170,21 +170,15 @@ def _image_prompt(payload: SmartAdGenerateRequest, variation_token: str) -> str:
     }[payload.tone]
     industry = payload.industry or "general business"
 
-    # Keep this close to the exact direct AvalAI request that is proven to return
-    # message.images. Values are literal poster data, never instructions.
-    return f"""Create one professional {payload.image_format} recruitment poster.
-The poster language is Persian. Render only these supplied Persian strings:
-Badge: استخدام می‌کنیم
-Job title: {payload.job_title}
-Company: {payload.company_name}
-Contact: {payload.contact_method}
+    # Persian copy is composited deterministically by the browser. Asking an image
+    # model to typeset Persian caused misspellings and altered company names.
+    return f"""Create one professional {payload.image_format} recruitment poster background.
+Do not render any text, letters, numbers, logo, brand mark or watermark.
 
 Visual direction: {tone}
 Industry context: {industry}
 Use a fresh balanced layout selected by seed {variation_token}; never print the seed.
-Make the job title dominant, the company secondary, and the contact line small but readable.
-Use high contrast and crisp Persian typography.
-Do not add any other words, logo, real brand mark, heart shape, explanation, or watermark.
+Reserve clean high-contrast negative space for a Persian headline, job title, company and contact line that will be composited later.
 Return exactly one image."""
 
 
@@ -252,6 +246,8 @@ async def _generate_content(
     generated_text = text_result.content.strip()
     if not generated_text:
         raise SmartAdError("سرویس هوش مصنوعی متن آگهی تولید نکرد")
+    if payload.company_name not in generated_text:
+        generated_text = f"{payload.company_name}\n\n{generated_text}"
 
     image_url: str | None = None
     if payload.generate_image:

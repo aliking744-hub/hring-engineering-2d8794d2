@@ -36,6 +36,10 @@ class CreditPreflightResponse(BaseModel):
     available_credits: int
 
 
+class CreditRateCardResponse(BaseModel):
+    rates: dict[str, int]
+
+
 class AdminCreditAdjustmentRequest(BaseModel):
     owner_type: OwnerType
     owner_id: UUID
