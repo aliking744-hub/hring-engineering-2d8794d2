@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -90,7 +91,7 @@ class SmartAdImageResponse(BaseModel):
 class SmartAdArtifactResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: str
+    id: UUID
     job_title: str = Field(serialization_alias="jobTitle")
     company_name: str = Field(serialization_alias="companyName")
     content_type: str = Field(serialization_alias="contentType")
