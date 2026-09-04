@@ -284,3 +284,8 @@ def test_support_removes_unconfigured_phone_numbers() -> None:
         "با 09111111111 تماس بگیرید", allowed_phone="09111111111"
     )
 
+
+
+def test_support_text_rejects_empty_response() -> None:
+    with pytest.raises(SupportInputError):
+        support_text("   ")
