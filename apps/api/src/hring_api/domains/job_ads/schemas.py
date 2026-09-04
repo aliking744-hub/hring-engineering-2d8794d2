@@ -88,6 +88,20 @@ class SmartAdImageResponse(BaseModel):
     asset_id: str | None = Field(default=None, serialization_alias="assetId")
 
 
+class SmartAdFinalizeImageRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    image_data: str = Field(alias="imageData", min_length=32, max_length=20_000_000)
+
+    @field_validator("image_data")
+    @classmethod
+    def validate_image_data_uri(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized.startswith("data:image/") or ";base64," not in normalized:
+            raise ValueError("Image data must be a base64 image data URI")
+        return normalized
+
+
 class SmartAdArtifactResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
