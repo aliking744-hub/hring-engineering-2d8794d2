@@ -384,5 +384,5 @@ def test_smart_ad_asset_streams_private_object(monkeypatch) -> None:
         assert response.status_code == 200, response.text
         assert response.content == b"private-image"
         assert response.headers["content-type"] == "image/png"
-        assert response.headers["cache-control"] == "private, max-age=300"
+        assert response.headers["cache-control"] == "no-store"
         assert response.headers["x-content-type-options"] == "nosniff"
