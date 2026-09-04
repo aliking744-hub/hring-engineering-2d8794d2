@@ -15,6 +15,7 @@ from hring_api.domains.job_engineering.schemas import (
     JobProfileGenerateRequest,
     JobProfileResponse,
 )
+from hring_api.domains.workspace_outputs.service import save_workspace_output
 from hring_api.domains.job_engineering.service import (
     JobEngineeringError,
     generate_job_profile,
@@ -60,6 +61,17 @@ async def create_job_profile(
             idempotency_key=idempotency_key,
             request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
             settings=settings,
+        )
+        await save_workspace_output(
+            db,
+            principal=principal,
+            feature_key="job_engineering.job_profile",
+            idempotency_key=idempotency_key,
+            title=payload.job_title,
+            payload={
+                "input": payload.model_dump(mode="json", by_alias=True),
+                "content": result.content,
+            },
         )
         await db.commit()
         return result
