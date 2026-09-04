@@ -23,6 +23,7 @@ from hring_api.domains.job_ads.schemas import (
     SmartAdResponse,
     SmartAdTextResponse,
 )
+from hring_api.domains.workspace_outputs.service import save_workspace_output
 from hring_api.domains.job_ads.service import (
     SmartAdError,
     generate_smart_ad,
@@ -185,6 +186,17 @@ async def create_smart_ad_text(
             idempotency_key=idempotency_key,
             request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
             settings=settings,
+        )
+        await save_workspace_output(
+            db,
+            principal=principal,
+            feature_key="job_ads.smart_ad_text",
+            idempotency_key=idempotency_key,
+            title=payload.job_title,
+            payload={
+                "input": text_payload.model_dump(mode="json", by_alias=True),
+                "content": result.generated_text,
+            },
         )
         await db.commit()
         return SmartAdTextResponse(generated_text=result.generated_text)
