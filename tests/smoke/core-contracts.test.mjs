@@ -360,3 +360,16 @@ test('smart ad keeps private image data alive through canvas composition', async
   assert.match(page, /await blobToDataUrl\(await apiBlobRequest\(responseImage\)\)/);
   assert.equal(page.includes('URL.revokeObjectURL(privateObjectUrl)'), false);
 });
+
+
+test('workspace report exports are branded and reject incomplete responses', async () => {
+  const [jobProfile, interview] = await Promise.all([
+    read('src/pages/JobDescriptionGenerator.tsx'),
+    read('src/pages/InterviewAssistant.tsx'),
+  ]);
+  assert.match(jobProfile, /alt="HRing"/);
+  assert.match(jobProfile, /!data\.content\.trim\(\)/);
+  assert.match(interview, /data\.questions\.length !== 11/);
+  assert.match(interview, /data-pdf-answer/);
+  assert.match(interview, /alt="HRing"/);
+});
