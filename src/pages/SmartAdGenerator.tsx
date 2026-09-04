@@ -34,6 +34,19 @@ const imageFormats = [
 
 type UnknownRecord = Record<string, unknown>;
 
+const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error("تصویر دریافتی قابل خواندن نیست"));
+  reader.onload = () => {
+    if (typeof reader.result === "string" && reader.result.startsWith("data:image/")) {
+      resolve(reader.result);
+      return;
+    }
+    reject(new Error("فرمت تصویر دریافتی معتبر نیست"));
+  };
+  reader.readAsDataURL(blob);
+});
+
 const formatGeneratedJobAd = (payload: unknown): string => {
   if (typeof payload === "string") return payload.trim();
   if (!payload || typeof payload !== "object") return "";
@@ -252,15 +265,10 @@ const SmartAdGenerator = () => {
         return;
       }
 
-      const privateObjectUrl = data.assetId && responseImage.startsWith("/job-ads/assets/")
-        ? URL.createObjectURL(await apiBlobRequest(responseImage))
+      const privateImageData = data.assetId && responseImage.startsWith("/job-ads/assets/")
+        ? await blobToDataUrl(await apiBlobRequest(responseImage))
         : null;
-      let composedImage: string;
-      try {
-        composedImage = await composeRecruitmentPoster(privateObjectUrl || responseImage);
-      } finally {
-        if (privateObjectUrl) URL.revokeObjectURL(privateObjectUrl);
-      }
+      const composedImage = await composeRecruitmentPoster(privateImageData || responseImage);
       setGeneratedImage(composedImage);
 
       if (data.assetId && composedImage.startsWith("data:image/")) {
