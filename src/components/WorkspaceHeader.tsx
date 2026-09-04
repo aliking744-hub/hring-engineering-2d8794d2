@@ -9,9 +9,10 @@ interface WorkspaceHeaderProps {
   subtitle: string;
   icon: ReactNode;
   className?: string;
+  actions?: ReactNode;
 }
 
-export default function WorkspaceHeader({ title, subtitle, icon, className = "" }: WorkspaceHeaderProps) {
+export default function WorkspaceHeader({ title, subtitle, icon, className = "", actions }: WorkspaceHeaderProps) {
   return (
     <header className={`border-b border-border/60 bg-background/90 px-4 py-5 backdrop-blur no-print ${className}`} dir="rtl">
       <div className="container mx-auto flex max-w-5xl items-center justify-between gap-4">
@@ -25,6 +26,7 @@ export default function WorkspaceHeader({ title, subtitle, icon, className = "" 
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {actions}
           <img src={logo} alt="HRing" className="hidden h-10 w-10 object-contain sm:block" />
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link to="/dashboard">
