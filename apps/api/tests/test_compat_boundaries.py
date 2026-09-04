@@ -7,7 +7,7 @@ from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiCitation
 from hring_api.domains.compat.access import PERSONAL_OPERATION_RULES
 from hring_api.domains.compat.functions import _response_with_citations
-from hring_api.domains.compat.support import support_text
+from hring_api.domains.compat.support import SupportInputError, support_text
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
 from hring_api.domains.compat.storage_policy import (
