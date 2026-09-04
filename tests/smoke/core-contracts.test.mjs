@@ -387,3 +387,17 @@ test('workspace generation pages expose persistent owner-scoped history', async 
   assert.match(smartAd, /featureKey=job_ads\.smart_ad_text/);
   assert.match(smartAd, /\/job-ads\/assets\/\$\{item\.id\}/);
 });
+
+
+test('PR78 release keeps payment disabled and documents additive migrations and rollback', async () => {
+  const [runbook, workspaceMigration, smartAdMigration] = await Promise.all([
+    read('docs/operations/PR78_DEPLOY_FA.md'),
+    read('apps/api/alembic/versions/20260904_0036_workspace_output_history.py'),
+    read('apps/api/alembic/versions/20260904_0035_private_smart_ad_assets.py'),
+  ]);
+  assert.match(runbook, /PAYMENT_PROVIDER=disabled/);
+  assert.match(runbook, /20260904_0036 \(head\)/);
+  assert.match(runbook, /rollback/);
+  assert.match(workspaceMigration, /down_revision: str \| None = "20260904_0035"/);
+  assert.match(smartAdMigration, /down_revision: str \| None = "20260904_0034"/);
+});
