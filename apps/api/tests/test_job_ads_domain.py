@@ -23,6 +23,7 @@ from hring_api.domains.job_ads.service import (
     SmartAdError,
     _generate_content,
     _generate_image_content,
+    _persist_image_asset,
     _image_prompt,
     finalize_smart_ad_artifact,
     get_smart_ad_artifact,
@@ -562,3 +563,54 @@ def test_smart_ad_finalization_route_requires_owner(monkeypatch) -> None:
             "imageUrl": f"/job-ads/assets/{artifact_id}",
             "assetId": str(artifact_id),
         }
+
+
+def test_smart_ad_private_asset_preserves_mime_extension(monkeypatch) -> None:
+    writes: list[dict[str, object]] = []
+    added: list[object] = []
+
+    def fake_put(*_args: object, **kwargs: object) -> str:
+        writes.append(kwargs)
+        return "stored"
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.put_object",
+        fake_put,
+    )
+    artifact = _persist_image_asset(
+        image_url="data:image/jpeg;base64,aGVsbG8=",
+        payload=_payload(),
+        principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+        idempotency_key="jpeg-extension",
+        settings=Settings(),
+        session=SimpleNamespace(add=added.append),
+    )
+
+    assert artifact is not None
+    assert artifact.storage_path.endswith(".jpg")
+    assert artifact.content_type == "image/jpeg"
+    assert writes[0]["content_type"] == "image/jpeg"
+    assert added == [artifact]
+
+
+def test_smart_ad_private_asset_rejects_oversized_source(monkeypatch) -> None:
+    writes: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.SMART_AD_IMAGE_MAX_BYTES",
+        4,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.put_object",
+        lambda *_args, **kwargs: writes.append(kwargs),
+    )
+    artifact = _persist_image_asset(
+        image_url="data:image/png;base64,aGVsbG8=",
+        payload=_payload(),
+        principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+        idempotency_key="oversized-source",
+        settings=Settings(),
+        session=SimpleNamespace(add=lambda _row: None),
+    )
+
+    assert artifact is None
+    assert writes == []
