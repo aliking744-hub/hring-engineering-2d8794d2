@@ -53,7 +53,7 @@ test('support uses live platform knowledge and emits the widget SSE contract', a
 test('active interview screen uses the restored interview kit, not dead guide code', async () => {
   const screen = await read('src/pages/InterviewAssistant.tsx');
 
-  assert.match(screen, /generate-interview-kit/);
+  assert.match(screen, /\/interview\/kits\/generate/);
   assert.equal(/generate-interview-guide/.test(screen), false);
 });
 
