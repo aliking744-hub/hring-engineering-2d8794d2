@@ -373,3 +373,16 @@ test('workspace report exports are branded and reject incomplete responses', asy
   assert.match(interview, /data-pdf-answer/);
   assert.match(interview, /alt="HRing"/);
 });
+
+
+test('workspace generation pages expose persistent owner-scoped history', async () => {
+  const [jobProfile, interview, smartAd] = await Promise.all([
+    read('src/pages/JobDescriptionGenerator.tsx'),
+    read('src/pages/InterviewAssistant.tsx'),
+    read('src/pages/SmartAdGenerator.tsx'),
+  ]);
+  assert.match(jobProfile, /featureKey=job_engineering\.job_profile/);
+  assert.match(interview, /featureKey=interview\.kit/);
+  assert.match(smartAd, /\/job-ads\/history/);
+  assert.match(smartAd, /\/job-ads\/assets\/\$\{item\.id\}/);
+});
