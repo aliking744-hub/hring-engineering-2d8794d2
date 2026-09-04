@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
-import { ApiError, apiRequest } from "@/lib/api";
+import { ApiError, apiBlobRequest, apiRequest } from "@/lib/api";
 import { ArrowRight, Megaphone, Loader2, Copy, Download, Sparkles, Image as ImageIcon, Upload, X, Coins } from "lucide-react";
 import logo from "@/assets/logo.png";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
@@ -237,7 +237,7 @@ const SmartAdGenerator = () => {
     try {
       const requestKey = imageRequestKeyRef.current || crypto.randomUUID();
       imageRequestKeyRef.current = requestKey;
-      const data = await apiRequest<{ imageUrl: string }>("/job-ads/generate-image", {
+      const data = await apiRequest<{ imageUrl: string; assetId?: string }>("/job-ads/generate-image", {
         method: "POST",
         headers: { "X-Idempotency-Key": requestKey },
         body: JSON.stringify(requestBody()),
@@ -252,7 +252,14 @@ const SmartAdGenerator = () => {
         return;
       }
 
-      setGeneratedImage(await composeRecruitmentPoster(responseImage));
+      const privateObjectUrl = data.assetId && responseImage.startsWith("/job-ads/assets/")
+        ? URL.createObjectURL(await apiBlobRequest(responseImage))
+        : null;
+      try {
+        setGeneratedImage(await composeRecruitmentPoster(privateObjectUrl || responseImage));
+      } finally {
+        if (privateObjectUrl) URL.revokeObjectURL(privateObjectUrl);
+      }
       imageRequestKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "تصویر آگهی با موفقیت تولید شد" });
