@@ -13,6 +13,7 @@ import jsPDF from "jspdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { Textarea } from "@/components/ui/textarea";
+import logo from "@/assets/logo.png";
 
 const seniorityLevels = [
   { value: "junior", label: "کارشناس (Junior)" },
@@ -147,6 +148,13 @@ const JobDescriptionGenerator = () => {
             <div ref={previewRef} className="bg-secondary/30 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto">
               {generatedContent ? (
                 <div className="text-sm text-foreground leading-relaxed space-y-2" style={{ fontFamily: 'BNazanin, Tahoma, sans-serif' }}>
+                  <div className="mb-6 flex items-center justify-between border-b border-primary/30 pb-4">
+                    <div className="text-right">
+                      <h1 className="text-xl font-bold">پروفایل شغلی</h1>
+                      <p className="text-muted-foreground">{companyName || 'HRing'} — {jobTitle}</p>
+                    </div>
+                    <img src={logo} alt="HRing" className="h-12 w-12 rounded-lg object-contain" />
+                  </div>
                   {generatedContent.split('\n').map((line, index) => {
                     const trimmed = line.trim();
                     if (!trimmed || trimmed.match(/^-{3,}$/)) return null;
