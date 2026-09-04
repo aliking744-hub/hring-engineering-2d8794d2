@@ -51,6 +51,11 @@ def test_phone_enrollment_then_sms_login(monkeypatch) -> None:
         )
         assert verify_phone.status_code == 204, verify_phone.text
 
+        context = client.get("/api/v1/auth/context", headers=auth_header)
+        assert context.status_code == 200, context.text
+        assert context.json()["phone_e164"] == "+989121234567"
+        assert context.json()["phone_verified_at"] is not None
+
         request_login = client.post(
             "/api/v1/auth/sms/request",
             json={"phone": "+989121234567"},
