@@ -46,7 +46,7 @@
 
 ### P0 — مانع عرضه
 - [x] صفحات اصلی میزکار از WorkspaceHeader مشترک، قیمت سروری روی دکمه، دانلود مستقیم PDF و خروجی برندشده استفاده می‌کنند؛ tab بی‌فایده حذف شده است.
-- [x] history مالک‌محور برای Smart Ad image، Job Profile، Interview Kit، Learning Path، Onboarding و Dashboard وجود دارد و پس از refresh بازیابی می‌شود.
+- [x] history مالک‌محور برای Smart Ad text/image، Job Profile، Interview Kit، Learning Path، Onboarding و Dashboard وجود دارد و پس از refresh بازیابی می‌شود.
 - [ ] PDF/RTL/فونت و history باید پس از استقرار، روی موبایل و دسکتاپ UAT نهایی شود.
 - [x] Learning Path پاسخ ناقص را رد و پیام قابل‌فهم نشان می‌دهد؛ refund/no-charge در guard سرور پوشش دارد.
 - [ ] سناریوی خطای واقعی Learning Path بدون کسر اعتبار باید پس از استقرار UAT شود.
