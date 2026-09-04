@@ -251,7 +251,7 @@ const AccountSecurity = () => {
                 <Badge variant="secondary">ورود با پیامک</Badge>
               </div>
               <CardTitle>اتصال شماره موبایل</CardTitle>
-              <CardDescription className="leading-6">شمارهٔ تأییدشده فقط برای ورود با پیامک استفاده می‌شود. برای حفظ حریم خصوصی، شماره‌ای که به حسابی متصل نیست هیچ پیامکی دریافت نمی‌کند.</CardDescription>
+              <CardDescription className="leading-6">با تأیید این شماره، ورود پیامکی برای همین حساب فعال می‌شود. در صفحه ورود، شماره‌های ناشناس پاسخ یکسان می‌گیرند و پیامکی دریافت نمی‌کنند.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={verifyPhone} className="space-y-4">
@@ -268,7 +268,7 @@ const AccountSecurity = () => {
                   <>
                     <Input
                       value={phoneCode}
-                      onChange={(event) => setPhoneCode(event.target.value.replace(/\\D/g, '').slice(0, 6))}
+                      onChange={(event) => setPhoneCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                       placeholder="کد ۶ رقمی"
                       inputMode="numeric"
                       dir="ltr"
