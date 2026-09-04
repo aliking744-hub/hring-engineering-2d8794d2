@@ -10,6 +10,7 @@ from hring_api.domains.access.policy import (
 from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.identity.models import Company, Profile
+from hring_api.domains.identity.sms_repository import get_phone_identity_by_user
 from hring_api.domains.identity.schemas import (
     AuthResponse,
     CurrentUserContextResponse,
@@ -345,6 +346,7 @@ async def current_user_context(
     membership = next((item for item in principal.memberships if item.is_active), None)
     company = await db.get(Company, membership.company_id) if membership is not None else None
     platform_roles = await list_platform_roles(db, principal.user_id)
+    phone_identity = await get_phone_identity_by_user(db, principal.user_id)
 
     effective_permissions: list[str] = []
     if membership is not None:
@@ -376,4 +378,6 @@ async def current_user_context(
         full_name=profile.full_name if profile is not None else None,
         title=profile.title if profile is not None else None,
         avatar_url=profile.avatar_url if profile is not None else None,
+        phone_e164=phone_identity.phone_e164 if phone_identity is not None else None,
+        phone_verified_at=phone_identity.verified_at if phone_identity is not None else None,
     )
