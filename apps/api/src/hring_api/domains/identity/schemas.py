@@ -153,6 +153,8 @@ class CurrentUserContextResponse(BaseModel):
     full_name: str | None
     title: str | None
     avatar_url: str | None
+    phone_e164: str | None
+    phone_verified_at: datetime | None
 
 
 class SessionResponse(BaseModel):
