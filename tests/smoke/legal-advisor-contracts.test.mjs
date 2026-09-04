@@ -25,3 +25,12 @@ test("native legal advisor preserves the cited RAG contract", () => {
   assert.match(advisor, /extract_upload/);
   assert.match(advisor, /rate_limit_legal_advisor_per_minute/);
 });
+
+
+test("legal defense is unavailable until its async execution is observable", () => {
+  const defense = read("src/components/legal/DefenseBuilder.tsx");
+  assert.match(defense, /const asyncUpgradePending = true/);
+  assert.match(defense, /لایحه دفاعیه هوشمند — به‌زودی/);
+  assert.match(defense, /هیچ فایل یا اعتباری دریافت نمی‌شود/);
+  assert.match(defense, /اجرای غیرهمزمان و پیگیری‌پذیر/);
+});
