@@ -66,6 +66,7 @@ class SmartAdResponse(BaseModel):
         serialization_alias="imageUrl",
         max_length=20_000_000,
     )
+    asset_id: str | None = Field(default=None, serialization_alias="assetId")
 
 
 class SmartAdTextResponse(BaseModel):
