@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from base64 import b64decode
 from hashlib import sha256
+from io import BytesIO
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +25,8 @@ from hring_api.domains.billing.credit_service import (
     run_with_credit_reservation,
 )
 from hring_api.domains.identity.dependencies import Principal
+from hring_api.domains.compat.storage import put_object
+from hring_api.domains.job_ads.models import SmartAdArtifact
 from hring_api.domains.job_ads.schemas import (
     SmartAdGenerateRequest,
     SmartAdImageResponse,
@@ -398,6 +402,32 @@ async def generate_smart_ad(
 
 
 
+def _persist_image_asset(*, image_url: str, payload: SmartAdGenerateRequest, principal: Principal, idempotency_key: str, settings: Settings, session: AsyncSession) -> SmartAdArtifact | None:
+    """Persist data-URI images privately; remote provider URLs remain display-only."""
+    if not image_url.startswith("data:image/") or ";base64," not in image_url:
+        return None
+    header, encoded = image_url.split(",", 1)
+    content_type = header.removeprefix("data:").removesuffix(";base64")
+    if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+        return None
+    try:
+        blob = b64decode(encoded, validate=True)
+    except ValueError:
+        return None
+    artifact = SmartAdArtifact(
+        owner_user_id=principal.user_id,
+        company_id=_company_id(principal),
+        idempotency_key=idempotency_key,
+        job_title=payload.job_title,
+        company_name=payload.company_name,
+        storage_path=f"{principal.user_id}/{uuid4().hex}.png",
+        content_type=content_type,
+    )
+    put_object(settings, logical_bucket="job-ads", path=artifact.storage_path, stream=BytesIO(blob), content_type=content_type)
+    session.add(artifact)
+    return artifact
+
+
 async def _generate_image_content(
     *,
     payload: SmartAdGenerateRequest,
@@ -405,6 +435,7 @@ async def _generate_image_content(
     image_credits: int,
     settings: Settings,
     session: AsyncSession,
+    idempotency_key: str,
 ) -> SmartAdImageResponse:
     """Generate only the poster image; text generation is intentionally not invoked."""
     image_prompt = _image_prompt(payload, uuid4().hex[:12])
@@ -449,7 +480,9 @@ async def _generate_image_content(
 
     if not image_result.images:
         raise SmartAdError("سرویس هوش مصنوعی تصویر آگهی تولید نکرد")
-    return SmartAdImageResponse(image_url=image_result.images[0].url)
+    image_url = image_result.images[0].url
+    artifact = _persist_image_asset(image_url=image_url, payload=payload, principal=principal, idempotency_key=idempotency_key, settings=settings, session=session)
+    return SmartAdImageResponse(image_url=image_url, asset_id=str(artifact.id) if artifact else None)
 
 
 async def generate_smart_ad_image(
@@ -482,6 +515,7 @@ async def generate_smart_ad_image(
             image_credits=image_credits,
             settings=settings,
             session=session,
+            idempotency_key=idempotency_key,
         )
 
     if image_credits == 0:
