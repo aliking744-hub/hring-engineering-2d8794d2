@@ -146,9 +146,8 @@ def test_smart_ad_preserves_text_and_real_image_contract(monkeypatch) -> None:
     assert "image_size" not in image_call
     image_prompt = "\n".join(message["content"] for message in image_call["messages"])
     assert "Create one professional 16:9 recruitment poster" in image_prompt
-    assert "Badge: استخدام می‌کنیم" in image_prompt
-    assert "Job title: کارشناس منابع انسانی" in image_prompt
-    assert "Do not add any other words, logo" in image_prompt
+    assert "Do not render any text, letters, numbers, logo, brand mark" in image_prompt
+    assert "will be composited later" in image_prompt
     assert len(image_prompt) < 1_200
     assert image_call["messages"] == [
         {
