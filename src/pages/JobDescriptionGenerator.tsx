@@ -75,7 +75,10 @@ const JobDescriptionGenerator = () => {
         headers: { "X-Idempotency-Key": requestKey },
         body: JSON.stringify({ jobTitle, industry, seniorityLevel, companyName: companyName || null }),
       });
-      setGeneratedContent(data.content);
+      if (typeof data?.content !== "string" || !data.content.trim()) {
+        throw new Error("پروفایل شغلی کامل دریافت نشد؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
+      }
+      setGeneratedContent(data.content.trim());
       idempotencyKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "پروفایل شغلی با موفقیت تولید شد." });
