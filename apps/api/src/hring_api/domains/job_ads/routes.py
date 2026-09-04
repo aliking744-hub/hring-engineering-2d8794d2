@@ -86,7 +86,7 @@ async def smart_ad_asset(
         stream,
         media_type=content_type,
         headers={
-            "Cache-Control": "private, max-age=300",
+            "Cache-Control": "no-store",
             "Content-Disposition": f'inline; filename="smart-ad-{artifact_id}"',
             "X-Content-Type-Options": "nosniff",
         },
