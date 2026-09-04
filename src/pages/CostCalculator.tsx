@@ -434,11 +434,11 @@ export default function CostCalculator() {
               type="button"
               size="lg"
               onClick={handleCalculate}
-              disabled={isCalculating || baseSalary <= 0 || credits < getCost('SALARY_CALCULATOR')}
+              disabled={isCalculating || baseSalary <= 0 || credits < getCost('COST_CALCULATOR')}
               className="w-full gap-2 print:hidden"
             >
               {isCalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calculator className="w-5 h-5" />}
-              محاسبه نهایی ({getCost('SALARY_CALCULATOR')} اعتبار)
+              محاسبه نهایی ({getCost('COST_CALCULATOR')} اعتبار)
             </Button>
           </div>
 
