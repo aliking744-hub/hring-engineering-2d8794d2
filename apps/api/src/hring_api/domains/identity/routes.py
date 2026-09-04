@@ -10,7 +10,6 @@ from hring_api.domains.access.policy import (
 from hring_api.domains.access.repository import list_platform_roles
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.identity.models import Company, Profile
-from hring_api.domains.identity.sms_repository import get_phone_identity_by_user
 from hring_api.domains.identity.schemas import (
     AuthResponse,
     CurrentUserContextResponse,
@@ -36,6 +35,7 @@ from hring_api.domains.identity.service import (
     refresh,
     register,
 )
+from hring_api.domains.identity.sms_repository import get_phone_identity_by_user
 from hring_api.domains.identity.sms_service import (
     InvalidSmsChallengeError,
     PhoneUnavailableError,
