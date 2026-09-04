@@ -5,6 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 from uuid import UUID, uuid4
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
@@ -540,3 +541,19 @@ async def generate_smart_ad_image(
         request_id=request_id,
         operation=operation,
     )
+
+
+async def list_smart_ad_artifacts(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    limit: int = 50,
+) -> list[SmartAdArtifact]:
+    """Return only the current user's private image history, newest first."""
+    result = await session.execute(
+        select(SmartAdArtifact)
+        .where(SmartAdArtifact.owner_user_id == principal.user_id)
+        .order_by(SmartAdArtifact.created_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
