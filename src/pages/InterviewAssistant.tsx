@@ -155,14 +155,6 @@ const InterviewAssistant = () => {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      {/* Print Footer */}
-      <div className="hidden print:block fixed bottom-4 left-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <img src={logo} alt="لوگو" className="w-6 h-6" />
-          <span>تولید شده توسط سیستم مدیریت منابع انسانی</span>
-        </div>
-      </div>
-
       <WorkspaceHeader title="دستیار مصاحبه" subtitle="تولید راهنمای جامع مصاحبه با کلید ارزیابی" icon={<Briefcase className="h-6 w-6" />} />
 
       {/* Main Content */}
