@@ -22,7 +22,7 @@ interface SmsChallenge {
 
 const AccountSecurity = () => {
   const { toast } = useToast();
-  const { context } = useUserContext();
+  const { context, refetch: refetchUserContext } = useUserContext();
   const { beginMfaEnrollment, confirmMfaEnrollment } = useAuth();
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
@@ -147,6 +147,7 @@ const AccountSecurity = () => {
       });
       setPhoneChallengeId(null);
       setPhoneCode('');
+      await refetchUserContext();
       toast({ title: 'شماره موبایل تأیید شد', description: 'از این پس می‌توانی با پیامک وارد شوی.' });
     } catch (error) {
       toast({
@@ -248,12 +249,21 @@ const AccountSecurity = () => {
             <CardHeader>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <Phone className="h-10 w-10 text-primary" />
-                <Badge variant="secondary">ورود با پیامک</Badge>
+                <Badge variant={context?.phoneVerifiedAt ? 'default' : 'secondary'}>{context?.phoneVerifiedAt ? 'فعال' : 'ورود با پیامک'}</Badge>
               </div>
               <CardTitle>اتصال شماره موبایل</CardTitle>
               <CardDescription className="leading-6">با تأیید این شماره، ورود پیامکی برای همین حساب فعال می‌شود. در صفحه ورود، شماره‌های ناشناس پاسخ یکسان می‌گیرند و پیامکی دریافت نمی‌کنند.</CardDescription>
             </CardHeader>
             <CardContent>
+              {context?.phoneE164 && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <div>
+                    <div className="font-medium">شماره تأییدشده</div>
+                    <div className="mt-1 text-sm text-muted-foreground" dir="ltr">{context.phoneE164}</div>
+                  </div>
+                </div>
+              )}
               <form onSubmit={verifyPhone} className="space-y-4">
                 <Input
                   value={phone}
