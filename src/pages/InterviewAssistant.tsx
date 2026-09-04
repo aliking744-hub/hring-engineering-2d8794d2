@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
-import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins } from "lucide-react";
+import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins, History, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
@@ -20,6 +20,16 @@ interface InterviewQuestion {
   question: string;
   goodSigns: string[];
   redFlags: string[];
+}
+
+interface InterviewHistoryItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  payload: {
+    input?: { jobTitle?: string; industry?: string; seniorityLevel?: string; focusArea?: string };
+    questions?: InterviewQuestion[];
+  };
 }
 
 const seniorityLevels = [
@@ -43,11 +53,46 @@ const InterviewAssistant = () => {
   const [focusArea, setFocusArea] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
+  const [history, setHistory] = useState<InterviewHistoryItem[]>([]);
   const [openAnswerKeys, setOpenAnswerKeys] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const { credits, hasEnoughCredits, getCost } = useCredits();
   const resultRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const rows = await apiRequest<InterviewHistoryItem[]>(
+        "/workspace/outputs?featureKey=interview.kit&limit=20",
+      );
+      setHistory(rows);
+    } catch (error) {
+      console.warn("Interview history could not be loaded:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const restoreHistory = (item: InterviewHistoryItem) => {
+    const input = item.payload.input;
+    setJobTitle(input?.jobTitle || item.title);
+    setIndustry(input?.industry || "");
+    setSeniorityLevel(input?.seniorityLevel || "");
+    setFocusArea(input?.focusArea || "technical");
+    setQuestions(Array.isArray(item.payload.questions) ? item.payload.questions : []);
+  };
+
+  const removeHistory = async (id: string) => {
+    try {
+      await apiRequest(`/workspace/outputs/${id}`, { method: "DELETE" });
+      setHistory((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error("Interview history deletion failed:", error);
+      toast({ title: "خطا", description: "حذف خروجی انجام نشد", variant: "destructive" });
+    }
+  };
 
   const downloadInterviewPDF = async () => {
     if (!resultRef.current) return;
@@ -146,6 +191,7 @@ const InterviewAssistant = () => {
           title: "موفق",
           description: "راهنمای مصاحبه با موفقیت تولید شد.",
         });
+        await loadHistory();
         setTimeout(() => {
           resultRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 100);
@@ -364,6 +410,29 @@ const InterviewAssistant = () => {
               </div>
             ))}
           </div>
+        )}
+
+        {history.length > 0 && (
+          <Card className="mt-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" /> تاریخچه راهنماهای مصاحبه
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {history.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <button type="button" onClick={() => restoreHistory(item)} className="text-right hover:text-primary">
+                    <span className="block font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                  </button>
+                  <Button type="button" variant="ghost" size="icon" aria-label="حذف خروجی" onClick={() => void removeHistory(item.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
