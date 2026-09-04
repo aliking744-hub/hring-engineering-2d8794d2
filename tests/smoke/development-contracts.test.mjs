@@ -58,3 +58,12 @@ test('native development migration follows head and preserves rollback data', as
   assert.match(migration, /development_onboarding_plans_archive/);
 });
 
+
+
+test('learning path refuses an incomplete AI contract before presenting a broken report', async () => {
+  const learning = await read('src/pages/LearningPath.tsx');
+  assert.match(learning, /پاسخ مسیر یادگیری ناقص است/);
+  assert.match(learning, /Array\.isArray\(data\.result\.roadmap\)/);
+  assert.match(learning, /Array\.isArray\(data\.result\.hardSkills\)/);
+  assert.match(learning, /Array\.isArray\(data\.result\.softSkills\)/);
+});
