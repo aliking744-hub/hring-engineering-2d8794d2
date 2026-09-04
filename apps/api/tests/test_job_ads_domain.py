@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -22,6 +23,7 @@ from hring_api.domains.job_ads.service import (
     SmartAdError,
     _generate_content,
     _image_prompt,
+    list_smart_ad_artifacts,
 )
 from hring_api.main import app
 
@@ -310,3 +312,20 @@ def test_split_smart_ad_routes_are_independent(monkeypatch) -> None:
         assert image_response.json() == {
             "imageUrl": "data:image/png;base64,aGVsbG8="
         }
+
+
+def test_smart_ad_history_requires_auth_and_is_owner_scoped() -> None:
+    source = inspect.getsource(list_smart_ad_artifacts)
+    assert "SmartAdArtifact.owner_user_id == principal.user_id" in source
+
+    with TestClient(app) as client:
+        unauthorized = client.get("/api/v1/job-ads/history")
+        assert unauthorized.status_code == 401
+
+        account = _register(client)
+        response = client.get(
+            "/api/v1/job-ads/history",
+            headers={"Authorization": f"Bearer {account['tokens']['access_token']}"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == []
