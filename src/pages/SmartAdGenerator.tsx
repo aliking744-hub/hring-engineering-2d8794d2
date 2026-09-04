@@ -283,7 +283,13 @@ const SmartAdGenerator = () => {
       image.src = src;
     });
 
-    const background = await loadImage(backgroundUrl);
+    let background: HTMLImageElement;
+    try {
+      background = await loadImage(backgroundUrl);
+    } catch {
+      // Preserve the provider image if a cross-origin host blocks client-side composition.
+      return backgroundUrl;
+    }
     context.drawImage(background, 0, 0, width, height);
     const gradient = context.createLinearGradient(0, 0, width, 0);
     gradient.addColorStop(0, 'rgba(7,12,28,.18)');
@@ -302,9 +308,14 @@ const SmartAdGenerator = () => {
     context.font = `400 ${Math.round(height * .035)}px Tahoma, sans-serif`;
     context.fillText(contactMethod, width * .9, height * .69, width * .72);
     if (companyLogo) {
-      const uploadedLogo = await loadImage(companyLogo);
-      const size = Math.min(width, height) * .16;
-      context.drawImage(uploadedLogo, width * .08, height * .08, size, size);
+      try {
+        const uploadedLogo = await loadImage(companyLogo);
+        const size = Math.min(width, height) * .16;
+        context.drawImage(uploadedLogo, width * .08, height * .08, size, size);
+      } catch {
+        // A bad uploaded logo must not turn a paid, successful image into a failed action.
+        console.warn("Smart-ad logo could not be composited");
+      }
     }
     return canvas.toDataURL('image/png', 0.95);
   };
