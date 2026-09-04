@@ -12,10 +12,10 @@ test('cost calculator is server-authoritative, current-year and explicitly meter
   assert.match(page, /\/costing\/statutory-rates\/current/);
   assert.match(page, /\/costing\/calculate/);
   assert.match(page, /X-Idempotency-Key/);
-  assert.match(page, /محاسبه نهایی \(۵ اعتبار\)/);
+  assert.match(page, /getCost\('SALARY_CALCULATOR'\)/);
   assert.equal(page.includes('useMemo'), false);
   assert.match(routes, /run_with_credit_reservation/);
-  assert.match(routes, /COST_CALCULATOR_DEFAULT_CREDIT_COST = 5/);
+  assert.match(routes, /COST_CALCULATOR_DEFAULT_CREDIT_COST = 2/);
   assert.match(service, /year=1405/);
   assert.match(service, /housing_allowance_rial=30_000_000/);
   assert.match(service, /grocery_allowance_rial=22_000_000/);
