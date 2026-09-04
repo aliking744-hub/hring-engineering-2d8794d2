@@ -352,3 +352,11 @@ test('smart ad preserves a provider image if client poster composition is blocke
   assert.match(page, /Preserve the provider image if a cross-origin host blocks client-side composition/);
   assert.match(page, /A bad uploaded logo must not turn a paid, successful image into a failed action/);
 });
+
+
+test('smart ad keeps private image data alive through canvas composition', async () => {
+  const page = await read('src/pages/SmartAdGenerator.tsx');
+  assert.match(page, /const blobToDataUrl/);
+  assert.match(page, /await blobToDataUrl\(await apiBlobRequest\(responseImage\)\)/);
+  assert.equal(page.includes('URL.revokeObjectURL(privateObjectUrl)'), false);
+});
