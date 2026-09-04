@@ -40,6 +40,12 @@ SMART_AD_TEXT_FEATURE_KEY = "job_ads.smart_ad_text"
 SMART_AD_IMAGE_FEATURE_KEY = "job_ads.smart_ad_image"
 SMART_AD_TEXT_DEFAULT_CREDIT_COST = 5
 SMART_AD_IMAGE_DEFAULT_CREDIT_COST = 50
+SMART_AD_IMAGE_MAX_BYTES = 12 * 1024 * 1024
+SMART_AD_IMAGE_EXTENSIONS = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+}
 
 PLATFORM_INSTRUCTIONS = {
     "linkedin": """- Use emojis appropriately throughout the text
@@ -427,12 +433,15 @@ def _persist_image_asset(*, image_url: str, payload: SmartAdGenerateRequest, pri
         return None
     header, encoded = image_url.split(",", 1)
     content_type = header.removeprefix("data:").removesuffix(";base64")
-    if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+    if content_type not in SMART_AD_IMAGE_EXTENSIONS:
         return None
     try:
         blob = b64decode(encoded, validate=True)
     except (Base64DecodeError, ValueError):
         return None
+    if not blob or len(blob) > SMART_AD_IMAGE_MAX_BYTES:
+        return None
+    extension = SMART_AD_IMAGE_EXTENSIONS[content_type]
     artifact = SmartAdArtifact(
         id=uuid4(),
         owner_user_id=principal.user_id,
@@ -440,7 +449,7 @@ def _persist_image_asset(*, image_url: str, payload: SmartAdGenerateRequest, pri
         idempotency_key=idempotency_key,
         job_title=payload.job_title,
         company_name=payload.company_name,
-        storage_path=f"{principal.user_id}/{uuid4().hex}.png",
+        storage_path=f"{principal.user_id}/{uuid4().hex}.{extension}",
         content_type=content_type,
     )
     put_object(settings, logical_bucket="job-ads", path=artifact.storage_path, stream=BytesIO(blob), content_type=content_type)
@@ -616,13 +625,13 @@ async def finalize_smart_ad_artifact(
         return None
     header, encoded = image_data.split(",", 1)
     content_type = header.removeprefix("data:").removesuffix(";base64")
-    if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+    if content_type not in SMART_AD_IMAGE_EXTENSIONS:
         raise SmartAdError("فرمت تصویر نهایی پشتیبانی نمی‌شود")
     try:
         blob = b64decode(encoded, validate=True)
     except (Base64DecodeError, ValueError) as exc:
         raise SmartAdError("تصویر نهایی معتبر نیست") from exc
-    if not blob or len(blob) > 12 * 1024 * 1024:
+    if not blob or len(blob) > SMART_AD_IMAGE_MAX_BYTES:
         raise SmartAdError("حجم تصویر نهایی مجاز نیست")
     put_object(
         settings,
