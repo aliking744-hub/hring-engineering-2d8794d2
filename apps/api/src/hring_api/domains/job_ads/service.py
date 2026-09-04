@@ -369,7 +369,7 @@ async def generate_smart_ad(
     key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
 
     async def operation() -> SmartAdResponse:
-        return await _generate_content(
+        result = await _generate_content(
             payload=payload,
             principal=principal,
             text_credits=text_credits,
@@ -377,6 +377,18 @@ async def generate_smart_ad(
             settings=settings,
             session=session,
         )
+        if payload.generate_image and result.image_url:
+            artifact = _persist_image_asset(
+                image_url=result.image_url,
+                payload=payload,
+                principal=principal,
+                idempotency_key=idempotency_key,
+                settings=settings,
+                session=session,
+            )
+            if artifact is not None:
+                return result.model_copy(update={"asset_id": str(artifact.id)})
+        return result
 
     if total_cost == 0:
         return await run_with_ai_execution_guard(
