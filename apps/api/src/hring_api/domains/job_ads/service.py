@@ -387,7 +387,12 @@ async def generate_smart_ad(
                 session=session,
             )
             if artifact is not None:
-                return result.model_copy(update={"asset_id": str(artifact.id)})
+                return result.model_copy(
+                    update={
+                        "image_url": f"/job-ads/assets/{artifact.id}",
+                        "asset_id": str(artifact.id),
+                    }
+                )
         return result
 
     if total_cost == 0:
@@ -496,7 +501,12 @@ async def _generate_image_content(
         raise SmartAdError("سرویس هوش مصنوعی تصویر آگهی تولید نکرد")
     image_url = image_result.images[0].url
     artifact = _persist_image_asset(image_url=image_url, payload=payload, principal=principal, idempotency_key=idempotency_key, settings=settings, session=session)
-    return SmartAdImageResponse(image_url=image_url, asset_id=str(artifact.id) if artifact else None)
+    if artifact is not None:
+        return SmartAdImageResponse(
+            image_url=f"/job-ads/assets/{artifact.id}",
+            asset_id=str(artifact.id),
+        )
+    return SmartAdImageResponse(image_url=image_url)
 
 
 async def generate_smart_ad_image(
