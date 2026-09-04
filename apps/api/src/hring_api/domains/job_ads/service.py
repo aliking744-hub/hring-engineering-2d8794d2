@@ -415,6 +415,7 @@ def _persist_image_asset(*, image_url: str, payload: SmartAdGenerateRequest, pri
     except ValueError:
         return None
     artifact = SmartAdArtifact(
+        id=uuid4(),
         owner_user_id=principal.user_id,
         company_id=_company_id(principal),
         idempotency_key=idempotency_key,
