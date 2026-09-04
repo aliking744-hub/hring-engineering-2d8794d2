@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
 import { ApiError, apiBlobRequest, apiRequest } from "@/lib/api";
-import { ArrowRight, Megaphone, Loader2, Copy, Download, Sparkles, Image as ImageIcon, Upload, X, Coins } from "lucide-react";
+import { ArrowRight, Megaphone, Loader2, Copy, Download, Sparkles, Image as ImageIcon, Upload, X, Coins, History } from "lucide-react";
 import logo from "@/assets/logo.png";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 
@@ -33,6 +33,14 @@ const imageFormats = [
 ];
 
 type UnknownRecord = Record<string, unknown>;
+
+interface SmartAdHistoryItem {
+  id: string;
+  jobTitle: string;
+  companyName: string;
+  contentType: string;
+  createdAt: string;
+}
 
 const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -98,6 +106,7 @@ const SmartAdGenerator = () => {
   const [generatedText, setGeneratedText] = useState("");
   const [editableText, setEditableText] = useState("");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [imageHistory, setImageHistory] = useState<SmartAdHistoryItem[]>([]);
   const [isTextLoading, setIsTextLoading] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -107,6 +116,30 @@ const SmartAdGenerator = () => {
   const imageRequestKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
   const { credits, getCost } = useCredits();
+
+  const loadImageHistory = useCallback(async () => {
+    try {
+      setImageHistory(await apiRequest<SmartAdHistoryItem[]>("/job-ads/history"));
+    } catch (error) {
+      console.warn("Smart-ad history could not be loaded:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadImageHistory();
+  }, [loadImageHistory]);
+
+  const restoreHistoryImage = async (item: SmartAdHistoryItem) => {
+    try {
+      const imageData = await blobToDataUrl(await apiBlobRequest(`/job-ads/assets/${item.id}`));
+      setGeneratedImage(imageData);
+      setJobTitle(item.jobTitle);
+      setCompanyName(item.companyName);
+      scrollToResult();
+    } catch (error) {
+      showRequestError(error, "تصویر تاریخچه قابل بازیابی نیست.");
+    }
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -287,6 +320,7 @@ const SmartAdGenerator = () => {
         }
       }
       imageRequestKeyRef.current = null;
+      await loadImageHistory();
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "تصویر آگهی با موفقیت تولید شد" });
       scrollToResult();
@@ -668,6 +702,31 @@ const SmartAdGenerator = () => {
               </Card>
             )}
           </div>
+        )}
+
+        {imageHistory.length > 0 && (
+          <Card className="mt-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" /> تاریخچه تصاویر آگهی
+              </CardTitle>
+              <CardDescription>تصاویر فقط برای مالک حساب قابل مشاهده و دانلود هستند.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {imageHistory.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => void restoreHistoryImage(item)}
+                  className="rounded-lg border border-border p-3 text-right transition-colors hover:border-primary hover:bg-muted/40"
+                >
+                  <span className="block font-medium">{item.jobTitle}</span>
+                  <span className="block text-sm text-muted-foreground">{item.companyName}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
