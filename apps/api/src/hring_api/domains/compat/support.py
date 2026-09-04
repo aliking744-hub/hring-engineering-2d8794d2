@@ -99,17 +99,16 @@ async def build_support_context(session: AsyncSession, body: Any) -> SupportCont
 
 
 def support_text(value: Any, *, allowed_phone: str | None = None) -> str:
-    if isinstance(value, str) and value.strip():
-        text = value.strip()
-    if isinstance(value, dict):
+    text: str | None = None
+    if isinstance(value, str):
+        text = value.strip() or None
+    elif isinstance(value, dict):
         for key in ("content", "answer", "message"):
             candidate = value.get(key)
             if isinstance(candidate, str) and candidate.strip():
                 text = candidate.strip()
                 break
-        else:
-            raise SupportInputError("پاسخ معتبری از دستیار پشتیبانی دریافت نشد")
-    if not isinstance(value, (str, dict)):
+    if text is None:
         raise SupportInputError("پاسخ معتبری از دستیار پشتیبانی دریافت نشد")
     phones = set(re.findall(r"(?<!\d)09\d{9}(?!\d)", text))
     unauthorized = phones - ({allowed_phone} if allowed_phone else set())
