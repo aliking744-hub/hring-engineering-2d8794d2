@@ -135,7 +135,10 @@ const InterviewAssistant = () => {
           focusArea: focusArea || "technical",
         }),
       });
-      if (data?.questions) {
+      if (!Array.isArray(data?.questions) || data.questions.length !== 11) {
+        throw new Error("راهنمای مصاحبه ناقص است؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
+      }
+      if (data.questions) {
         setQuestions(data.questions);
         idempotencyKeyRef.current = null;
         window.dispatchEvent(new Event("hring:credits-changed"));
