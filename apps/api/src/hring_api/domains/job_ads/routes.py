@@ -12,6 +12,7 @@ from hring_api.domains.billing.credit_service import (
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.job_ads.schemas import (
+    SmartAdArtifactResponse,
     SmartAdGenerateRequest,
     SmartAdImageResponse,
     SmartAdResponse,
@@ -21,6 +22,7 @@ from hring_api.domains.job_ads.service import (
     SmartAdError,
     generate_smart_ad,
     generate_smart_ad_image,
+    list_smart_ad_artifacts,
 )
 
 
@@ -39,6 +41,15 @@ def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, CreditError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.get("/history", response_model=list[SmartAdArtifactResponse])
+async def smart_ad_history(
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[SmartAdArtifactResponse]:
+    rows = await list_smart_ad_artifacts(db, principal=principal)
+    return [SmartAdArtifactResponse.model_validate(row) for row in rows]
 
 
 @router.post("/generate", response_model=SmartAdResponse, response_model_exclude_none=True)
