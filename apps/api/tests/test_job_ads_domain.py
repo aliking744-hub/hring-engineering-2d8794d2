@@ -24,6 +24,7 @@ from hring_api.domains.job_ads.service import (
     _generate_content,
     _image_prompt,
     get_smart_ad_artifact,
+    generate_smart_ad,
     list_smart_ad_artifacts,
 )
 from hring_api.main import app
@@ -386,3 +387,56 @@ def test_smart_ad_asset_streams_private_object(monkeypatch) -> None:
         assert response.headers["content-type"] == "image/png"
         assert response.headers["cache-control"] == "no-store"
         assert response.headers["x-content-type-options"] == "nosniff"
+
+
+
+def test_combined_smart_ad_persists_private_image(monkeypatch) -> None:
+    artifact_id = uuid4()
+
+    async def fake_cost(*_args: object, **_kwargs: object) -> int:
+        return 5
+
+    async def fake_byok(*_args: object, **_kwargs: object) -> bool:
+        return False
+
+    async def fake_generate(*_args: object, **_kwargs: object) -> SmartAdResponse:
+        return SmartAdResponse(
+            generated_text="متن آگهی",
+            image_url="data:image/png;base64,aGVsbG8=",
+        )
+
+    def fake_persist(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(id=artifact_id)
+
+    async def fake_reservation(*_args: object, **kwargs: Any) -> SmartAdResponse:
+        return await kwargs["operation"]()
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.feature_credit_cost", fake_cost
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.uses_company_byok", fake_byok
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service._generate_content", fake_generate
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service._persist_image_asset", fake_persist
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.run_with_credit_reservation",
+        fake_reservation,
+    )
+
+    result = asyncio.run(
+        generate_smart_ad(
+            SimpleNamespace(),
+            payload=_payload(),
+            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+            idempotency_key="combined-smart-ad-persistence",
+            request_id="test-request",
+            settings=Settings(),
+        )
+    )
+
+    assert result.asset_id == str(artifact_id)
