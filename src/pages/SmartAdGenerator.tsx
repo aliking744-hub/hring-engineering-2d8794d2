@@ -255,10 +255,28 @@ const SmartAdGenerator = () => {
       const privateObjectUrl = data.assetId && responseImage.startsWith("/job-ads/assets/")
         ? URL.createObjectURL(await apiBlobRequest(responseImage))
         : null;
+      let composedImage: string;
       try {
-        setGeneratedImage(await composeRecruitmentPoster(privateObjectUrl || responseImage));
+        composedImage = await composeRecruitmentPoster(privateObjectUrl || responseImage);
       } finally {
         if (privateObjectUrl) URL.revokeObjectURL(privateObjectUrl);
+      }
+      setGeneratedImage(composedImage);
+
+      if (data.assetId && composedImage.startsWith("data:image/")) {
+        try {
+          await apiRequest(`/job-ads/assets/${data.assetId}/finalize`, {
+            method: "POST",
+            body: JSON.stringify({ imageData: composedImage }),
+          });
+        } catch (error) {
+          console.warn("Smart-ad history persistence failed:", error);
+          toast({
+            title: "تصویر ساخته شد",
+            description: "ذخیره در تاریخچه انجام نشد؛ می‌توانید همین حالا آن را دانلود کنید.",
+            variant: "destructive",
+          });
+        }
       }
       imageRequestKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
