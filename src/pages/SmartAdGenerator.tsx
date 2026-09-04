@@ -34,6 +34,16 @@ const imageFormats = [
 
 type UnknownRecord = Record<string, unknown>;
 
+interface SmartAdTextHistoryItem {
+  id: string;
+  title: string;
+  createdAt: string;
+  payload: {
+    input?: { jobTitle?: string; companyName?: string; contactMethod?: string; industry?: string; platform?: string; tone?: string };
+    content?: string;
+  };
+}
+
 interface SmartAdHistoryItem {
   id: string;
   jobTitle: string;
@@ -107,6 +117,7 @@ const SmartAdGenerator = () => {
   const [editableText, setEditableText] = useState("");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [imageHistory, setImageHistory] = useState<SmartAdHistoryItem[]>([]);
+  const [textHistory, setTextHistory] = useState<SmartAdTextHistoryItem[]>([]);
   const [isTextLoading, setIsTextLoading] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -116,6 +127,29 @@ const SmartAdGenerator = () => {
   const imageRequestKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
   const { credits, getCost } = useCredits();
+
+  const loadTextHistory = useCallback(async () => {
+    try {
+      setTextHistory(await apiRequest<SmartAdTextHistoryItem[]>(
+        "/workspace/outputs?featureKey=job_ads.smart_ad_text&limit=20",
+      ));
+    } catch (error) {
+      console.warn("Smart-ad text history could not be loaded:", error);
+    }
+  }, []);
+
+  const restoreTextHistory = (item: SmartAdTextHistoryItem) => {
+    const input = item.payload.input;
+    setJobTitle(input?.jobTitle || item.title);
+    setCompanyName(input?.companyName || "");
+    setContactMethod(input?.contactMethod || "");
+    setIndustry(input?.industry || "");
+    setPlatform(input?.platform || "linkedin");
+    setTone(input?.tone || "formal");
+    setGeneratedText(item.payload.content || "");
+    setEditableText(item.payload.content || "");
+    scrollToResult();
+  };
 
   const loadImageHistory = useCallback(async () => {
     try {
@@ -127,7 +161,8 @@ const SmartAdGenerator = () => {
 
   useEffect(() => {
     void loadImageHistory();
-  }, [loadImageHistory]);
+    void loadTextHistory();
+  }, [loadImageHistory, loadTextHistory]);
 
   const restoreHistoryImage = async (item: SmartAdHistoryItem) => {
     try {
@@ -267,6 +302,7 @@ const SmartAdGenerator = () => {
       textRequestKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
       toast({ title: "موفق", description: "متن آگهی با موفقیت تولید شد" });
+      await loadTextHistory();
       scrollToResult();
     } catch (error) {
       if (error instanceof ApiError) textRequestKeyRef.current = null;
@@ -702,6 +738,29 @@ const SmartAdGenerator = () => {
               </Card>
             )}
           </div>
+        )}
+
+        {textHistory.length > 0 && (
+          <Card className="mt-8 border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <History className="h-5 w-5" /> تاریخچه متن‌های آگهی
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {textHistory.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => restoreTextHistory(item)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-border p-3 text-right transition-colors hover:border-primary hover:bg-muted/40"
+                >
+                  <span className="font-medium">{item.title}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
         )}
 
         {imageHistory.length > 0 && (
