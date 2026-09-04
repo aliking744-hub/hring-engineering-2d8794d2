@@ -16,6 +16,7 @@ from hring_api.domains.integrations import models as integration_models
 from hring_api.domains.legal import models as legal_models
 from hring_api.domains.job_ads import models as job_ads_models
 from hring_api.domains.recruiting import models as recruiting_models
+from hring_api.domains.workspace_outputs import models as workspace_output_models
 
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "legal_models",
     "job_ads_models",
     "recruiting_models",
+    "workspace_output_models",
 ]
