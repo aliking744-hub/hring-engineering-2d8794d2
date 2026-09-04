@@ -17,6 +17,7 @@ from hring_api.domains.compat.storage import StorageCompatError, read_object
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 from hring_api.domains.job_ads.schemas import (
     SmartAdArtifactResponse,
+    SmartAdFinalizeImageRequest,
     SmartAdGenerateRequest,
     SmartAdImageResponse,
     SmartAdResponse,
@@ -25,6 +26,7 @@ from hring_api.domains.job_ads.schemas import (
 from hring_api.domains.job_ads.service import (
     SmartAdError,
     generate_smart_ad,
+    finalize_smart_ad_artifact,
     generate_smart_ad_image,
     get_smart_ad_artifact,
     list_smart_ad_artifacts,
@@ -55,6 +57,41 @@ async def smart_ad_history(
 ) -> list[SmartAdArtifactResponse]:
     rows = await list_smart_ad_artifacts(db, principal=principal)
     return [SmartAdArtifactResponse.model_validate(row) for row in rows]
+
+
+@router.post(
+    "/assets/{artifact_id}/finalize",
+    response_model=SmartAdImageResponse,
+    response_model_exclude_none=True,
+)
+async def finalize_smart_ad_asset(
+    artifact_id: UUID,
+    payload: SmartAdFinalizeImageRequest,
+    principal: Principal = Depends(get_current_principal),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db_session),
+) -> SmartAdImageResponse:
+    try:
+        artifact = await finalize_smart_ad_artifact(
+            db,
+            principal=principal,
+            artifact_id=artifact_id,
+            image_data=payload.image_data,
+            settings=settings,
+        )
+        if artifact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="تصویر یافت نشد",
+            )
+        await db.commit()
+    except SmartAdError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return SmartAdImageResponse(
+        image_url=f"/job-ads/assets/{artifact.id}",
+        asset_id=str(artifact.id),
+    )
 
 
 @router.get("/assets/{artifact_id}")
