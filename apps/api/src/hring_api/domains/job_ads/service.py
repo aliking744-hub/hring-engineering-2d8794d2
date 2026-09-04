@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from base64 import b64decode
+from binascii import Error as Base64DecodeError
 from hashlib import sha256
 from io import BytesIO
 from uuid import UUID, uuid4
@@ -430,7 +431,7 @@ def _persist_image_asset(*, image_url: str, payload: SmartAdGenerateRequest, pri
         return None
     try:
         blob = b64decode(encoded, validate=True)
-    except ValueError:
+    except (Base64DecodeError, ValueError):
         return None
     artifact = SmartAdArtifact(
         id=uuid4(),
@@ -595,3 +596,40 @@ async def get_smart_ad_artifact(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def finalize_smart_ad_artifact(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    artifact_id: UUID,
+    image_data: str,
+    settings: Settings,
+) -> SmartAdArtifact | None:
+    """Replace a private generated background with the browser-composited final poster."""
+    artifact = await get_smart_ad_artifact(
+        session,
+        principal=principal,
+        artifact_id=artifact_id,
+    )
+    if artifact is None:
+        return None
+    header, encoded = image_data.split(",", 1)
+    content_type = header.removeprefix("data:").removesuffix(";base64")
+    if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise SmartAdError("فرمت تصویر نهایی پشتیبانی نمی‌شود")
+    try:
+        blob = b64decode(encoded, validate=True)
+    except (Base64DecodeError, ValueError) as exc:
+        raise SmartAdError("تصویر نهایی معتبر نیست") from exc
+    if not blob or len(blob) > 12 * 1024 * 1024:
+        raise SmartAdError("حجم تصویر نهایی مجاز نیست")
+    put_object(
+        settings,
+        logical_bucket="job-ads",
+        path=artifact.storage_path,
+        stream=BytesIO(blob),
+        content_type=content_type,
+    )
+    artifact.content_type = content_type
+    return artifact
