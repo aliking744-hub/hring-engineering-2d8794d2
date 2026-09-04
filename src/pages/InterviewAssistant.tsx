@@ -11,6 +11,7 @@ import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle,
 import jsPDF from "jspdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
+import logo from "@/assets/logo.png";
 
 interface InterviewQuestion {
   id: string;
@@ -50,15 +51,37 @@ const InterviewAssistant = () => {
 
   const downloadInterviewPDF = async () => {
     if (!resultRef.current) return;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(resultRef.current, {
-      callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
-      margin: [10, 10, 10, 10],
-      autoPaging: 'text',
-      html2canvas: { scale: 0.75, useCORS: true },
-      width: 190,
-      windowWidth: 900,
+    const root = resultRef.current;
+    const controls = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-exclude]'));
+    const answers = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-answer]'));
+    const controlDisplays = controls.map((element) => element.style.display);
+    const answerState = answers.map((element) => ({
+      display: element.style.display,
+      hidden: element.hasAttribute('hidden'),
+    }));
+    controls.forEach((element) => { element.style.display = 'none'; });
+    answers.forEach((element) => {
+      element.removeAttribute('hidden');
+      element.style.display = 'block';
     });
+
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      await pdf.html(root, {
+        callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
+        margin: [10, 10, 10, 10],
+        autoPaging: 'text',
+        html2canvas: { scale: 0.75, useCORS: true },
+        width: 190,
+        windowWidth: 900,
+      });
+    } finally {
+      controls.forEach((element, index) => { element.style.display = controlDisplays[index]; });
+      answers.forEach((element, index) => {
+        element.style.display = answerState[index].display;
+        if (answerState[index].hidden) element.setAttribute('hidden', '');
+      });
+    }
   };
 
   const getSectionIcon = (icon: string) => {
@@ -241,7 +264,7 @@ const InterviewAssistant = () => {
         {questions.length > 0 && (
           <div ref={resultRef} className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between print:hidden">
+            <div data-pdf-exclude className="flex items-center justify-between print:hidden">
               <h2 className="text-2xl font-bold text-foreground">راهنمای مصاحبه</h2>
               <Button onClick={() => void downloadInterviewPDF()} variant="outline" className="gap-2">
                 <Download className="w-4 h-4" />
@@ -249,13 +272,16 @@ const InterviewAssistant = () => {
               </Button>
             </div>
 
-            {/* Print Header */}
-            <div className="hidden print:block mb-8 text-center border-b pb-4">
-              <h1 className="text-2xl font-bold">راهنمای مصاحبه</h1>
-              <p className="text-muted-foreground">
-                {jobTitle} | {seniorityLevels.find((l) => l.value === seniorityLevel)?.label}
-                {industry && ` | ${industry}`}
-              </p>
+            {/* Branded report header (also rendered in PDF) */}
+            <div className="mb-8 flex items-center justify-between border-b border-primary/30 pb-4">
+              <div className="text-right">
+                <h1 className="text-2xl font-bold">راهنمای مصاحبه</h1>
+                <p className="text-muted-foreground">
+                  {jobTitle} | {seniorityLevels.find((l) => l.value === seniorityLevel)?.label}
+                  {industry && ` | ${industry}`}
+                </p>
+              </div>
+              <img src={logo} alt="HRing" className="h-12 w-12 rounded-lg object-contain" />
             </div>
 
             {/* Questions by Section */}
@@ -293,7 +319,7 @@ const InterviewAssistant = () => {
                             )}
                           </Button>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="print:block">
+                        <CollapsibleContent data-pdf-answer className="print:block">
                           <div className="mt-4 space-y-3">
                             {/* Good Signs */}
                             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
