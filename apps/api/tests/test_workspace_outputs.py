@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from hring_api.domains.job_engineering.schemas import JobProfileResponse
 from hring_api.domains.workspace_outputs.service import (
     delete_workspace_output,
     list_workspace_outputs,
@@ -58,3 +59,47 @@ def test_workspace_history_delete_does_not_leak_missing_or_foreign_rows() -> Non
         )
         assert response.status_code == 404
         assert response.json()["detail"] == "خروجی یافت نشد"
+
+
+def test_job_profile_generation_persists_one_idempotent_history_row(monkeypatch) -> None:
+    async def fake_generate(*_args: object, **_kwargs: object) -> JobProfileResponse:
+        return JobProfileResponse(content="## ماموریت شغل\nیک پروفایل شغلی آزمایشی")
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_engineering.routes.generate_job_profile",
+        fake_generate,
+    )
+    payload = {
+        "jobTitle": "مدیر محصول",
+        "industry": "فناوری",
+        "seniorityLevel": "manager",
+        "companyName": "شرکت آزمایشی",
+    }
+    with TestClient(app) as client:
+        account = _register(client)
+        headers = {
+            "Authorization": f"Bearer {account['tokens']['access_token']}",
+            "X-Idempotency-Key": "workspace-history-idempotent-job-profile",
+        }
+        first = client.post(
+            "/api/v1/job-engineering/job-profiles/generate",
+            json=payload,
+            headers=headers,
+        )
+        second = client.post(
+            "/api/v1/job-engineering/job-profiles/generate",
+            json=payload,
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        assert second.status_code == 200, second.text
+
+        history = client.get(
+            "/api/v1/workspace/outputs?featureKey=job_engineering.job_profile",
+            headers={"Authorization": headers["Authorization"]},
+        )
+        assert history.status_code == 200, history.text
+        rows = history.json()
+        assert len(rows) == 1
+        assert rows[0]["title"] == "مدیر محصول"
+        assert rows[0]["payload"]["content"].startswith("## ماموریت شغل")
