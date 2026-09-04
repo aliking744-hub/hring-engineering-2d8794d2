@@ -41,7 +41,7 @@ def _http_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
 
-@router.post("/generate", response_model=SmartAdResponse)
+@router.post("/generate", response_model=SmartAdResponse, response_model_exclude_none=True)
 async def create_smart_ad(
     payload: SmartAdGenerateRequest,
     request: Request,
@@ -72,7 +72,7 @@ async def create_smart_ad(
 
 
 
-@router.post("/generate-text", response_model=SmartAdTextResponse)
+@router.post("/generate-text", response_model=SmartAdTextResponse, response_model_exclude_none=True)
 async def create_smart_ad_text(
     payload: SmartAdGenerateRequest,
     request: Request,
@@ -104,7 +104,7 @@ async def create_smart_ad_text(
         raise _http_error(exc) from exc
 
 
-@router.post("/generate-image", response_model=SmartAdImageResponse)
+@router.post("/generate-image", response_model=SmartAdImageResponse, response_model_exclude_none=True)
 async def create_smart_ad_image(
     payload: SmartAdGenerateRequest,
     request: Request,
