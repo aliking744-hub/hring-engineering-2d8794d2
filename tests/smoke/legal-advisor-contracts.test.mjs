@@ -13,6 +13,9 @@ test("legal advisor UI uses the dedicated independent endpoint", () => {
   assert.match(page, /X-Idempotency-Key/);
   assert.match(page, /sourceUrl/);
   assert.equal(page.includes('functions.invoke("legal-advisor-chat"'), false);
+
+  const widget = read("src/components/LegalAdvisorWidget.tsx");
+  assert.match(widget, /جایگزین بررسی وکیل یا مشاور حقوقی نیستند/);
 });
 
 test("native legal advisor preserves the cited RAG contract", () => {
