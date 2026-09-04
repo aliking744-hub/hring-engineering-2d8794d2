@@ -145,6 +145,55 @@ export const apiRequest = async <T>(
 export const authRequest = async <T>(path: string, init: RequestInit = {}) =>
   apiRequest<T>(path, init, { auth: false, retryAuth: false });
 
+const executeBlob = async (
+  path: string,
+  init: RequestInit = {},
+  token: string | null = accessToken,
+): Promise<Blob> => {
+  const headers = new Headers(init.headers);
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(urlFor(path), {
+    ...init,
+    headers,
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    await parseResponse<unknown>(response);
+    throw new ApiError(`HTTP ${response.status}`, response.status);
+  }
+  return response.blob();
+};
+
+export const apiBlobRequest = async (
+  path: string,
+  init: RequestInit = {},
+  options: { auth?: boolean; retryAuth?: boolean } = {},
+): Promise<Blob> => {
+  const authRequired = options.auth !== false;
+  const retryAuth = options.retryAuth !== false;
+
+  try {
+    return await executeBlob(path, init, authRequired ? accessToken : null);
+  } catch (error) {
+    if (
+      authRequired &&
+      retryAuth &&
+      error instanceof ApiError &&
+      error.status === 401 &&
+      error.detail === 'Authentication required'
+    ) {
+      const refreshed = await refreshSession();
+      if (refreshed) {
+        return executeBlob(path, init, accessToken);
+      }
+    }
+    throw error;
+  }
+};
+
 const installLegacyFunctionFetchBridge = () => {
   if (typeof window === 'undefined') return;
   const marker = '__hringLegacyFunctionFetchInstalled';
