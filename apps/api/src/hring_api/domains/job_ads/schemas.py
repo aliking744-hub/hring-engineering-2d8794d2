@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -84,3 +85,13 @@ class SmartAdImageResponse(BaseModel):
         max_length=20_000_000,
     )
     asset_id: str | None = Field(default=None, serialization_alias="assetId")
+
+
+class SmartAdArtifactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: str
+    job_title: str = Field(serialization_alias="jobTitle")
+    company_name: str = Field(serialization_alias="companyName")
+    content_type: str = Field(serialization_alias="contentType")
+    created_at: datetime = Field(serialization_alias="createdAt")
