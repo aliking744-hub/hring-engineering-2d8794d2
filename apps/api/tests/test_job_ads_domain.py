@@ -22,6 +22,7 @@ from hring_api.domains.job_ads.schemas import (
 from hring_api.domains.job_ads.service import (
     SmartAdError,
     _generate_content,
+    _generate_image_content,
     _image_prompt,
     get_smart_ad_artifact,
     generate_smart_ad,
@@ -440,3 +441,50 @@ def test_combined_smart_ad_persists_private_image(monkeypatch) -> None:
     )
 
     assert result.asset_id == str(artifact_id)
+    assert result.image_url == f"/job-ads/assets/{artifact_id}"
+
+
+def test_standalone_smart_ad_returns_private_asset_url(monkeypatch) -> None:
+    artifact_id = uuid4()
+
+    async def fake_managed(_session: object, **_kwargs: Any) -> AiGatewayResult:
+        return AiGatewayResult(
+            request_id=uuid4(),
+            content="",
+            provider="test",
+            model="image-model",
+            usage={},
+            provider_cost_microusd=1,
+            images=(
+                AiGeneratedImage(
+                    url="data:image/png;base64,aGVsbG8=",
+                    mime_type="image/png",
+                ),
+            ),
+        )
+
+    def fake_persist(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(id=artifact_id)
+
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service.generate_with_managed_prompt",
+        fake_managed,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.job_ads.service._persist_image_asset",
+        fake_persist,
+    )
+
+    result = asyncio.run(
+        _generate_image_content(
+            payload=_payload(),
+            principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+            image_credits=25,
+            settings=Settings(),
+            session=SimpleNamespace(),
+            idempotency_key="standalone-private-image",
+        )
+    )
+
+    assert result.asset_id == str(artifact_id)
+    assert result.image_url == f"/job-ads/assets/{artifact_id}"
