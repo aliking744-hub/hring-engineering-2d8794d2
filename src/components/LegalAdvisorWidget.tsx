@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Scale, Send, X, Loader2, MessageSquare, Bot, User } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Scale, Send, Loader2, MessageSquare, Bot, User, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,9 +9,18 @@ import { toast } from 'sonner';
 import { ApiError, apiRequest } from '@/lib/api';
 import { useCredits } from '@/hooks/useCredits';
 
+interface LegalSource {
+  articleNumber?: string | null;
+  category: string;
+  similarity: number;
+  title: string;
+  sourceUrl?: string | null;
+}
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  sources?: LegalSource[];
 }
 
 const LegalAdvisorWidget = () => {
@@ -35,14 +44,14 @@ const LegalAdvisorWidget = () => {
     try {
       const key = requestKey || crypto.randomUUID();
       setRequestKey(key);
-      const data = await apiRequest<{ answer: string }>('/legal/advisor/chat', {
+      const data = await apiRequest<{ answer: string; sources: LegalSource[] }>('/legal/advisor/chat', {
         method: 'POST',
         headers: { 'X-Idempotency-Key': key },
         body: JSON.stringify({ query: userMessage, conversationHistory: messages.slice(-6) }),
       });
 
       if (data.answer) {
-        setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: data.answer, sources: data.sources }]);
         setRequestKey(null);
         window.dispatchEvent(new Event('hring:credits-changed'));
       } else {
@@ -163,6 +172,34 @@ const LegalAdvisorWidget = () => {
                     <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                       {msg.content}
                     </p>
+                    {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                      <div className="mt-4 border-t border-border/60 pt-3">
+                        <p className="mb-2 text-xs font-semibold text-muted-foreground">منابع پاسخ</p>
+                        <ul className="space-y-2">
+                          {msg.sources.map((source, sourceIndex) => (
+                            <li key={`${source.title}-${sourceIndex}`} className="rounded-lg bg-background/60 p-2 text-xs">
+                              {source.sourceUrl ? (
+                                <a
+                                  href={source.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                                >
+                                  {source.title}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : (
+                                <span className="font-medium">{source.title}</span>
+                              )}
+                              <span className="mt-1 block text-muted-foreground">
+                                {source.category}
+                                {source.articleNumber ? ` — ماده ${source.articleNumber}` : ''}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
