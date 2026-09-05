@@ -1,11 +1,15 @@
 from datetime import UTC, datetime, timedelta
 from secrets import choice
 from string import ascii_uppercase, digits
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.access.policy import is_company_permission_allowed
+from hring_api.domains.billing.credit_service import (
+    CreditError,
+    transfer_company_credits_to_user,
+)
 from hring_api.domains.companies.repository import (
     count_active_members,
     get_company,
@@ -64,6 +68,10 @@ class ProtectedMemberError(CompanyError):
 
 
 class CompanyUserExistsError(CompanyError):
+    pass
+
+
+class CompanyCreditError(CompanyError):
     pass
 
 
@@ -351,6 +359,46 @@ async def create_company_user(
     session.add(membership)
     await session.flush()
     return user, membership
+
+
+async def allocate_member_credits(
+    session: AsyncSession,
+    *,
+    actor_user_id: UUID,
+    company_id: UUID,
+    member_id: UUID,
+    amount: int,
+    reason: str,
+    request_id: str | None = None,
+) -> None:
+    company = await _require_company(session, company_id, for_update=True)
+    _require_company_writable(company)
+    await _require_permission(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company_id,
+        permission_key="company.members.manage",
+    )
+    member = await get_member_by_id(session, company_id=company_id, member_id=member_id)
+    if member is None or not member.is_active:
+        raise MemberNotFoundError("Member not found")
+    if company.credit_pool_enabled:
+        raise CompanyCreditError(
+            "اعتبار این شرکت اشتراکی است و اعضا مستقیماً از کیف شرکت مصرف می‌کنند"
+        )
+    try:
+        await transfer_company_credits_to_user(
+            session,
+            company_id=company_id,
+            user_id=member.user_id,
+            amount=amount,
+            operation_key=f"company-member-allocation:{company_id}:{member.user_id}:{uuid4()}",
+            actor_user_id=actor_user_id,
+            reason=reason.strip(),
+            request_id=request_id,
+        )
+    except CreditError as exc:
+        raise CompanyCreditError(str(exc)) from exc
 
 
 async def reset_company_user_password(
