@@ -20,23 +20,19 @@ from hring_api.domains.development.schemas import (
     LearningPathResponse,
     OnboardingGenerateRequest,
     OnboardingPlanResponse,
-    OnboardingTaskCreateRequest,
-    OnboardingTaskResponse,
-    OnboardingTaskUpdateRequest,
+    OnboardingProgressRequest,
 )
 from hring_api.domains.development.service import (
     DevelopmentConflictError,
     DevelopmentNotFoundError,
-    create_onboarding_workflow_task,
     deliver_learning_path,
     generate_learning_path,
     generate_onboarding_plan,
     list_learning_paths,
-    list_onboarding_workflows,
-    onboarding_workflow_response,
+    list_onboarding_plans,
     remove_learning_path,
     remove_onboarding_plan,
-    update_onboarding_workflow_task,
+    update_onboarding_progress,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 
@@ -87,7 +83,8 @@ async def onboarding_plan_history(
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[OnboardingPlanResponse]:
-    return await list_onboarding_workflows(db, owner_user_id=principal.user_id, limit=limit)
+    rows = await list_onboarding_plans(db, owner_user_id=principal.user_id, limit=limit)
+    return [OnboardingPlanResponse.model_validate(row) for row in rows]
 
 
 @router.post(
@@ -120,62 +117,11 @@ async def create_onboarding_plan(
         )
         await db.commit()
         await db.refresh(row)
-        return await onboarding_workflow_response(db, plan=row)
+        return OnboardingPlanResponse.model_validate(row)
     except CreditError as exc:
         await db.rollback()
         raise _credit_http_error(exc) from exc
     except (DevelopmentAiError, DevelopmentConflictError) as exc:
-        await db.rollback()
-        raise _development_http_error(exc) from exc
-
-
-@router.post(
-    "/onboarding-plans/{plan_id}/tasks",
-    response_model=OnboardingTaskResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_onboarding_task_route(
-    plan_id: UUID,
-    payload: OnboardingTaskCreateRequest,
-    principal: Principal = Depends(get_current_principal),
-    db: AsyncSession = Depends(get_db_session),
-) -> OnboardingTaskResponse:
-    try:
-        response = await create_onboarding_workflow_task(
-            db,
-            plan_id=plan_id,
-            payload=payload,
-            principal=principal,
-        )
-        await db.commit()
-        return response
-    except (DevelopmentNotFoundError, DevelopmentConflictError) as exc:
-        await db.rollback()
-        raise _development_http_error(exc) from exc
-
-
-@router.patch(
-    "/onboarding-plans/{plan_id}/tasks/{task_id}",
-    response_model=OnboardingTaskResponse,
-)
-async def update_onboarding_task_route(
-    plan_id: UUID,
-    task_id: UUID,
-    payload: OnboardingTaskUpdateRequest,
-    principal: Principal = Depends(get_current_principal),
-    db: AsyncSession = Depends(get_db_session),
-) -> OnboardingTaskResponse:
-    try:
-        response = await update_onboarding_workflow_task(
-            db,
-            plan_id=plan_id,
-            task_id=task_id,
-            payload=payload,
-            principal=principal,
-        )
-        await db.commit()
-        return response
-    except (DevelopmentNotFoundError, DevelopmentConflictError) as exc:
         await db.rollback()
         raise _development_http_error(exc) from exc
 
@@ -190,6 +136,28 @@ async def delete_onboarding_plan_route(
         await remove_onboarding_plan(db, plan_id=plan_id, owner_user_id=principal.user_id)
         await db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except DevelopmentNotFoundError as exc:
+        await db.rollback()
+        raise _development_http_error(exc) from exc
+
+
+@router.put("/onboarding-plans/{plan_id}/progress", response_model=OnboardingPlanResponse)
+async def save_onboarding_progress(
+    plan_id: UUID,
+    payload: OnboardingProgressRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> OnboardingPlanResponse:
+    try:
+        row = await update_onboarding_progress(
+            db,
+            plan_id=plan_id,
+            owner_user_id=principal.user_id,
+            payload=payload,
+        )
+        await db.commit()
+        await db.refresh(row)
+        return OnboardingPlanResponse.model_validate(row)
     except DevelopmentNotFoundError as exc:
         await db.rollback()
         raise _development_http_error(exc) from exc
@@ -279,7 +247,11 @@ async def delete_learning_path_route(
     db: AsyncSession = Depends(get_db_session),
 ) -> Response:
     try:
-        await remove_learning_path(db, learning_path_id=learning_path_id, owner_user_id=principal.user_id)
+        await remove_learning_path(
+            db,
+            learning_path_id=learning_path_id,
+            owner_user_id=principal.user_id,
+        )
         await db.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except DevelopmentNotFoundError as exc:

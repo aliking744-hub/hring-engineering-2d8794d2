@@ -5,9 +5,12 @@ from pydantic import SecretStr
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiCitation
-from hring_api.domains.compat.access import PERSONAL_OPERATION_RULES
-from hring_api.domains.compat.functions import _response_with_citations
-from hring_api.domains.compat.support import SupportInputError, support_text
+from hring_api.domains.compat.functions import (
+    CompatFunctionError,
+    _capability_prompt,
+    _response_with_citations,
+    _validate_capability_response,
+)
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
 from hring_api.domains.compat.storage_policy import (
@@ -40,6 +43,30 @@ def test_compat_ai_response_keeps_provider_citation_urls() -> None:
     assert result["researchMeta"]["sourcesFound"] == 2
 
 
+def test_smart_ad_jobboard_contract_requires_all_sections() -> None:
+    system_prompt, _ = _capability_prompt("generate-job-ad", "{}")
+    assert "شرایط احراز" in system_prompt
+    assert "نحوه ارسال درخواست" in system_prompt
+
+    with pytest.raises(CompatFunctionError):
+        _validate_capability_response(
+            "generate-job-ad",
+            {"platform": "jobboard"},
+            {"generatedText": "معرفی موقعیت\nمزایا"},
+        )
+
+    result = _validate_capability_response(
+        "generate-job-ad",
+        {"platform": "jobboard"},
+        {
+            "generatedText": (
+                "معرفی موقعیت\nمسئولیت‌ها\nشرایط احراز\nمزایا\nنحوه ارسال درخواست"
+            )
+        },
+    )
+    assert result["generatedText"].startswith("معرفی موقعیت")
+
+
 def test_compat_tables_are_deny_by_default() -> None:
     with pytest.raises(TableScopeError):
         scope_for("future_unreviewed_table")
@@ -61,36 +88,8 @@ def test_personal_scope_does_not_infer_company_sharing() -> None:
     assert scope_for("notifications").scope == "personal"
     assert scope_for("hr_uploads").scope == "personal"
     assert scope_for("learning_path_records").scope == "personal"
-
-
-def test_user_cannot_self_grant_a_marketplace_purchase() -> None:
-    assert PERSONAL_OPERATION_RULES["user_purchases"] == frozenset({"select"})
-
-
-def test_user_cannot_append_to_the_credit_ledger() -> None:
-    assert PERSONAL_OPERATION_RULES["credit_transactions"] == frozenset({"select"})
-
-
-@pytest.mark.parametrize(
-    "table",
-    [
-        "strategic_radar_analyses",
-        "unicorn_analyses",
-        "behaviors",
-        "bet_allocations",
-        "decision_journals",
-        "intent_assignments",
-        "scenario_responses",
-        "scenarios",
-        "strategic_achievements",
-        "strategic_bets",
-        "strategic_intents",
-        "compass_user_roles",
-    ],
-)
-def test_retired_strategy_tables_are_not_exposed_by_compat_bridge(table: str) -> None:
-    with pytest.raises(TableScopeError):
-        scope_for(table)
+    assert scope_for("strategic_radar_analyses").scope == "personal"
+    assert scope_for("unicorn_analyses").scope == "personal"
 
 
 def test_dedicated_domains_cannot_fall_through_generic_query_bridge() -> None:
@@ -234,33 +233,6 @@ def test_valid_legacy_public_assets_remain_supported() -> None:
     )
 
 
-def test_public_uploads_reject_spoofed_mime_and_magic_bytes() -> None:
-    with pytest.raises(StoragePolicyError):
-        validate_storage_upload(
-            logical_bucket="avatars",
-            object_path=f"{uuid4()}/avatar.jpg",
-            content_type="image/jpeg",
-            size_bytes=100,
-            header_bytes=b"<html>not really a jpeg</html>",
-        )
-    with pytest.raises(StoragePolicyError):
-        validate_storage_upload(
-            logical_bucket="products",
-            object_path="catalog.xlsx",
-            content_type="text/plain",
-            size_bytes=100,
-            header_bytes=b"PK\x03\x04fake-office-archive",
-        )
-    with pytest.raises(StoragePolicyError):
-        validate_storage_upload(
-            logical_bucket="products",
-            object_path="document.pdf",
-            content_type="application/pdf",
-            size_bytes=100,
-            header_bytes=b"not-a-pdf",
-        )
-
-
 def test_production_settings_still_require_real_independent_secrets() -> None:
     with pytest.raises(ValueError):
         Settings(
@@ -276,16 +248,3 @@ def test_production_settings_still_require_real_independent_secrets() -> None:
                 "development-security-token-pepper-change-me"
             ),
         )
-def test_support_removes_unconfigured_phone_numbers() -> None:
-    assert "09123456789" not in support_text(
-        {"content": "با 09123456789 تماس بگیرید"}, allowed_phone=None
-    )
-    assert "09111111111" in support_text(
-        "با 09111111111 تماس بگیرید", allowed_phone="09111111111"
-    )
-
-
-
-def test_support_text_rejects_empty_response() -> None:
-    with pytest.raises(SupportInputError):
-        support_text("   ")

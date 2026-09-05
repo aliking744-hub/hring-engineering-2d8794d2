@@ -7,10 +7,12 @@ import * as XLSX from '@e965/xlsx';
 import { Employee } from '@/types/employee';
 import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
-import { useCredits } from '@/hooks/useCredits';
+import { supabase } from '@/integrations/supabase/client';
+
+const EXCEL_IMPORT_COST = 10;
 
 interface UploadPageProps {
-  onDataLoaded: (data: Employee[], name: string) => Promise<void>;
+  onDataLoaded: (data: Employee[], name: string) => void;
   historySlot?: React.ReactNode;
 }
 
@@ -18,9 +20,6 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { credits, getCost } = useCredits();
-  const uploadBaseCost = getCost('HR_DASHBOARD_UPLOAD');
-  const demoCost = getCost('HR_DASHBOARD');
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
@@ -42,11 +41,25 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
 
       const employees = parseExcelData(jsonData);
 
-      await onDataLoaded(employees, file.name);
+      const { error: billingError } = await supabase.rpc('deduct_credits', {
+        amount: EXCEL_IMPORT_COST,
+        feature_key: 'hr_dashboard.excel_import',
+      });
+      if (billingError) {
+        throw new Error(`برای تحلیل فایل اکسل ${EXCEL_IMPORT_COST} جم لازم است`);
+      }
+      window.dispatchEvent(new Event('hring:credits-changed'));
+
+      toast({
+        title: 'موفقیت',
+        description: `${employees.length} رکورد با موفقیت بارگذاری شد`,
+      });
+
+      onDataLoaded(employees, file.name);
     } catch (error) {
       toast({
         title: 'خطا',
-        description: 'مشکلی در خواندن فایل اکسل پیش آمد',
+        description: error instanceof Error ? error.message : 'مشکلی در خواندن فایل اکسل پیش آمد',
         variant: 'destructive',
       });
     } finally {
@@ -75,14 +88,13 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
     if (file) handleFile(file);
   }, [handleFile]);
 
-  const handleDemoData = useCallback(async () => {
-    setIsLoading(true);
+  const handleDemoData = useCallback(() => {
     const sampleData = generateSampleData(78);
-    try {
-      await onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
-    } finally {
-      setIsLoading(false);
-    }
+    toast({
+      title: 'داده نمونه',
+      description: '78 رکورد نمونه بارگذاری شد',
+    });
+    onDataLoaded(sampleData, `داده نمونه - ${new Date().toLocaleDateString('fa-IR')}`);
   }, [onDataLoaded]);
 
   const handleDownloadTemplate = useCallback(() => {
@@ -160,7 +172,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
             داشبورد منابع انسانی
           </h1>
           <p className="text-muted-foreground text-sm md:text-base">
-            فایل اکسل خود را آپلود کنید تا داشبورد تحلیلی خود را مشاهده کنید
+            فایل اکسل خود را با هزینه ۱۰ جم تحلیل کنید؛ مشاهده داده نمونه رایگان است
           </p>
         </div>
 
@@ -185,7 +197,6 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
             onChange={handleFileInput}
             className="hidden"
             id="file-input"
-            disabled={isLoading || credits < uploadBaseCost}
           />
 
           <label htmlFor="file-input" className="cursor-pointer">
@@ -210,7 +221,6 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <FileSpreadsheet className="w-4 h-4" />
               <span>فرمت‌های پشتیبانی شده: XLSX, XLS</span>
-              <span>— هزینه از {uploadBaseCost} اعتبار، متناسب با تعداد ردیف‌ها</span>
             </div>
           </label>
         </div>
@@ -230,15 +240,14 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
           {/* Demo Button */}
           <Button
             onClick={handleDemoData}
-            disabled={isLoading || credits < demoCost}
             className="gap-2 px-6 py-3"
           >
             <Sparkles className="w-4 h-4" />
-            <span>مشاهده با داده نمونه ({demoCost} اعتبار)</span>
+            <span>مشاهده با داده نمونه</span>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-3 text-center">
-          فایل نمونه را دانلود کنید، اطلاعات کارمندان را پر کنید و آپلود کنید. هزینه اکسل: {uploadBaseCost} اعتبار برای ۵۰۰ ردیف اول و ۲ اعتبار برای هر ۵۰۰ ردیف اضافه.
+          فایل نمونه را دانلود کنید، اطلاعات کارمندان را پر کنید و آپلود کنید
         </p>
 
         {/* Features */}

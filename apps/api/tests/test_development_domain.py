@@ -9,15 +9,14 @@ from pydantic import ValidationError
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiGatewayResult
-from hring_api.domains.development.ai_service import (
-    _normalize_learning_payload,
-    generate_learning_path_content,
-)
+from hring_api.domains.development.ai_service import generate_learning_path_content
 from hring_api.domains.development.email import build_learning_path_html
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
     LearningPathResult,
+    OnboardingProgressRequest,
 )
+from hring_api.domains.development.service import update_onboarding_progress
 from hring_api.main import app
 
 
@@ -58,26 +57,48 @@ def _learning_result() -> LearningPathResult:
                     "month": "ماه اول",
                     "focus": "پایه‌ها",
                     "actionItems": ["تکمیل دوره", "اجرای پروژه"],
-                },
-                {
-                    "month": "ماه دوم",
-                    "focus": "داده",
-                    "actionItems": ["تمرین SQL", "مرور پروژه"],
-                },
-                {
-                    "month": "ماه سوم",
-                    "focus": "سرویس",
-                    "actionItems": ["ساخت API", "بازبینی کد"],
-                },
-                {
-                    "month": "ماه چهارم",
-                    "focus": "پایداری",
-                    "actionItems": ["تست‌نویسی", "مستندسازی"],
                 }
             ],
             "trainingNote": "هفته‌ای چهار ساعت",
         }
     )
+
+
+def test_onboarding_progress_finalizes_at_fifty_percent(monkeypatch) -> None:
+    row = SimpleNamespace(progress={}, score=None, status="active", completed_at=None)
+
+    async def fake_get(*_args: object, **kwargs: object) -> SimpleNamespace:
+        assert kwargs["for_update"] is True
+        return row
+
+    session = SimpleNamespace(flush=lambda: None)
+
+    async def flush() -> None:
+        return None
+
+    session.flush = flush
+    monkeypatch.setattr(
+        "hring_api.domains.development.service.get_onboarding_plan",
+        fake_get,
+    )
+
+    result = asyncio.run(
+        update_onboarding_progress(
+            session,
+            plan_id=uuid4(),
+            owner_user_id=uuid4(),
+            payload=OnboardingProgressRequest(
+                completed_task_indexes=[0, 2, 8],
+                total_tasks=4,
+                finalize=True,
+            ),
+        )
+    )
+
+    assert result.progress == {"completedTaskIndexes": [0, 2], "totalTasks": 4}
+    assert result.score == 50
+    assert result.status == "completed"
+    assert result.completed_at is not None
 
 
 def test_learning_ai_omits_employee_identity_from_provider_payload(monkeypatch) -> None:
@@ -157,24 +178,6 @@ def test_learning_request_rejects_invalid_employee_email() -> None:
             education_level="Bachelor",
             experience_years=5,
         )
-
-
-def test_learning_path_normalizes_wrappers_aliases_and_string_skills() -> None:
-    normalized = _normalize_learning_payload(
-        {
-            "data": {
-                "analysis": "شکاف روشن",
-                "hard_skills": ["Python", {"name": "SQL", "why": "تحلیل"}],
-                "soft_skills": ["ارتباط"],
-                "learningRoadmap": [
-                    {"period": "ماه اول", "mainFocus": "پایه", "tasks": "تمرین روزانه"}
-                ],
-            }
-        }
-    )
-    assert normalized["skillGapAnalysis"] == "شکاف روشن"
-    assert normalized["hardSkills"][0]["skill"] == "Python"
-    assert normalized["roadmap"][0]["actionItems"] == ["تمرین روزانه"]
 
 
 def test_native_development_records_are_owner_scoped_and_idempotent(monkeypatch) -> None:

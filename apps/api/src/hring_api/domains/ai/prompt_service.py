@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.admin.repository import add_audit_log
 from hring_api.domains.ai.gateway_client import AiGatewayResult, generate_with_ai_gateway
+from hring_api.domains.ai.feature_routing import resolve_runtime_feature_route
 from hring_api.domains.ai.models import AiPrompt, AiPromptVersion
 from hring_api.domains.ai.prompt_repository import (
     get_prompt,
@@ -152,7 +153,6 @@ async def generate_with_registered_prompt(
     user_id: UUID | None,
     company_id: UUID | None,
     credits_charged: int = 0,
-    modalities: list[str] | None = None,
 ) -> AiGatewayResult:
     """Resolve the published version and attach immutable prompt provenance.
 
@@ -173,6 +173,11 @@ async def generate_with_registered_prompt(
         raise PromptConflictError("Prompt has no published version")
     validate_prompt_contract(_version_values(version))
     rendered = render_prompt(version, variables)
+    route = await resolve_runtime_feature_route(
+        feature_key=prompt.feature_key,
+        default_provider=version.provider_alias,
+        default_model=version.model,
+    )
     messages: list[dict[str, str]] = []
     if rendered.system:
         messages.append({"role": "system", "content": rendered.system})
@@ -181,19 +186,21 @@ async def generate_with_registered_prompt(
         feature_key=prompt.feature_key,
         user_id=user_id,
         company_id=company_id,
-        provider=version.provider_alias,
-        model=version.model,
+        provider=route.provider,
+        model=route.model,
         messages=messages,
         credits_charged=credits_charged,
         temperature=version.temperature,
         max_output_tokens=version.max_output_tokens,
         response_format=version.response_format,
-        modalities=modalities,
         metadata_json={
             "prompt_key": prompt.prompt_key,
             "prompt_version_id": str(version.id),
             "prompt_version": version.version,
             "prompt_mode": "runtime",
+            "ai_route_source": route.source,
+            "prompt_provider_alias": version.provider_alias,
+            "prompt_model": version.model,
         },
     )
     if version.response_format == "json_object":
@@ -216,7 +223,6 @@ async def generate_with_managed_prompt(
     company_id: UUID | None,
     fallback: Callable[[], Awaitable[AiGatewayResult]],
     credits_charged: int = 0,
-    modalities: list[str] | None = None,
 ) -> AiGatewayResult:
     """Use a published registry prompt, or preserve the embedded product prompt.
 
@@ -237,7 +243,6 @@ async def generate_with_managed_prompt(
             user_id=user_id,
             company_id=company_id,
             credits_charged=credits_charged,
-            modalities=modalities,
         )
     except (PromptNotFoundError, PromptConflictError):
         return await fallback()
@@ -812,4 +817,3 @@ async def rollback_prompt(
         ip_address=ip_address,
     )
     return prompt, restored
-

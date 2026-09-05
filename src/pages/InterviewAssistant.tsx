@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { useCredits } from "@/hooks/useCredits";
-import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins, History, Trash2 } from "lucide-react";
-import jsPDF from "jspdf";
-import { ApiError, apiRequest } from "@/lib/api";
-import WorkspaceHeader from "@/components/WorkspaceHeader";
+import { useCredits, CREDIT_COSTS, DIAMOND_COSTS } from "@/hooks/useCredits";
+import { supabase } from "@/integrations/supabase/client";
+import { ArrowRight, Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins } from "lucide-react";
+import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
+import { escapePrintHtml, openPrintDocument } from "@/lib/printDocument";
 
 interface InterviewQuestion {
   id: string;
@@ -22,16 +22,6 @@ interface InterviewQuestion {
   redFlags: string[];
 }
 
-interface InterviewHistoryItem {
-  id: string;
-  title: string;
-  createdAt: string;
-  payload: {
-    input?: { jobTitle?: string; industry?: string; seniorityLevel?: string; focusArea?: string };
-    questions?: InterviewQuestion[];
-  };
-}
-
 const seniorityLevels = [
   { value: "junior", label: "کارشناس (Junior)" },
   { value: "senior", label: "کارشناس ارشد (Senior)" },
@@ -40,9 +30,9 @@ const seniorityLevels = [
 ];
 
 const focusAreas = [
+  { value: "general", label: "عمومی" },
   { value: "technical", label: "تخصصی و فنی" },
-  { value: "behavioral", label: "رفتاری و مهارت‌های نرم" },
-  { value: "intelligence", label: "هوش و حل مسئله" },
+  { value: "leadership", label: "رهبری و مدیریت" },
   { value: "cultural", label: "تناسب فرهنگی" },
 ];
 
@@ -53,81 +43,10 @@ const InterviewAssistant = () => {
   const [focusArea, setFocusArea] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
-  const [history, setHistory] = useState<InterviewHistoryItem[]>([]);
   const [openAnswerKeys, setOpenAnswerKeys] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-  const { credits, hasEnoughCredits, getCost } = useCredits();
+  const { credits, hasEnoughCredits } = useCredits();
   const resultRef = useRef<HTMLDivElement>(null);
-  const idempotencyKeyRef = useRef<string | null>(null);
-
-  const loadHistory = useCallback(async () => {
-    try {
-      const rows = await apiRequest<InterviewHistoryItem[]>(
-        "/workspace/outputs?featureKey=interview.kit&limit=20",
-      );
-      setHistory(rows);
-    } catch (error) {
-      console.warn("Interview history could not be loaded:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
-
-  const restoreHistory = (item: InterviewHistoryItem) => {
-    const input = item.payload.input;
-    setJobTitle(input?.jobTitle || item.title);
-    setIndustry(input?.industry || "");
-    setSeniorityLevel(input?.seniorityLevel || "");
-    setFocusArea(input?.focusArea || "technical");
-    setQuestions(Array.isArray(item.payload.questions) ? item.payload.questions : []);
-  };
-
-  const removeHistory = async (id: string) => {
-    try {
-      await apiRequest(`/workspace/outputs/${id}`, { method: "DELETE" });
-      setHistory((items) => items.filter((item) => item.id !== id));
-    } catch (error) {
-      console.error("Interview history deletion failed:", error);
-      toast({ title: "خطا", description: "حذف خروجی انجام نشد", variant: "destructive" });
-    }
-  };
-
-  const downloadInterviewPDF = async () => {
-    if (!resultRef.current) return;
-    const root = resultRef.current;
-    const controls = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-exclude]'));
-    const answers = Array.from(root.querySelectorAll<HTMLElement>('[data-pdf-answer]'));
-    const controlDisplays = controls.map((element) => element.style.display);
-    const answerState = answers.map((element) => ({
-      display: element.style.display,
-      hidden: element.hasAttribute('hidden'),
-    }));
-    controls.forEach((element) => { element.style.display = 'none'; });
-    answers.forEach((element) => {
-      element.removeAttribute('hidden');
-      element.style.display = 'block';
-    });
-
-    try {
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      await pdf.html(root, {
-        callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
-        margin: [10, 10, 10, 10],
-        autoPaging: 'text',
-        html2canvas: { scale: 0.75, useCORS: true },
-        width: 190,
-        windowWidth: 900,
-      });
-    } finally {
-      controls.forEach((element, index) => { element.style.display = controlDisplays[index]; });
-      answers.forEach((element, index) => {
-        element.style.display = answerState[index].display;
-        if (answerState[index].hidden) element.setAttribute('hidden', '');
-      });
-    }
-  };
 
   const getSectionIcon = (icon: string) => {
     switch (icon) {
@@ -158,7 +77,7 @@ const InterviewAssistant = () => {
     if (!hasEnoughCredits('INTERVIEW_KIT')) {
       toast({
         title: "اعتبار ناکافی",
-        description: `برای این عملیات ${getCost('INTERVIEW_KIT')} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        description: `برای این عملیات ${CREDIT_COSTS.INTERVIEW_KIT} جم نیاز دارید. اعتبار فعلی: ${credits}`,
         variant: "destructive",
       });
       return;
@@ -168,36 +87,28 @@ const InterviewAssistant = () => {
     setQuestions([]);
 
     try {
-      const requestKey = idempotencyKeyRef.current || crypto.randomUUID();
-      idempotencyKeyRef.current = requestKey;
-      const data = await apiRequest<{ questions: InterviewQuestion[] }>("/interview/kits/generate", {
-        method: "POST",
-        headers: { "X-Idempotency-Key": requestKey },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke("generate-interview-kit", {
+        body: {
           jobTitle,
           industry,
           seniorityLevel,
-          focusArea: focusArea || "technical",
-        }),
+          focusArea: focusArea || "general",
+        },
       });
-      if (!Array.isArray(data?.questions) || data.questions.length !== 11) {
-        throw new Error("راهنمای مصاحبه ناقص است؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
-      }
-      if (data.questions) {
+
+      if (error) throw error;
+
+      if (data?.questions) {
         setQuestions(data.questions);
-        idempotencyKeyRef.current = null;
-        window.dispatchEvent(new Event("hring:credits-changed"));
         toast({
           title: "موفق",
           description: "راهنمای مصاحبه با موفقیت تولید شد.",
         });
-        await loadHistory();
         setTimeout(() => {
           resultRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 100);
       }
     } catch (error: unknown) {
-      if (error instanceof ApiError) idempotencyKeyRef.current = null;
       console.error("Error generating interview kit:", error);
       toast({
         title: "خطا",
@@ -216,6 +127,212 @@ const InterviewAssistant = () => {
     }));
   };
 
+  const handleDownloadPDF = async () => {
+    const today = new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date());
+    const seniorityLabel = seniorityLevels.find(l => l.value === seniorityLevel)?.label ?? seniorityLevel;
+    const focusLabel = focusAreas.find(f => f.value === focusArea)?.label ?? '';
+
+    const sectionsHtml = Object.entries(groupedQuestions).map(([section, sectionQs]) => {
+      const questionsHtml = sectionQs.map((q, idx) => {
+        const goodSignsHtml = q.goodSigns.map(s => `<li>✓ ${escapePrintHtml(s)}</li>`).join('');
+        const redFlagsHtml = q.redFlags.map(f => `<li>⚠ ${escapePrintHtml(f)}</li>`).join('');
+        return `
+          <div class="question-card">
+            <div class="question-header">
+              <span class="question-num">${idx + 1}</span>
+              <p class="question-text">${escapePrintHtml(q.question)}</p>
+            </div>
+            <div class="answer-key">
+              <div class="good-signs">
+                <div class="signs-title">✅ نشانه‌های مثبت</div>
+                <ul>${goodSignsHtml}</ul>
+              </div>
+              <div class="red-flags">
+                <div class="flags-title">⚠️ هشدارها (Red Flags)</div>
+                <ul>${redFlagsHtml}</ul>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+      return `<div class="section"><div class="section-title">${escapePrintHtml(section)}</div>${questionsHtml}</div>`;
+    }).join('');
+
+    try {
+      await openPrintDocument(`<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>راهنمای مصاحبه - ${jobTitle}</title>
+  <style>
+    @font-face { font-family: 'BNazanin'; src: url('${window.location.origin}/fonts/BNAZANIN.TTF') format('truetype'); }
+    @font-face { font-family: 'IRANSans'; src: url('${window.location.origin}/fonts/IRANSansBold-Edit.ttf') format('truetype'); font-weight: bold; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'BNazanin', Tahoma, Arial, sans-serif;
+      direction: rtl;
+      background: #ffffff;
+      color: #1a1a2e;
+      font-size: 11pt;
+      line-height: 1.8;
+    }
+    @page { size: A4 portrait; margin: 12mm 14mm 12mm 14mm; }
+
+    /* HEADER */
+    .pdf-header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      padding: 16px 20px;
+      border-radius: 8px;
+      color: white;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-header-title {
+      font-family: 'IRANSans', 'BNazanin', Tahoma, sans-serif;
+      font-size: 17pt;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .pdf-header-sub { font-size: 9.5pt; color: #bfdbfe; }
+
+    /* META */
+    .pdf-meta {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 7px 14px;
+      margin-bottom: 18px;
+      font-size: 9.5pt;
+      color: #1e40af;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* SECTION */
+    .section { margin-bottom: 20px; page-break-inside: avoid; }
+    .section-title {
+      font-family: 'IRANSans', 'BNazanin', Tahoma, sans-serif;
+      font-size: 13pt;
+      font-weight: bold;
+      color: #1e40af;
+      background: linear-gradient(90deg, #dbeafe 0%, transparent 100%);
+      padding: 6px 10px;
+      border-right: 4px solid #2563eb;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 10px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* QUESTION CARD */
+    .question-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+    .question-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .question-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+      font-size: 11pt;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .question-text {
+      font-size: 11pt;
+      font-weight: bold;
+      color: #1e293b;
+      padding-top: 3px;
+    }
+
+    /* ANSWER KEY */
+    .answer-key {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .good-signs, .red-flags {
+      padding: 10px 14px;
+      font-size: 9.5pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .good-signs { background: #f0fdf4; border-left: 1px solid #e2e8f0; }
+    .red-flags { background: #fff1f2; }
+    .signs-title {
+      font-weight: bold;
+      color: #16a34a;
+      margin-bottom: 6px;
+      font-size: 10pt;
+    }
+    .flags-title {
+      font-weight: bold;
+      color: #dc2626;
+      margin-bottom: 6px;
+      font-size: 10pt;
+    }
+    ul { padding-right: 0; list-style: none; }
+    li { margin-bottom: 4px; color: #374151; padding-right: 4px; }
+
+    /* FOOTER */
+    .pdf-footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      border-top: 1px solid #dbeafe;
+      padding: 5px 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8pt;
+      color: #94a3b8;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-header">
+    <div>
+      <div class="pdf-header-title">راهنمای مصاحبه: ${escapePrintHtml(jobTitle)}</div>
+      <div class="pdf-header-sub">${seniorityLabel}${industry ? ' | ' + industry : ''}${focusLabel ? ' | ' + focusLabel : ''} | ${today}</div>
+    </div>
+  </div>
+  <div class="pdf-meta">📋 این سند شامل سوالات مصاحبه و کلید ارزیابی کامل برای مصاحبه‌گر می‌باشد</div>
+  ${sectionsHtml}
+  <div class="pdf-footer">
+    <span>hring.io — دستیار مصاحبه</span>
+    <span>${today}</span>
+  </div>
+</body>
+</html>`);
+      toast({ title: "آماده چاپ", description: "در پنجره چاپ، گزینه ذخیره به‌صورت PDF را انتخاب کنید." });
+    } catch (error) {
+      toast({ title: "چاپ باز نشد", description: error instanceof Error ? error.message : "خطای چاپ", variant: "destructive" });
+    }
+  };
 
   const groupedQuestions = questions.reduce((acc, q) => {
     if (!acc[q.section]) {
@@ -227,7 +344,30 @@ const InterviewAssistant = () => {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      <WorkspaceHeader title="دستیار مصاحبه" subtitle="تولید راهنمای جامع مصاحبه با کلید ارزیابی" icon={<Briefcase className="h-6 w-6" />} />
+      {/* Print Footer */}
+      <div className="hidden print:block fixed bottom-4 left-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <img src={logo} alt="لوگو" className="w-6 h-6" />
+          <span>تولید شده توسط سیستم مدیریت منابع انسانی</span>
+        </div>
+      </div>
+
+      {/* Hero Section */}
+      <div className="bg-gradient-to-l from-primary to-primary/80 text-primary-foreground py-12 px-4 print:hidden">
+        <div className="container max-w-4xl mx-auto">
+          <Link to="/dashboard" className="inline-flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground mb-6 transition-colors">
+            <ArrowRight className="w-4 h-4" />
+            بازگشت به داشبورد
+          </Link>
+          <div className="flex items-center gap-4 mb-4">
+            <img src={logo} alt="لوگو" className="w-16 h-16" />
+            <div>
+              <h1 className="text-3xl font-bold">دستیار مصاحبه</h1>
+              <p className="text-primary-foreground/80">تولید راهنمای جامع مصاحبه با کلید ارزیابی</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="container max-w-4xl mx-auto py-8 px-4">
@@ -294,7 +434,7 @@ const InterviewAssistant = () => {
 
             <Button
               onClick={handleGenerate}
-              disabled={isLoading || !hasEnoughCredits('INTERVIEW_KIT')}
+              disabled={isLoading}
               className="w-full h-12 text-lg"
             >
               {isLoading ? (
@@ -303,7 +443,7 @@ const InterviewAssistant = () => {
                   در حال تولید سوالات...
                 </>
               ) : (
-                `تولید راهنمای مصاحبه (${getCost('INTERVIEW_KIT')} جم)`
+                "تولید راهنمای مصاحبه"
               )}
             </Button>
           </CardContent>
@@ -313,24 +453,21 @@ const InterviewAssistant = () => {
         {questions.length > 0 && (
           <div ref={resultRef} className="space-y-6">
             {/* Header */}
-            <div data-pdf-exclude className="flex items-center justify-between print:hidden">
+            <div className="flex items-center justify-between print:hidden">
               <h2 className="text-2xl font-bold text-foreground">راهنمای مصاحبه</h2>
-              <Button onClick={() => void downloadInterviewPDF()} variant="outline" className="gap-2">
+              <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
                 <Download className="w-4 h-4" />
                 دانلود PDF
               </Button>
             </div>
 
-            {/* Branded report header (also rendered in PDF) */}
-            <div className="mb-8 flex items-center justify-between border-b border-primary/30 pb-4">
-              <div className="text-right">
-                <h1 className="text-2xl font-bold">راهنمای مصاحبه</h1>
-                <p className="text-muted-foreground">
-                  {jobTitle} | {seniorityLevels.find((l) => l.value === seniorityLevel)?.label}
-                  {industry && ` | ${industry}`}
-                </p>
-              </div>
-              <img src={logo} alt="HRing" className="h-12 w-12 rounded-lg object-contain" />
+            {/* Print Header */}
+            <div className="hidden print:block mb-8 text-center border-b pb-4">
+              <h1 className="text-2xl font-bold">راهنمای مصاحبه</h1>
+              <p className="text-muted-foreground">
+                {jobTitle} | {seniorityLevels.find((l) => l.value === seniorityLevel)?.label}
+                {industry && ` | ${industry}`}
+              </p>
             </div>
 
             {/* Questions by Section */}
@@ -368,7 +505,7 @@ const InterviewAssistant = () => {
                             )}
                           </Button>
                         </CollapsibleTrigger>
-                        <CollapsibleContent data-pdf-answer className="print:block">
+                        <CollapsibleContent className="print:block">
                           <div className="mt-4 space-y-3">
                             {/* Good Signs */}
                             <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
@@ -410,29 +547,6 @@ const InterviewAssistant = () => {
               </div>
             ))}
           </div>
-        )}
-
-        {history.length > 0 && (
-          <Card className="mt-8 border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <History className="h-5 w-5" /> تاریخچه راهنماهای مصاحبه
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {history.map((item) => (
-                <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
-                  <button type="button" onClick={() => restoreHistory(item)} className="text-right hover:text-primary">
-                    <span className="block font-medium">{item.title}</span>
-                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
-                  </button>
-                  <Button type="button" variant="ghost" size="icon" aria-label="حذف خروجی" onClick={() => void removeHistory(item.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
         )}
       </div>
     </div>

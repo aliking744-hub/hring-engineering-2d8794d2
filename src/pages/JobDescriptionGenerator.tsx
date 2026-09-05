@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Briefcase, Sparkles, Download, Loader2, History, Trash2 } from "lucide-react";
+import { ArrowRight, Briefcase, Sparkles, Download, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import AuroraBackground from "@/components/AuroraBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useCredits } from "@/hooks/useCredits";
+import { useCredits, DIAMOND_COSTS } from "@/hooks/useCredits";
+import logoImage from "@/assets/logo.png";
 import DataPrivacyWarning from "@/components/DataPrivacyWarning";
-import jsPDF from "jspdf";
-import { ApiError, apiRequest } from "@/lib/api";
-import WorkspaceHeader from "@/components/WorkspaceHeader";
-import { Textarea } from "@/components/ui/textarea";
-import logo from "@/assets/logo.png";
+import { escapePrintHtml, openPrintDocument } from "@/lib/printDocument";
 
 const seniorityLevels = [
   { value: "junior", label: "کارشناس (Junior)" },
@@ -22,16 +21,6 @@ const seniorityLevels = [
   { value: "manager", label: "مدیر (Manager)" },
 ];
 
-interface JobProfileHistoryItem {
-  id: string;
-  title: string;
-  createdAt: string;
-  payload: {
-    input?: { jobTitle?: string; industry?: string; seniorityLevel?: string; companyName?: string | null };
-    content?: string;
-  };
-}
-
 const JobDescriptionGenerator = () => {
   const [jobTitle, setJobTitle] = useState("");
   const [industry, setIndustry] = useState("");
@@ -39,58 +28,8 @@ const JobDescriptionGenerator = () => {
   const [companyName, setCompanyName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState("");
-  const [history, setHistory] = useState<JobProfileHistoryItem[]>([]);
   const { toast } = useToast();
-  const { credits, hasEnoughCredits, getCost } = useCredits();
-  const previewRef = useRef<HTMLDivElement>(null);
-  const idempotencyKeyRef = useRef<string | null>(null);
-
-  const loadHistory = useCallback(async () => {
-    try {
-      const rows = await apiRequest<JobProfileHistoryItem[]>(
-        "/workspace/outputs?featureKey=job_engineering.job_profile&limit=20",
-      );
-      setHistory(rows);
-    } catch (error) {
-      console.warn("Job-profile history could not be loaded:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
-
-  const restoreHistory = (item: JobProfileHistoryItem) => {
-    const input = item.payload.input;
-    setJobTitle(input?.jobTitle || item.title);
-    setIndustry(input?.industry || "");
-    setSeniorityLevel(input?.seniorityLevel || "");
-    setCompanyName(input?.companyName || "");
-    setGeneratedContent(item.payload.content || "");
-  };
-
-  const removeHistory = async (id: string) => {
-    try {
-      await apiRequest(`/workspace/outputs/${id}`, { method: "DELETE" });
-      setHistory((items) => items.filter((item) => item.id !== id));
-    } catch (error) {
-      console.error("Job-profile history deletion failed:", error);
-      toast({ title: "خطا", description: "حذف خروجی انجام نشد", variant: "destructive" });
-    }
-  };
-
-  const downloadPDF = async () => {
-    if (!previewRef.current) return;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(previewRef.current, {
-      callback: (document) => document.save(`HRing-job-profile-${jobTitle || 'report'}.pdf`),
-      margin: [12, 12, 12, 12],
-      autoPaging: 'text',
-      html2canvas: { scale: 0.8, useCORS: true },
-      width: 186,
-      windowWidth: 900,
-    });
-  };
+  const { credits, hasEnoughCredits } = useCredits();
 
   const handleGenerate = async () => {
     if (!jobTitle || !industry || !seniorityLevel) {
@@ -105,7 +44,7 @@ const JobDescriptionGenerator = () => {
     if (!hasEnoughCredits('JOB_PROFILE')) {
       toast({
         title: "اعتبار ناکافی",
-        description: `برای این عملیات ${getCost('JOB_PROFILE')} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        description: `برای این عملیات ${DIAMOND_COSTS.JOB_PROFILE} الماس نیاز دارید. اعتبار فعلی: ${credits}`,
         variant: "destructive",
       });
       return;
@@ -113,23 +52,19 @@ const JobDescriptionGenerator = () => {
 
     setIsLoading(true);
     try {
-      const requestKey = idempotencyKeyRef.current || crypto.randomUUID();
-      idempotencyKeyRef.current = requestKey;
-      const data = await apiRequest<{ content: string }>("/job-engineering/job-profiles/generate", {
-        method: "POST",
-        headers: { "X-Idempotency-Key": requestKey },
-        body: JSON.stringify({ jobTitle, industry, seniorityLevel, companyName: companyName || null }),
+      const { data, error } = await supabase.functions.invoke("generate-job-profile", {
+        body: { jobTitle, industry, seniorityLevel, companyName },
       });
-      if (typeof data?.content !== "string" || !data.content.trim()) {
-        throw new Error("پروفایل شغلی کامل دریافت نشد؛ اعتبار شما کسر نشده یا در صورت کسر خودکار بازگردانده می‌شود.");
+
+      if (error) throw error;
+      if (data?.error) {
+        toast({ title: "خطا", description: data.error, variant: "destructive" });
+        return;
       }
-      setGeneratedContent(data.content.trim());
-      idempotencyKeyRef.current = null;
-      window.dispatchEvent(new Event("hring:credits-changed"));
+
+      setGeneratedContent(data.content);
       toast({ title: "موفق", description: "پروفایل شغلی با موفقیت تولید شد." });
-      await loadHistory();
     } catch (error) {
-      if (error instanceof ApiError) idempotencyKeyRef.current = null;
       console.error("Error:", error);
       toast({ title: "خطا", description: "خطا در تولید پروفایل شغلی", variant: "destructive" });
     } finally {
@@ -137,13 +72,253 @@ const JobDescriptionGenerator = () => {
     }
   };
 
+  const generatePDF = async () => {
+    if (!generatedContent) return;
+
+    // Build HTML content for the print area
+    const parsedContent = generatedContent
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .split('\n')
+      .map(line => {
+        const t = line.trim();
+        if (!t || t.match(/^-{3,}$/)) return '';
+        if (t.startsWith('##')) {
+          const text = t.replace(/^#+\s*/, '');
+          return `<h2 class="pdf-section-title">${escapePrintHtml(text)}</h2>`;
+        }
+        if (t.startsWith('#')) {
+          const text = t.replace(/^#+\s*/, '');
+          return `<h3 class="pdf-sub-title">${escapePrintHtml(text)}</h3>`;
+        }
+        if (t.startsWith('|')) {
+          const cells = t.split('|').filter(c => c.trim() && !c.trim().match(/^-+$/));
+          if (cells.length >= 2) {
+            return `<div class="pdf-table-row">${cells.map(c => `<span>${escapePrintHtml(c.trim())}</span>`).join('')}</div>`;
+          }
+          return '';
+        }
+        if (t.startsWith('-') || t.startsWith('•')) {
+          const text = t.replace(/^[-•]\s*/, '');
+          return `<li>${escapePrintHtml(text)}</li>`;
+        }
+        return `<p>${escapePrintHtml(t)}</p>`;
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    const today = new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date());
+    const meta = [
+      companyName ? `شرکت: ${companyName}` : '',
+      industry ? `صنعت: ${industry}` : '',
+      seniorityLevel ? `سطح: ${seniorityLevels.find(s => s.value === seniorityLevel)?.label ?? seniorityLevel}` : '',
+    ].filter(Boolean).join('  |  ');
+
+    try {
+      await openPrintDocument(`<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>پروفایل شغلی - ${jobTitle}</title>
+  <style>
+    @font-face {
+      font-family: 'BNazanin';
+      src: url('/fonts/BNAZANIN.TTF') format('truetype');
+      font-weight: normal;
+    }
+    @font-face {
+      font-family: 'IRANSans';
+      src: url('/fonts/IRANSansBold-Edit.ttf') format('truetype');
+      font-weight: bold;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'BNazanin', Tahoma, Arial, sans-serif;
+      direction: rtl;
+      background: #ffffff;
+      color: #1a1a2e;
+      font-size: 11pt;
+      line-height: 1.8;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    /* HEADER */
+    .pdf-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+      border-bottom: 3px solid #2563eb;
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      padding: 16px 20px;
+      border-radius: 8px;
+      color: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-header-right {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pdf-header-title {
+      font-family: 'IRANSans', 'BNazanin', Tahoma, sans-serif;
+      font-size: 18pt;
+      font-weight: bold;
+      color: #ffffff;
+    }
+    .pdf-header-subtitle {
+      font-size: 10pt;
+      color: #bfdbfe;
+    }
+    .pdf-logo {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      filter: brightness(0) invert(1);
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    /* META STRIP */
+    .pdf-meta {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 8px 16px;
+      margin-bottom: 20px;
+      font-size: 9.5pt;
+      color: #1e40af;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    /* CONTENT */
+    .pdf-body {
+      padding: 0 4px;
+    }
+    .pdf-section-title {
+      font-family: 'IRANSans', 'BNazanin', Tahoma, sans-serif;
+      font-size: 13pt;
+      font-weight: bold;
+      color: #1e40af;
+      background: linear-gradient(90deg, #dbeafe 0%, transparent 100%);
+      padding: 6px 10px;
+      border-right: 4px solid #2563eb;
+      border-radius: 0 4px 4px 0;
+      margin: 18px 0 8px 0;
+      page-break-after: avoid;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-sub-title {
+      font-size: 11pt;
+      font-weight: bold;
+      color: #374151;
+      margin: 10px 0 4px 0;
+      page-break-after: avoid;
+    }
+    p {
+      margin-bottom: 6px;
+      color: #111827;
+    }
+    li {
+      margin: 4px 0 4px 0;
+      padding-right: 8px;
+      color: #1f2937;
+      list-style: none;
+      position: relative;
+    }
+    li::before {
+      content: '◆';
+      color: #2563eb;
+      font-size: 7pt;
+      position: absolute;
+      right: -10px;
+      top: 3px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-table-row {
+      display: flex;
+      justify-content: space-between;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 5px 10px;
+      margin-bottom: 4px;
+      font-size: 10pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .pdf-table-row span:first-child {
+      font-weight: bold;
+      color: #1e40af;
+    }
+    /* FOOTER */
+    .pdf-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      border-top: 1px solid #dbeafe;
+      padding: 6px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8pt;
+      color: #94a3b8;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-header">
+    <div class="pdf-header-right">
+      <div class="pdf-header-title">پروفایل شغلی: ${escapePrintHtml(jobTitle)}</div>
+      <div class="pdf-header-subtitle">سند هویت و مشخصات شغلی | ${today}</div>
+    </div>
+    <img class="pdf-logo" src="${window.location.origin}/favicon.ico" onerror="this.style.display='none'" />
+  </div>
+  ${meta ? `<div class="pdf-meta">${meta}</div>` : ''}
+  <div class="pdf-body">
+    ${parsedContent}
+  </div>
+  <div class="pdf-footer">
+    <span>hring.io</span>
+    <span>${today}</span>
+  </div>
+</body>
+</html>`);
+      toast({ title: "آماده چاپ", description: "در پنجره چاپ، گزینه ذخیره به‌صورت PDF را انتخاب کنید." });
+    } catch (error) {
+      toast({ title: "چاپ باز نشد", description: error instanceof Error ? error.message : "خطای چاپ", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="relative min-h-screen" dir="rtl">
       <AuroraBackground />
       
-      <WorkspaceHeader title="ایجاد پروفایل شغلی" subtitle="با هوش مصنوعی سند شرح شغلی حرفه‌ای بسازید" icon={<Briefcase className="h-6 w-6" />} />
       <div className="relative z-10 container mx-auto px-4 py-8">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 mb-8">
+          <Link to="/dashboard">
+            <Button variant="outline" className="gap-2 border-border bg-secondary/50">
+              <ArrowRight className="h-5 w-5" />
+              بازگشت به داشبورد
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Briefcase className="w-6 h-6 text-primary" />
+              ایجاد پروفایل شغلی
+            </h1>
+            <p className="text-muted-foreground">با هوش مصنوعی سند شرح شغلی حرفه‌ای بسازید</p>
+          </div>
+        </motion.div>
 
         {/* Data Privacy Warning for non-Plus users */}
         <DataPrivacyWarning className="mb-6" />
@@ -171,8 +346,8 @@ const JobDescriptionGenerator = () => {
               <Label>نام شرکت (اختیاری)</Label>
               <Input placeholder="مثال: شرکت فناوری" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="bg-secondary/50 border-border" />
             </div>
-            <Button className="w-full glow-button text-foreground" onClick={handleGenerate} disabled={isLoading || !hasEnoughCredits('JOB_PROFILE')}>
-              {isLoading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید...</> : <><Sparkles className="w-4 h-4 ml-2" />تولید پروفایل شغلی ({getCost('JOB_PROFILE')} جم)</>}
+            <Button className="w-full glow-button text-foreground" onClick={handleGenerate} disabled={isLoading}>
+              {isLoading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید...</> : <><Sparkles className="w-4 h-4 ml-2" />تولید پروفایل شغلی</>}
             </Button>
           </motion.div>
 
@@ -180,30 +355,15 @@ const JobDescriptionGenerator = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-foreground">پیش‌نمایش</h2>
               {generatedContent && (
-                <Button onClick={() => void downloadPDF()} className="glow-button text-foreground">
+                <Button onClick={generatePDF} className="glow-button text-foreground">
                   <Download className="w-4 h-4 ml-2" />
                   دانلود PDF
                 </Button>
               )}
             </div>
-            {generatedContent && (
-              <Textarea
-                aria-label="ویرایش متن پروفایل شغلی"
-                value={generatedContent}
-                onChange={(event) => setGeneratedContent(event.target.value)}
-                className="mb-4 min-h-[220px] bg-background font-sans leading-7"
-              />
-            )}
-            <div ref={previewRef} className="bg-secondary/30 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto">
+            <div className="bg-secondary/30 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto">
               {generatedContent ? (
                 <div className="text-sm text-foreground leading-relaxed space-y-2" style={{ fontFamily: 'BNazanin, Tahoma, sans-serif' }}>
-                  <div className="mb-6 flex items-center justify-between border-b border-primary/30 pb-4">
-                    <div className="text-right">
-                      <h1 className="text-xl font-bold">پروفایل شغلی</h1>
-                      <p className="text-muted-foreground">{companyName || 'HRing'} — {jobTitle}</p>
-                    </div>
-                    <img src={logo} alt="HRing" className="h-12 w-12 rounded-lg object-contain" />
-                  </div>
                   {generatedContent.split('\n').map((line, index) => {
                     const trimmed = line.trim();
                     if (!trimmed || trimmed.match(/^-{3,}$/)) return null;
@@ -243,27 +403,6 @@ const JobDescriptionGenerator = () => {
             </div>
           </motion.div>
         </div>
-
-        {history.length > 0 && (
-          <div className="mt-8 glass-card p-6">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              <History className="h-5 w-5" /> تاریخچه پروفایل‌های شغلی
-            </h2>
-            <div className="space-y-2">
-              {history.map((item) => (
-                <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
-                  <button type="button" onClick={() => restoreHistory(item)} className="text-right hover:text-primary">
-                    <span className="block font-medium">{item.title}</span>
-                    <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("fa-IR")}</span>
-                  </button>
-                  <Button type="button" variant="ghost" size="icon" aria-label="حذف خروجی" onClick={() => void removeHistory(item.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

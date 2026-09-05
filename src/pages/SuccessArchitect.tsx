@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ApiError, apiRequest } from "@/lib/api";
-import { ArrowRight, Route, Loader2, Sparkles, Copy, Mail, Download } from "lucide-react";
+import { ArrowRight, Route, Loader2, Sparkles, Copy, Mail, History, Award, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useCredits } from "@/hooks/useCredits";
-import WorkspaceHeader from "@/components/WorkspaceHeader";
-import jsPDF from "jspdf";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const seniorityLevels = [
   { value: "junior", label: "جونیور (۰-۲ سال)" },
@@ -30,32 +29,53 @@ const expectations = [
 ];
 
 interface OnboardingPlanResponse {
+  id: string;
+  job_title: string;
   plan: string;
   welcomeEmail: string;
+  progress: { completedTaskIndexes?: number[]; totalTasks?: number };
+  status: "active" | "completed" | "failed";
+  score: number | null;
+  completed_at: string | null;
+  created_at: string;
 }
 
 const SuccessArchitect = () => {
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeeEmail, setEmployeeEmail] = useState("");
-  const [startsOn, setStartsOn] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [seniority, setSeniority] = useState("");
   const [expectation, setExpectation] = useState("");
   const [mentorRole, setMentorRole] = useState("");
   const [generatedPlan, setGeneratedPlan] = useState("");
   const [welcomeEmail, setWelcomeEmail] = useState("");
+  const [activePlan, setActivePlan] = useState<OnboardingPlanResponse | null>(null);
+  const [history, setHistory] = useState<OnboardingPlanResponse[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<number[]>([]);
+  const [activeTab, setActiveTab] = useState("plan");
   const [isLoading, setIsLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
-  const { credits, getCost } = useCredits();
+
+  const tasks = useMemo(
+    () => generatedPlan.split("\n").map((line) => line.trim()).filter((line) => /^[-*]\s+/.test(line)).map((line) => line.replace(/^[-*]\s+/, "")),
+    [generatedPlan],
+  );
+
+  const fetchHistory = async () => {
+    try {
+      setHistory(await apiRequest<OnboardingPlanResponse[]>("/development/onboarding-plans"));
+    } catch (error) {
+      console.error("Onboarding history failed:", error);
+    }
+  };
+
+  useEffect(() => { void fetchHistory(); }, []);
 
   const handleGenerate = async () => {
-    if (!employeeName.trim() || !jobTitle || !seniority || !expectation) {
+    if (!jobTitle || !seniority || !expectation) {
       toast({
         title: "خطا",
-        description: "نام کارمند و تمام فیلدهای ضروری را پر کنید",
+        description: "لطفاً تمام فیلدهای ضروری را پر کنید",
         variant: "destructive",
       });
       return;
@@ -74,11 +94,6 @@ const SuccessArchitect = () => {
           method: "POST",
           headers: { "X-Idempotency-Key": requestKey },
           body: JSON.stringify({
-            employee_name: employeeName.trim(),
-            employee_email: employeeEmail.trim() || null,
-            starts_on: /^\d{4}-\d{2}-\d{2}$/.test(startsOn) ? startsOn : null,
-            starts_on_display: startsOn.trim() || null,
-            company_name: companyName.trim() || null,
             job_title: jobTitle,
             seniority,
             expectation,
@@ -89,6 +104,9 @@ const SuccessArchitect = () => {
 
       setGeneratedPlan(data.plan);
       setWelcomeEmail(data.welcomeEmail);
+      setActivePlan(data);
+      setCompletedTasks(data.progress.completedTaskIndexes || []);
+      setHistory((current) => [data, ...current.filter((item) => item.id !== data.id)]);
       idempotencyKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
 
@@ -129,6 +147,41 @@ const SuccessArchitect = () => {
     }
   };
 
+  const saveProgress = async (nextCompleted: number[], finalize = false) => {
+    if (!activePlan || tasks.length === 0) return;
+    try {
+      const updated = await apiRequest<OnboardingPlanResponse>(
+        `/development/onboarding-plans/${activePlan.id}/progress`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            completed_task_indexes: nextCompleted,
+            total_tasks: tasks.length,
+            finalize,
+          }),
+        },
+      );
+      setActivePlan(updated);
+      setCompletedTasks(updated.progress.completedTaskIndexes || []);
+      setHistory((current) => current.map((item) => item.id === updated.id ? updated : item));
+      if (finalize) {
+        toast(updated.status === "completed"
+          ? { title: "برنامه با موفقیت تکمیل شد", description: `امتیاز نهایی: ${updated.score} از ۱۰۰` }
+          : { title: "برنامه تکمیل نشد", description: `امتیاز ${updated.score} کمتر از حد نصاب ۵۰ است`, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "ذخیره پیشرفت ناموفق بود", description: error instanceof Error ? error.message : "خطای ناشناخته", variant: "destructive" });
+    }
+  };
+
+  const openHistoryPlan = (plan: OnboardingPlanResponse) => {
+    setActivePlan(plan);
+    setGeneratedPlan(plan.plan);
+    setWelcomeEmail(plan.welcomeEmail);
+    setCompletedTasks(plan.progress.completedTaskIndexes || []);
+    setActiveTab("plan");
+  };
+
   const handleCopy = async (text: string, type: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -145,22 +198,40 @@ const SuccessArchitect = () => {
     }
   };
 
-  const handleDownload = async () => {
-    if (!resultRef.current) return;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(resultRef.current, {
-      callback: (document) => document.save(`HRing-onboarding-${employeeName || 'report'}.pdf`),
-      margin: [10, 10, 10, 10], autoPaging: 'text',
-      html2canvas: { scale: 0.75, useCORS: true }, width: 190, windowWidth: 900,
-    });
-  };
-
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      <WorkspaceHeader title="معمار موفقیت ۹۰ روزه" subtitle="طراحی نقشه راه جامع برای آنبوردینگ نیروی جدید" icon={<Route className="h-6 w-6" />} />
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground py-12 px-4">
+        <div className="container max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <Link to="/dashboard" className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+              <ArrowRight className="w-5 h-5" />
+              <span>بازگشت به داشبورد</span>
+            </Link>
+            <img src={logo} alt="لوگو" className="w-12 h-12" />
+          </div>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary-foreground/20 flex items-center justify-center">
+              <Route className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold">معمار موفقیت ۹۰ روزه</h1>
+              <p className="text-primary-foreground/80 mt-1">
+                طراحی نقشه راه جامع برای آنبوردینگ نیروی جدید
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Form Section */}
       <div className="container max-w-4xl mx-auto py-10 px-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="plan" className="gap-2"><Route className="w-4 h-4" />نقشه راه ۹۰ روزه</TabsTrigger>
+            <TabsTrigger value="history" className="gap-2" onClick={fetchHistory}><History className="w-4 h-4" />تاریخچه</TabsTrigger>
+          </TabsList>
+          <TabsContent value="plan">
         <Card className="shadow-lg border-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -173,26 +244,6 @@ const SuccessArchitect = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="employeeName">نام کارمند *</Label>
-                <Input
-                  id="employeeName"
-                  placeholder="مثال: سارا احمدی"
-                  value={employeeName}
-                  onChange={(e) => setEmployeeName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="startsOn">تاریخ شروع (شمسی یا میلادی)</Label>
-                <Input id="startsOn" placeholder="مثال: ۱۴۰۵/۰۶/۱۵" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">نام سازمان</Label>
-                <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="مثال: HRing" />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="jobTitle">عنوان شغل *</Label>
                 <Input
@@ -221,17 +272,6 @@ const SuccessArchitect = () => {
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="employeeEmail">ایمیل کارمند (اختیاری)</Label>
-                <Input
-                  id="employeeEmail"
-                  type="email"
-                  dir="ltr"
-                  placeholder="employee@company.com"
-                  value={employeeEmail}
-                  onChange={(e) => setEmployeeEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label>انتظار اصلی *</Label>
                 <Select value={expectation} onValueChange={setExpectation}>
                   <SelectTrigger>
@@ -259,7 +299,7 @@ const SuccessArchitect = () => {
 
             <Button
               onClick={handleGenerate}
-              disabled={isLoading || credits < getCost('ONBOARDING_PLAN')}
+              disabled={isLoading}
               className="w-full h-12 text-lg gap-2"
             >
               {isLoading ? (
@@ -270,7 +310,7 @@ const SuccessArchitect = () => {
               ) : (
                 <>
                   <Route className="w-5 h-5" />
-                  تولید نقشه راه ۹۰ روزه و ایمیل خوش‌آمدگویی ({getCost('ONBOARDING_PLAN')} جم)
+                  تولید نقشه راه ۹۰ روزه
                 </>
               )}
             </Button>
@@ -280,11 +320,6 @@ const SuccessArchitect = () => {
         {/* Result Section */}
         {generatedPlan && (
           <div ref={resultRef} className="mt-8 space-y-6">
-            <div className="flex justify-end no-print">
-              <Button variant="outline" onClick={() => void handleDownload()} className="gap-2">
-                <Download className="h-4 w-4" /> دانلود PDF
-              </Button>
-            </div>
             {/* 90-Day Plan */}
             <Card className="shadow-lg border-0">
               <CardHeader>
@@ -303,7 +338,6 @@ const SuccessArchitect = () => {
                     کپی
                   </Button>
                 </CardTitle>
-                <CardDescription>تسک‌های قابل پیگیری برنامه در «نقشه راه ۹۰ روزه» در دسترس‌اند.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="prose prose-sm max-w-none dark:prose-invert text-right">
@@ -313,6 +347,43 @@ const SuccessArchitect = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {tasks.length > 0 && activePlan && (
+              <Card className="shadow-lg border-0">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-primary" />اقدام‌های برنامه</CardTitle>
+                  <CardDescription>هر اقدام را پس از انجام علامت بزنید؛ پیشرفت در حساب شما ذخیره می‌شود.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {tasks.map((task, index) => (
+                    <label key={`${index}-${task}`} className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
+                      <Checkbox
+                        checked={completedTasks.includes(index)}
+                        disabled={activePlan.status !== "active"}
+                        onCheckedChange={(checked) => {
+                          const next = checked
+                            ? [...completedTasks, index].sort((a, b) => a - b)
+                            : completedTasks.filter((item) => item !== index);
+                          void saveProgress(next);
+                        }}
+                      />
+                      <span className="text-sm leading-7">{task}</span>
+                    </label>
+                  ))}
+                  {activePlan.status === "active" && (
+                    <Button className="w-full" onClick={() => saveProgress(completedTasks, true)}>پایان برنامه و محاسبه امتیاز</Button>
+                  )}
+                  {activePlan.status === "failed" && <p className="text-destructive text-sm">امتیاز {activePlan.score} کمتر از حد نصاب ۵۰ است؛ گواهی صادر نمی‌شود.</p>}
+                  {activePlan.status === "completed" && (
+                    <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-5 text-center">
+                      <Award className="w-10 h-10 text-green-500 mx-auto mb-2" />
+                      <h3 className="font-bold">گواهی پایان نقشه راه ۹۰ روزه</h3>
+                      <p className="text-sm mt-1">{activePlan.job_title} — امتیاز {activePlan.score} از ۱۰۰</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Welcome Email */}
             {welcomeEmail && (
@@ -345,6 +416,20 @@ const SuccessArchitect = () => {
             )}
           </div>
         )}
+          </TabsContent>
+          <TabsContent value="history">
+            <div className="space-y-3">
+              {history.length === 0 ? <p className="text-muted-foreground text-center py-12">هنوز برنامه‌ای ثبت نشده است.</p> : history.map((item) => (
+                <Card key={item.id} className="cursor-pointer hover:border-primary/50" onClick={() => openHistoryPlan(item)}>
+                  <CardContent className="p-4 flex items-center justify-between gap-4">
+                    <div><p className="font-semibold">{item.job_title}</p><p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString("fa-IR")}</p></div>
+                    <div className="text-left text-sm">{item.status === "completed" ? `گواهی — امتیاز ${item.score}` : item.status === "failed" ? `ناموفق — امتیاز ${item.score}` : "در حال اجرا"}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

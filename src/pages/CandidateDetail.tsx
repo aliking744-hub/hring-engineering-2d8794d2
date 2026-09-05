@@ -32,7 +32,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { apiRequest } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Candidate as DBCandidate } from "@/hooks/useCampaigns";
 import { toast } from "@/hooks/use-toast";
 
@@ -52,36 +52,17 @@ interface CampaignInfo {
 }
 
 type CandidateStatus = 'pending' | 'approved' | 'rejected' | 'waiting';
-type CandidateDetailData = Omit<DBCandidate, 'status'> & { status: CandidateStatus };
+type CandidateDetailRecord = Omit<DBCandidate, 'status'> & { status: CandidateStatus };
 
-const normalizeCandidateStatus = (status: string): CandidateStatus => {
-  switch (status) {
-    case 'approved':
-    case 'rejected':
-    case 'waiting':
-    case 'pending':
-      return status;
-    default:
-      return 'pending';
-  }
-};
+const candidateStatuses: readonly CandidateStatus[] = ['pending', 'approved', 'rejected', 'waiting'];
 
-const isLayerScores = (value: unknown): value is LayerScores => {
-  if (!value || typeof value !== 'object') return false;
-  const scores = value as Record<keyof LayerScores, unknown>;
-  return (
-    typeof scores.activitySentiment === 'number' &&
-    typeof scores.hardSkillMatch === 'number' &&
-    typeof scores.careerTrajectory === 'number' &&
-    typeof scores.cultureFit === 'number' &&
-    typeof scores.riskOpportunity === 'number'
-  );
-};
+const isCandidateStatus = (value: string): value is CandidateStatus =>
+  candidateStatuses.includes(value as CandidateStatus);
 
 const CandidateDetail = () => {
   const { campaignId, candidateId } = useParams();
   const navigate = useNavigate();
-  const [candidate, setCandidate] = useState<CandidateDetailData | null>(null);
+  const [candidate, setCandidate] = useState<CandidateDetailRecord | null>(null);
   const [campaign, setCampaign] = useState<CampaignInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -94,42 +75,77 @@ const CandidateDetail = () => {
         setLoading(false);
         return;
       }
+
       try {
-        const [candidateData, campaignData] = await Promise.all([
-          apiRequest<DBCandidate>(`/recruiting/campaigns/${campaignId}/candidates/${candidateId}`),
-          apiRequest<CampaignInfo>(`/recruiting/campaigns/${campaignId}`),
-        ]);
-        setCandidate({ ...candidateData, status: normalizeCandidateStatus(candidateData.status) });
-        setCampaign(campaignData);
+        // Fetch candidate
+        const { data: candidateData, error: candidateError } = await supabase
+          .from('candidates')
+          .select('*')
+          .eq('id', candidateId)
+          .single();
+
+        if (candidateError) throw candidateError;
+        if (!candidateData) throw new Error("کاندیدا پیدا نشد");
+
+        const fetchedCandidate = candidateData as DBCandidate;
+        setCandidate({
+          ...fetchedCandidate,
+          status: isCandidateStatus(fetchedCandidate.status) ? fetchedCandidate.status : 'pending',
+        });
+
+        // Fetch campaign info
+        const { data: campaignData, error: campaignError } = await supabase
+          .from('campaigns')
+          .select('id, name, job_title, city')
+          .eq('id', campaignId)
+          .single();
+
+        if (campaignError) throw campaignError;
+        setCampaign(campaignData as CampaignInfo);
+
       } catch (err) {
-        console.error("Error fetching candidate:", err);
+        console.error('Error fetching candidate:', err);
         setError(err instanceof Error ? err.message : "خطا در بارگذاری");
       } finally {
         setLoading(false);
       }
     };
-    void fetchData();
+
+    fetchData();
   }, [campaignId, candidateId]);
 
   const updateCandidateStatus = async (newStatus: CandidateStatus) => {
-    if (!campaignId || !candidateId) return;
+    if (!candidateId) return;
+    
     setUpdating(true);
     try {
-      await apiRequest<DBCandidate>(
-        `/recruiting/campaigns/${campaignId}/candidates/${candidateId}`,
-        { method: "PATCH", body: JSON.stringify({ status: newStatus }) },
-      );
-      setCandidate((prev) => (prev ? { ...prev, status: newStatus } : null));
+      const { error } = await supabase
+        .from('candidates')
+        .update({ status: newStatus })
+        .eq('id', candidateId);
+
+      if (error) throw error;
+
+      setCandidate(prev => prev ? { ...prev, status: newStatus } : null);
+
       const statusLabels: Record<CandidateStatus, string> = {
-        approved: "تأیید شد",
-        rejected: "رد شد",
-        waiting: "در لیست انتظار قرار گرفت",
-        pending: "به حالت بررسی برگشت",
+        approved: 'تأیید شد',
+        rejected: 'رد شد',
+        waiting: 'در لیست انتظار قرار گرفت',
+        pending: 'به حالت بررسی برگشت'
       };
-      toast({ title: "وضعیت بروزرسانی شد", description: `کاندیدا ${statusLabels[newStatus]}` });
+
+      toast({
+        title: "وضعیت بروزرسانی شد",
+        description: `کاندیدا ${statusLabels[newStatus]}`,
+      });
     } catch (err) {
-      console.error("Error updating status:", err);
-      toast({ title: "خطا", description: "بروزرسانی وضعیت انجام نشد", variant: "destructive" });
+      console.error('Error updating status:', err);
+      toast({
+        title: "خطا",
+        description: "بروزرسانی وضعیت انجام نشد",
+        variant: "destructive",
+      });
     } finally {
       setUpdating(false);
     }
@@ -193,7 +209,7 @@ const CandidateDetail = () => {
     );
   }
 
-  const layerScores = isLayerScores(candidate.layer_scores) ? candidate.layer_scores : null;
+  const layerScores = candidate.layer_scores as unknown as LayerScores | null;
   const skills = candidate.skills ? candidate.skills.split(",").map(s => s.trim()) : [];
 
   const getScoreColor = (score: number) => {

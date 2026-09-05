@@ -24,22 +24,6 @@ from hring_api.domains.billing.credit_service import (
     compatibility_credit_cost,
     run_with_credit_reservation,
 )
-from hring_api.domains.company_ai.service import uses_company_byok
-from hring_api.domains.compat.labor_complaint import (
-    LABOR_SYSTEM_TEMPLATE,
-    LABOR_USER_TEMPLATE,
-    LaborComplaintContext,
-    LaborComplaintError,
-    build_context,
-    normalize_result,
-    required_evidence,
-)
-from hring_api.domains.compat.support import (
-    SupportContext,
-    SupportInputError,
-    build_support_context,
-    support_text,
-)
 from hring_api.domains.identity.dependencies import Principal
 
 
@@ -108,6 +92,40 @@ def _response_with_citations(
     return value
 
 
+def _capability_prompt(name: str, serialized: str) -> tuple[str, str]:
+    if name == "generate-job-ad":
+        return (
+            """تو آگهی‌نویس حرفه‌ای منابع انسانی هستی. خروجی باید فقط JSON معتبر با کلید generatedText باشد. آگهی فارسی را با حفظ لحن درخواستی تولید کن. اگر platform برابر jobboard است، generatedText باید حتماً تیترهای «معرفی موقعیت»، «مسئولیت‌ها»، «شرایط احراز»، «مزایا» و «نحوه ارسال درخواست» را جداگانه داشته باشد. صمیمی بودن لحن هرگز مجوز حذف شرایط احراز یا مسئولیت‌ها نیست. اطلاعات تماس را دقیقاً از ورودی بگیر و چیزی حدس نزن.""",
+            f"داده آگهی: {serialized}",
+        )
+    return (
+        "You are the HRing compatibility execution layer. Execute the named HR product capability "
+        "using only the supplied request data. Never invent identity/contact facts or sensitive "
+        "personal traits. Preserve the response contract implied by the request. Return valid JSON "
+        "only, without markdown. If evidence is missing, represent uncertainty explicitly rather "
+        "than fabricating facts. Respond in Persian unless the request requires another language.",
+        f"HRing capability: {name}\nRequest JSON: {serialized}\n\n"
+        "Return the structured result expected by this HRing capability as JSON.",
+    )
+
+
+def _validate_capability_response(name: str, body: Any, value: Any) -> Any:
+    if name != "generate-job-ad":
+        return value
+    if not isinstance(value, dict) or not isinstance(value.get("generatedText"), str):
+        raise CompatFunctionError("Smart-ad service returned an invalid structured response")
+    generated = value["generatedText"].strip()
+    if not generated:
+        raise CompatFunctionError("Smart-ad service returned empty text")
+    platform = body.get("platform") if isinstance(body, dict) else None
+    if platform == "jobboard":
+        required = ("معرفی موقعیت", "مسئولیت", "شرایط احراز", "مزایا", "نحوه ارسال")
+        if any(section not in generated for section in required):
+            raise CompatFunctionError("Smart-ad output omitted a required job-board section")
+    value["generatedText"] = generated
+    return value
+
+
 async def invoke_ai_function(
     *,
     name: str,
@@ -125,57 +143,9 @@ async def invoke_ai_function(
             )
         raise CompatFunctionUnavailableError(f"Unsupported compatibility function: {name}")
 
-    if name == "labor-complaint-assistant":
-        try:
-            evidence_contract = required_evidence(body)
-        except LaborComplaintError as exc:
-            raise CompatFunctionError(str(exc)) from exc
-        if evidence_contract is not None:
-            return evidence_contract
-
     serialized = json.dumps(body, ensure_ascii=False, default=str)
-    labor_context: LaborComplaintContext | None = None
-    support_context: SupportContext | None = None
-    if name == "labor-complaint-assistant":
-        if session is None:
-            raise CompatFunctionError("Labor complaint analysis requires a database session")
-        try:
-            labor_context = await build_context(session, body)
-        except LaborComplaintError as exc:
-            raise CompatFunctionError(str(exc)) from exc
-        prompt_variables = labor_context.prompt_variables()
-        system_prompt = LABOR_SYSTEM_TEMPLATE.format_map(prompt_variables)
-        user_prompt = LABOR_USER_TEMPLATE.format_map(prompt_variables)
-        feature_key = "legal.labor_complaint"
-    elif name == "hring-support":
-        if session is None:
-            raise CompatFunctionError("HRing support requires a database session")
-        try:
-            support_context = await build_support_context(session, body)
-        except SupportInputError as exc:
-            raise CompatFunctionError(str(exc)) from exc
-        prompt_variables = support_context.prompt_variables()
-        system_prompt = support_context.system_prompt
-        user_prompt = support_context.conversation_json
-        feature_key = "support.hring"
-    else:
-        system_prompt = (
-            "You are the HRing compatibility execution layer. Execute the named HR product capability "
-            "using only the supplied request data. Never invent identity/contact facts or sensitive "
-            "personal traits. Preserve the response contract implied by the request. Return valid JSON "
-            "only, without markdown. If evidence is missing, represent uncertainty explicitly rather "
-            "than fabricating facts. Respond in Persian unless the request requires another language."
-        )
-        user_prompt = (
-            f"HRing capability: {name}\n"
-            f"Request JSON: {serialized}\n\n"
-            "Return the structured result expected by this HRing capability as JSON."
-        )
-        feature_key = f"compat.{name}"
-        prompt_variables = {
-            "capability_name": name,
-            "request_json": serialized,
-        }
+    system_prompt, user_prompt = _capability_prompt(name, serialized)
+    feature_key = f"compat.{name}"
     if principal is not None and session is None:
         raise CompatFunctionError("Credit-controlled AI execution requires a database session")
     cost = (
@@ -183,38 +153,30 @@ async def invoke_ai_function(
         if principal is not None and session is not None
         else 0
     )
-    company_id = _company_id(principal)
-    managed_cost = (
-        0
-        if principal is not None
-        and session is not None
-        and await uses_company_byok(
-            session,
-            company_id=company_id,
-            capability_key=feature_key,
-        )
-        else cost
-    )
 
     async def fallback() -> AiGatewayResult:
+        default_provider = settings.recruiting_ai_provider
+        default_model = settings.recruiting_ai_model
+        if name == "generate-job-ad":
+            default_provider = settings.smart_ad_text_ai_provider
+            default_model = settings.smart_ad_text_ai_model
         route = await resolve_runtime_feature_route(
             feature_key=feature_key,
-            default_provider=settings.recruiting_ai_provider,
-            default_model=settings.recruiting_ai_model,
+            default_provider=default_provider,
+            default_model=default_model,
         )
         return await generate_with_ai_gateway(
             feature_key=feature_key,
             user_id=principal.user_id if principal is not None else None,
-            company_id=company_id,
+            company_id=_company_id(principal),
             provider=route.provider,
             model=route.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            credits_charged=managed_cost,
-            max_output_tokens=4_000 if labor_context is not None else 5_000,
-            response_format="json_object" if labor_context is not None else "text",
+            credits_charged=cost,
+            max_output_tokens=12_000,
             metadata_json={
                 "ai_route_source": route.source,
                 "prompt_key": feature_key,
@@ -224,34 +186,36 @@ async def invoke_ai_function(
 
     async def generate() -> Any:
         try:
-            result = await generate_with_managed_prompt(
-                session,
-                prompt_key=feature_key,
-                variables=prompt_variables,
-                user_id=principal.user_id if principal is not None else None,
-                company_id=company_id,
-                fallback=fallback,
-                credits_charged=managed_cost,
-            )
+            # Smart ads have a strict product contract. The old generic published
+            # compatibility prompt could drop required sections, so keep this
+            # capability on its validated embedded contract until a dedicated
+            # prompt version is published.
+            if name == "generate-job-ad":
+                result = await fallback()
+            else:
+                result = await generate_with_managed_prompt(
+                    session,
+                    prompt_key=feature_key,
+                    variables={
+                        "capability_name": name,
+                        "request_json": serialized,
+                    },
+                    user_id=principal.user_id if principal is not None else None,
+                    company_id=_company_id(principal),
+                    fallback=fallback,
+                    credits_charged=cost,
+                )
         except (AiGatewayError, PromptRegistryError) as exc:
             raise CompatFunctionError("HRing AI service is unavailable") from exc
-        value = _response_with_citations(result.content, result.citations)
-        if labor_context is not None:
-            return normalize_result(value, labor_context)
-        if support_context is not None:
-            try:
-                return {
-                    "content": support_text(
-                        value, allowed_phone=support_context.support_phone
-                    )
-                }
-            except SupportInputError as exc:
-                raise CompatFunctionError(str(exc)) from exc
-        return value
+        return _validate_capability_response(
+            name,
+            body,
+            _response_with_citations(result.content, result.citations),
+        )
 
     if principal is None:
         return await generate()
-    if managed_cost <= 0:
+    if cost <= 0:
         return await generate()
     assert session is not None
     raw_key = (idempotency_key or "").strip()
@@ -261,7 +225,7 @@ async def invoke_ai_function(
     return await run_with_credit_reservation(
         session,
         principal=principal,
-        amount=managed_cost,
+        amount=cost,
         idempotency_key=operation_key,
         feature_key=feature_key,
         description=f"Compatibility AI execution: {name}",
