@@ -31,6 +31,15 @@ class AdminUserResponse(BaseModel):
     created_at: datetime
 
 
+class CreateManagedUserRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=10, max_length=256)
+    full_name: str = Field(min_length=1, max_length=200)
+    company_id: UUID | None = None
+    company_role: str = Field(default="employee", pattern=r"^(deputy|manager|employee)$")
+    initial_credits: int = Field(default=0, ge=0, le=10_000_000)
+
+
 class AdminUserStatusRequest(BaseModel):
     is_active: bool
 

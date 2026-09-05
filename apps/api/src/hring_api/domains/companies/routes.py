@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.db.session import get_db_session
 from hring_api.domains.companies.schemas import (
+    AllocateMemberCreditsRequest,
     CompanyInviteResponse,
     CompanyMemberResponse,
     CompanyResponse,
@@ -31,6 +32,7 @@ from hring_api.domains.companies.service import (
     InviteNotFoundError,
     MemberNotFoundError,
     ProtectedMemberError,
+    allocate_member_credits,
     create_company_user,
     create_invite,
     deactivate_invite,
@@ -328,6 +330,15 @@ async def provision_company_user(
             full_name=payload.full_name,
             role=payload.role,
         )
+        if payload.initial_credits > 0:
+            await allocate_member_credits(
+                db,
+                actor_user_id=principal.user_id,
+                company_id=company_id,
+                member_id=membership.id,
+                amount=payload.initial_credits,
+                reason="Initial company member credit allocation",
+            )
     except CompanyError as exc:
         await db.rollback()
         raise _domain_http_error(exc) from exc
@@ -338,6 +349,33 @@ async def provision_company_user(
         full_name=payload.full_name.strip(),
         role=membership.role,
     )
+
+
+@router.post(
+    "/companies/{company_id}/members/{member_id}/credits",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def allocate_company_member_credits(
+    company_id: UUID,
+    member_id: UUID,
+    payload: AllocateMemberCreditsRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> Response:
+    try:
+        await allocate_member_credits(
+            db,
+            actor_user_id=principal.user_id,
+            company_id=company_id,
+            member_id=member_id,
+            amount=payload.amount,
+            reason=payload.reason,
+        )
+    except CompanyError as exc:
+        await db.rollback()
+        raise _domain_http_error(exc) from exc
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

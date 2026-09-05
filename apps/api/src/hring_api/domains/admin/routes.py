@@ -27,6 +27,7 @@ from hring_api.domains.admin.schemas import (
     AuditLogResponse,
     BulkUpsertSiteSettingsRequest,
     CreateManagedCompanyRequest,
+    CreateManagedUserRequest,
     ManagedCompanyCreatedResponse,
     PlatformOverviewResponse,
     PublicSettingsResponse,
@@ -41,10 +42,16 @@ from hring_api.domains.admin.service import (
     AdminSafetyError,
     SensitiveSettingKeyError,
     create_managed_company,
+    create_managed_user,
     save_site_setting,
     set_user_active_state,
     set_user_platform_roles,
     update_managed_company,
+)
+from hring_api.domains.billing.credit_service import (
+    CreditError,
+    admin_adjust_credits,
+    transfer_company_credits_to_user,
 )
 from hring_api.domains.identity.models import User
 from hring_api.domains.identity.account_security_repository import get_mfa_factor
@@ -112,6 +119,64 @@ async def platform_overview(
         trial_companies=counts[4],
         suspended_companies=counts[5],
     )
+
+
+@router.post(
+    "/admin/platform/users",
+    response_model=AdminUserResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["platform-admin"],
+)
+async def create_platform_user(
+    payload: CreateManagedUserRequest,
+    request: Request,
+    actor: PlatformPrincipal = Depends(require_platform_permission("platform.users.manage")),
+    db: AsyncSession = Depends(get_db_session),
+) -> AdminUserResponse:
+    try:
+        user = await create_managed_user(
+            db,
+            actor_user_id=actor.user_id,
+            email=str(payload.email),
+            password=payload.password,
+            full_name=payload.full_name,
+            company_id=payload.company_id,
+            company_role=payload.company_role,
+            ip_address=_client_ip(request),
+        )
+        if payload.initial_credits > 0:
+            operation_key = f"platform-user-initial:{user.id}"
+            if payload.company_id is not None:
+                await transfer_company_credits_to_user(
+                    db,
+                    company_id=payload.company_id,
+                    user_id=user.id,
+                    amount=payload.initial_credits,
+                    operation_key=operation_key,
+                    actor_user_id=actor.user_id,
+                    reason="Initial user credit allocation",
+                    request_id=request.headers.get("x-request-id"),
+                    ip_address=_client_ip(request),
+                )
+            else:
+                await admin_adjust_credits(
+                    db,
+                    owner_type="user",
+                    owner_id=user.id,
+                    amount=payload.initial_credits,
+                    idempotency_key=operation_key,
+                    reason="Initial user credit allocation",
+                    actor_user_id=actor.user_id,
+                    request_id=request.headers.get("x-request-id"),
+                    ip_address=_client_ip(request),
+                )
+    except (AdminError, CreditError) as exc:
+        await db.rollback()
+        if isinstance(exc, AdminError):
+            raise _admin_error(exc) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await db.commit()
+    return await _user_response(db, user)
 
 
 @router.get(

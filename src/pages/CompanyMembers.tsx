@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronLeft,
   Copy,
+  CreditCard,
   Edit,
   KeyRound,
   Link2,
@@ -81,12 +82,15 @@ const CompanyMembers = () => {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [creditOpen, setCreditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [newRole, setNewRole] = useState<CompanyRole>('employee');
+  const [initialCredits, setInitialCredits] = useState(0);
+  const [creditAmount, setCreditAmount] = useState(0);
 
   const [inviteRole, setInviteRole] = useState<CompanyRole>('employee');
   const [inviteMaxUses, setInviteMaxUses] = useState(1);
@@ -126,6 +130,7 @@ const CompanyMembers = () => {
           password,
           full_name: fullName.trim(),
           role: newRole,
+          initial_credits: initialCredits,
         }),
       });
       toast.success('کاربر شرکت ایجاد شد');
@@ -134,6 +139,7 @@ const CompanyMembers = () => {
       setPassword('');
       setFullName('');
       setNewRole('employee');
+      setInitialCredits(0);
       await refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ساخت کاربر انجام نشد');
@@ -197,6 +203,33 @@ const CompanyMembers = () => {
       await refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'ویرایش پروفایل انجام نشد');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const allocateCredits = async () => {
+    if (!context?.companyId || !targetMemberId || creditAmount <= 0) return;
+    setBusy(true);
+    try {
+      await apiRequest<void>(
+        `/companies/${context.companyId}/members/${targetMemberId}/credits`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: creditAmount,
+            reason: 'تخصیص اعتبار توسط مدیر شرکت',
+          }),
+        },
+      );
+      toast.success('اعتبار به حساب کاربر منتقل شد');
+      setCreditOpen(false);
+      setCreditAmount(0);
+      setTargetMemberId(null);
+      setTargetUser(null);
+      await refreshAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تخصیص اعتبار انجام نشد');
     } finally {
       setBusy(false);
     }
@@ -344,6 +377,17 @@ const CompanyMembers = () => {
                                       setPasswordOpen(true);
                                     }}
                                   ><KeyRound className="h-4 w-4" /></Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="تخصیص اعتبار"
+                                    onClick={() => {
+                                      setTargetUser({ id: member.user_id, name });
+                                      setTargetMemberId(member.id);
+                                      setCreditAmount(0);
+                                      setCreditOpen(true);
+                                    }}
+                                  ><CreditCard className="h-4 w-4" /></Button>
                                   <Button variant="ghost" size="icon" className="text-destructive" onClick={() => void remove(member.id)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                               )}
@@ -388,6 +432,7 @@ const CompanyMembers = () => {
             <div><Label>ایمیل</Label><Input dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div><Label>رمز عبور اولیه</Label><Input dir="ltr" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={10} /></div>
             <div><Label>نقش</Label><Select value={newRole} onValueChange={(v) => setNewRole(v as CompanyRole)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MANAGED_ROLES.map((role) => <SelectItem key={role} value={role}>{ROLE_NAMES[role]}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>اعتبار اولیه کاربر</Label><Input type="number" min={0} value={initialCredits} onChange={(e) => setInitialCredits(Math.max(0, Number(e.target.value) || 0))} /><p className="mt-1 text-xs text-muted-foreground">از اعتبار شرکت کم و به حساب شخصی این کاربر منتقل می‌شود.</p></div>
           </div>
           <DialogFooter><Button onClick={() => void createUser()} disabled={busy}>{busy && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}ساخت کاربر</Button></DialogFooter>
         </DialogContent>
@@ -400,6 +445,17 @@ const CompanyMembers = () => {
             <div><Label>حداکثر تعداد استفاده</Label><Input type="number" min={1} max={1000} value={inviteMaxUses} onChange={(e) => setInviteMaxUses(Number(e.target.value) || 1)} /></div>
           </div>
           <DialogFooter><Button onClick={() => void createNewInvite()} disabled={busy}>ساخت دعوت‌نامه</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={creditOpen} onOpenChange={setCreditOpen}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تخصیص اعتبار به {targetUser?.name}</DialogTitle>
+            <DialogDescription>این مقدار از مانده شرکت کم و به حساب شخصی کاربر منتقل می‌شود.</DialogDescription>
+          </DialogHeader>
+          <div><Label>تعداد اعتبار</Label><Input type="number" min={1} value={creditAmount} onChange={(e) => setCreditAmount(Math.max(0, Number(e.target.value) || 0))} /></div>
+          <DialogFooter><Button onClick={() => void allocateCredits()} disabled={busy || creditAmount <= 0}>{busy && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}تخصیص اعتبار</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
