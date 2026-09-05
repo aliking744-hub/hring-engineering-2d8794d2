@@ -320,6 +320,8 @@ async def create_onboarding_workflow_task(
     plan = await get_onboarding_plan(session, plan_id=plan_id, owner_user_id=principal.user_id)
     if plan is None:
         raise DevelopmentNotFoundError("Onboarding plan was not found")
+    if plan.status != "active":
+        raise DevelopmentConflictError("Finalized onboarding plans cannot be changed")
     task = await create_onboarding_task(
         session,
         plan=plan,
@@ -338,6 +340,15 @@ async def update_onboarding_workflow_task(
     payload: OnboardingTaskUpdateRequest,
     principal: Principal,
 ) -> OnboardingTaskResponse:
+    plan = await get_onboarding_plan(
+        session,
+        plan_id=plan_id,
+        owner_user_id=principal.user_id,
+    )
+    if plan is None:
+        raise DevelopmentNotFoundError("Onboarding plan was not found")
+    if plan.status != "active":
+        raise DevelopmentConflictError("Finalized onboarding plans cannot be changed")
     task = await get_onboarding_task(
         session,
         plan_id=plan_id,
@@ -373,6 +384,37 @@ async def update_onboarding_workflow_task(
         event_summary=event_summary,
     )
     return await _single_task_response(session, updated)
+
+
+async def complete_onboarding_workflow(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    principal: Principal,
+) -> OnboardingPlanResponse:
+    plan = await get_onboarding_plan(
+        session,
+        plan_id=plan_id,
+        owner_user_id=principal.user_id,
+        for_update=True,
+    )
+    if plan is None:
+        raise DevelopmentNotFoundError("Onboarding plan was not found")
+    if plan.status != "active":
+        return await onboarding_workflow_response(session, plan=plan)
+
+    task_map, _ = await list_onboarding_tasks(session, plan_ids=[plan.id])
+    tasks = task_map.get(plan.id, [])
+    if not tasks:
+        raise DevelopmentConflictError("Onboarding plan has no tasks to score")
+
+    completed_count = sum(task.status == "completed" for task in tasks)
+    score = round((completed_count / len(tasks)) * 100)
+    plan.score = score
+    plan.status = "completed" if score >= 50 else "failed"
+    plan.completed_at = datetime.now(UTC)
+    await session.flush()
+    return await onboarding_workflow_response(session, plan=plan)
 
 
 async def _single_task_response(

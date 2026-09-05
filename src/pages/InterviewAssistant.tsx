@@ -12,6 +12,7 @@ import jsPDF from "jspdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import logo from "@/assets/logo.png";
+import { waitForPrintableAssets } from "@/lib/printDocument";
 
 interface InterviewQuestion {
   id: string;
@@ -111,6 +112,7 @@ const InterviewAssistant = () => {
     });
 
     try {
+      await waitForPrintableAssets(root);
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       await pdf.html(root, {
         callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),

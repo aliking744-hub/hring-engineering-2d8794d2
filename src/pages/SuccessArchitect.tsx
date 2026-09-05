@@ -14,6 +14,7 @@ import remarkGfm from "remark-gfm";
 import { useCredits } from "@/hooks/useCredits";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import jsPDF from "jspdf";
+import { waitForPrintableAssets } from "@/lib/printDocument";
 
 const seniorityLevels = [
   { value: "junior", label: "جونیور (۰-۲ سال)" },
@@ -147,6 +148,7 @@ const SuccessArchitect = () => {
 
   const handleDownload = async () => {
     if (!resultRef.current) return;
+    await waitForPrintableAssets(resultRef.current);
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     await pdf.html(resultRef.current, {
       callback: (document) => document.save(`HRing-onboarding-${employeeName || 'report'}.pdf`),

@@ -135,6 +135,9 @@ class OnboardingPlanResponse(BaseModel):
     mentor_role: str | None
     plan: str
     welcome_email: str = Field(serialization_alias="welcomeEmail")
+    status: Literal["active", "completed", "failed"]
+    score: int | None
+    completed_at: datetime | None
     created_at: datetime
     tasks: list[OnboardingTaskResponse] = Field(default_factory=list)
 

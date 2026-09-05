@@ -16,7 +16,7 @@ export const DIAMOND_COSTS = {
   LEARNING_PATH: 12,
   LEGAL_ADVISOR: 5,
   LABOR_COMPLAINT: 25,
-  LEGAL_DEFENSE: 35,
+  LEGAL_DEFENSE: 20,
   HR_SUPPORT: 1,
 
   // Complex Analysis - 20 Diamonds
@@ -24,8 +24,8 @@ export const DIAMOND_COSTS = {
 
   // Image Generation - 25 Diamonds
   SMART_AD_IMAGE: 50,
-  HR_DASHBOARD: 5,
-  HR_DASHBOARD_UPLOAD: 15,
+  HR_DASHBOARD: 0,
+  HR_DASHBOARD_UPLOAD: 10,
   COST_CALCULATOR: 2,
   ANALYTICS_HUB: 25,
 

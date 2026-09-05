@@ -14,6 +14,7 @@ from hring_api.domains.development.ai_service import (
     generate_learning_path_content,
 )
 from hring_api.domains.development.email import build_learning_path_html
+from hring_api.domains.development.service import complete_onboarding_workflow
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
     LearningPathResult,
@@ -175,6 +176,44 @@ def test_learning_path_normalizes_wrappers_aliases_and_string_skills() -> None:
     assert normalized["skillGapAnalysis"] == "شکاف روشن"
     assert normalized["hardSkills"][0]["skill"] == "Python"
     assert normalized["roadmap"][0]["actionItems"] == ["تمرین روزانه"]
+
+
+def test_onboarding_completion_scores_tasks_and_issues_success(monkeypatch) -> None:
+    plan = SimpleNamespace(
+        id=uuid4(),
+        status="active",
+        score=None,
+        completed_at=None,
+    )
+    tasks = [SimpleNamespace(status="completed") for _ in range(3)] + [
+        SimpleNamespace(status="todo") for _ in range(2)
+    ]
+
+    async def fake_get_plan(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return plan
+
+    async def fake_list_tasks(*_args: object, **_kwargs: object) -> tuple[dict, dict]:
+        return {plan.id: tasks}, {}
+
+    async def fake_response(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return plan
+
+    class FakeSession:
+        async def flush(self) -> None:
+            return None
+
+    monkeypatch.setattr("hring_api.domains.development.service.get_onboarding_plan", fake_get_plan)
+    monkeypatch.setattr("hring_api.domains.development.service.list_onboarding_tasks", fake_list_tasks)
+    monkeypatch.setattr("hring_api.domains.development.service.onboarding_workflow_response", fake_response)
+
+    result = asyncio.run(complete_onboarding_workflow(
+        FakeSession(),
+        plan_id=plan.id,
+        principal=SimpleNamespace(user_id=uuid4()),
+    ))
+    assert result.status == "completed"
+    assert result.score == 60
+    assert result.completed_at is not None
 
 
 def test_native_development_records_are_owner_scoped_and_idempotent(monkeypatch) -> None:

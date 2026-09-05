@@ -14,6 +14,7 @@ import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { Textarea } from "@/components/ui/textarea";
 import logo from "@/assets/logo.png";
+import { waitForPrintableAssets } from "@/lib/printDocument";
 
 const seniorityLevels = [
   { value: "junior", label: "کارشناس (Junior)" },
@@ -81,6 +82,7 @@ const JobDescriptionGenerator = () => {
 
   const downloadPDF = async () => {
     if (!previewRef.current) return;
+    await waitForPrintableAssets(previewRef.current);
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     await pdf.html(previewRef.current, {
       callback: (document) => document.save(`HRing-job-profile-${jobTitle || 'report'}.pdf`),

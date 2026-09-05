@@ -29,6 +29,14 @@ class OnboardingPlan(Base):
             "expectation IN ('quick_delivery','learning','leadership','innovation')",
             name="expectation",
         ),
+        CheckConstraint(
+            "status IN ('active','completed','failed')",
+            name="status",
+        ),
+        CheckConstraint(
+            "score IS NULL OR (score >= 0 AND score <= 100)",
+            name="score",
+        ),
         UniqueConstraint(
             "owner_user_id",
             "idempotency_key",
@@ -59,6 +67,9 @@ class OnboardingPlan(Base):
     mentor_role: Mapped[str | None] = mapped_column(Text, nullable=True)
     plan: Mapped[str] = mapped_column(Text, nullable=False)
     welcome_email: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active", index=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
