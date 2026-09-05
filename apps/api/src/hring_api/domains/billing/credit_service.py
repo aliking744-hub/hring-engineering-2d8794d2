@@ -790,6 +790,72 @@ async def admin_adjust_credits(
     return entry
 
 
+async def transfer_company_credits_to_user(
+    session: AsyncSession,
+    *,
+    company_id: UUID,
+    user_id: UUID,
+    amount: int,
+    operation_key: str,
+    actor_user_id: UUID,
+    reason: str,
+    request_id: str | None,
+    ip_address: str | None = None,
+) -> CreditLedgerEntry:
+    """Move available credits from a company account to one user atomically."""
+    if amount <= 0:
+        raise CreditConflictError("Transfer amount must be positive")
+    transfer_metadata = {
+        "company_id": str(company_id),
+        "user_id": str(user_id),
+        "direction": "company_to_user",
+    }
+    company_account, _, company_replay = await _apply_available_event(
+        session,
+        owner_type="company",
+        owner_id=company_id,
+        event_type="admin_adjustment",
+        amount_delta=-amount,
+        idempotency_key=f"{operation_key}:debit",
+        actor_user_id=actor_user_id,
+        reason=reason,
+        request_id=request_id,
+        metadata_json=transfer_metadata,
+    )
+    _, user_entry, user_replay = await _apply_available_event(
+        session,
+        owner_type="user",
+        owner_id=user_id,
+        event_type="admin_adjustment",
+        amount_delta=amount,
+        idempotency_key=f"{operation_key}:credit",
+        actor_user_id=actor_user_id,
+        reason=reason,
+        request_id=request_id,
+        metadata_json=transfer_metadata,
+    )
+    if company_replay != user_replay:
+        raise CreditConflictError("Credit transfer is only partially recorded")
+    if not company_replay:
+        await add_audit_log(
+            session,
+            actor_user_id=actor_user_id,
+            company_id=company_id,
+            action="billing.credit.company_member_transfer",
+            resource_type="credit_account",
+            resource_id=str(company_account.id),
+            metadata_json={
+                **transfer_metadata,
+                "amount": amount,
+                "reason": reason,
+                "request_id": request_id or "",
+            },
+            ip_address=ip_address,
+        )
+    await session.flush()
+    return user_entry
+
+
 async def replace_available_credits_for_plan(
     session: AsyncSession,
     *,
