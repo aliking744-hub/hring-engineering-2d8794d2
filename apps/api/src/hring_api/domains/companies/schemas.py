@@ -108,6 +108,12 @@ class CreateCompanyUserRequest(BaseModel):
     password: str = Field(min_length=10, max_length=256)
     full_name: str = Field(min_length=1, max_length=200)
     role: str = Field(pattern=r"^(deputy|manager|employee)$")
+    initial_credits: int = Field(default=0, ge=0, le=10_000_000)
+
+
+class AllocateMemberCreditsRequest(BaseModel):
+    amount: int = Field(ge=1, le=10_000_000)
+    reason: str = Field(default="Company credit allocation", min_length=3, max_length=500)
 
 
 class ResetCompanyUserPasswordRequest(BaseModel):
