@@ -11,9 +11,10 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test:secrets": "node scripts/scan-secrets.mjs",
     "test:safety": "node --test tests/safety/*.test.mjs",
     "test:smoke": "node --test tests/smoke/*.test.mjs",
-    "test": "npm run test:safety && npm run test:smoke",
+    "test": "npm run test:secrets && npm run test:safety && npm run test:smoke",
     "check": "npm run typecheck && npm test && npm run build",
     "preview": "vite preview"
   },
