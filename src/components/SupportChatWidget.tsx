@@ -22,6 +22,7 @@ const SupportChatWidget = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [isTyping, setIsTyping] = useState(false);
   const [feedbackOffered, setFeedbackOffered] = useState(false);
@@ -263,7 +264,7 @@ const SupportChatWidget = () => {
     setIsLoading(true);
 
     try {
-      let data: { content?: string } | null = null;
+      let data: { content?: string; requestId?: string } | null = null;
       if (user) {
         const response = await supabase.functions.invoke('hring-support', {
           body: {
@@ -286,11 +287,12 @@ const SupportChatWidget = () => {
         const stream = await response.text();
         const dataLine = stream.split('\n').find((line) => line.startsWith('data: {'));
         const event = dataLine ? JSON.parse(dataLine.slice(6)) : null;
-        data = { content: event?.choices?.[0]?.delta?.content };
+        data = { content: event?.choices?.[0]?.delta?.content, requestId: event?.request_id };
       }
       const assistantContent = typeof data?.content === 'string' ? data.content.trim() : '';
       if (!assistantContent) throw new Error('پاسخی از پشتیبانی دریافت نشد');
       setMessages([...newMessages, { role: 'assistant', content: assistantContent }]);
+      setLastRequestId(typeof data?.requestId === 'string' ? data.requestId : null);
       setTimeout(startFollowUpTimer, 0);
     } catch (error) {
       console.error('Chat error:', error);
@@ -355,7 +357,7 @@ const SupportChatWidget = () => {
     setSubmittingFeedback(true);
     try {
       const { data, error } = await supabase.functions.invoke('submit-feedback', {
-        body: { userId: user.id, rating, comment },
+        body: { userId: user.id, rating, comment, sessionId, requestId: lastRequestId },
       });
 
       if (error) throw error;

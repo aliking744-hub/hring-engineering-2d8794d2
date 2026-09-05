@@ -26,6 +26,8 @@ PLATFORM_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "platform.feature_access.manage",
             "platform.audit.read",
             "platform.ai_usage.read",
+            "platform.ai_conversations.read",
+            "platform.ai_conversations.manage",
             "platform.ai_rates.manage",
             "platform.billing.read",
             "platform.billing.manage",
@@ -57,6 +59,8 @@ PLATFORM_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "platform.audit.read",
             "platform.billing.read",
             "platform.integrations.read",
+            "platform.ai_conversations.read",
+            "platform.ai_conversations.manage",
         }
     ),
 }

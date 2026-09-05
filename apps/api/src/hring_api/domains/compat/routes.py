@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
@@ -17,6 +18,7 @@ from hring_api.domains.compat.downloads import (
     create_product_download_url,
     decode_product_download_token,
 )
+from hring_api.domains.compat.models import CompatRecord
 from hring_api.domains.compat.functions import (
     BLOCKED_SENSITIVE_FUNCTIONS,
     NON_AI_SPECIAL_FUNCTIONS,
@@ -69,6 +71,7 @@ from hring_api.domains.compat.storage_policy import (
     validate_storage_upload,
 )
 from hring_api.domains.billing.credit_service import (
+    grant_credits,
     CreditConflictError,
     CreditError,
     CreditForbiddenError,
@@ -236,6 +239,7 @@ async def public_support(
     async def event_stream() -> AsyncIterator[str]:
         chunk = {
             "choices": [{"delta": {"content": answer}}],
+            "request_id": data.get("requestId") if isinstance(data, dict) else None,
         }
         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
@@ -316,17 +320,78 @@ async def execute_compat_function(
             detail=f"{name} must use a dedicated security-sensitive HRing API",
         )
     if name == "submit-feedback":
+        if not isinstance(payload.body, dict):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid feedback")
+        raw_rating = payload.body.get("rating")
+        if isinstance(raw_rating, bool) or not isinstance(raw_rating, int) or not 1 <= raw_rating <= 5:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rating must be 1 to 5")
+        comment = payload.body.get("comment")
+        if comment is not None and not isinstance(comment, str):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid comment")
+        existing_rows = await db.scalars(
+            select(CompatRecord).where(
+                CompatRecord.table_name == "site_feedback",
+                CompatRecord.owner_user_id == principal.user_id,
+            )
+        )
+        already_rewarded = any(bool(row.data.get("rewarded")) for row in existing_rows.all())
+        values = {
+            "userId": str(principal.user_id),
+            "user_id": str(principal.user_id),
+            "rating": raw_rating,
+            "comment": comment.strip()[:4000] if comment and comment.strip() else None,
+            "sessionId": str(payload.body.get("sessionId") or "")[:160] or None,
+            "requestId": str(payload.body.get("requestId") or "")[:160] or None,
+            "rewarded": False,
+        }
         query_request = CompatQueryRequest(
             table="site_feedback",
             operation="insert",
-            values=payload.body if isinstance(payload.body, dict) else {"feedback": payload.body},
+            values=values,
             single=True,
         )
         try:
             data = await execute_query(db, request=query_request, principal=principal)
         except CompatError as exc:
             raise _compat_http_error(exc) from exc
-        return CompatQueryResponse(data={"success": True, "record": data}, count=1)
+        diamonds_awarded = 0
+        if not already_rewarded:
+            try:
+                await grant_credits(
+                    db,
+                    owner_type="user",
+                    owner_id=principal.user_id,
+                    amount=50,
+                    idempotency_key=f"feedback-reward:{principal.user_id}",
+                    reason="First HRing feedback reward",
+                    actor_user_id=None,
+                    request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+                )
+                record = await db.scalar(
+                    select(CompatRecord).where(
+                        CompatRecord.table_name == "site_feedback",
+                        CompatRecord.record_id == str(data["id"]),
+                    )
+                )
+                if record is not None:
+                    updated = dict(record.data)
+                    updated["rewarded"] = True
+                    record.data = updated
+                    await db.commit()
+                    data = updated
+                diamonds_awarded = 50
+            except CreditError as exc:
+                raise _compat_http_error(exc) from exc
+        return CompatQueryResponse(
+            data={
+                "success": True,
+                "record": data,
+                "message": "نظر شما ثبت شد؛ ممنونیم.",
+                "isFirstFeedback": diamonds_awarded > 0,
+                "diamondsAwarded": diamonds_awarded,
+            },
+            count=1,
+        )
     if name == "download-product":
         if not isinstance(payload.body, dict) or not isinstance(payload.body.get("productId"), str):
             raise HTTPException(

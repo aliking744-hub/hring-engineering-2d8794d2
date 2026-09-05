@@ -59,6 +59,7 @@ TABLE_SCOPES: dict[str, TableScope] = {
 
     # Financial/audit data must not become generic tenant data.
     "audit_logs": TableScope("admin_only"),
+    "ai_interactions": TableScope("admin_only"),
     "credit_transactions": TableScope("personal", "user_id"),
 }
 

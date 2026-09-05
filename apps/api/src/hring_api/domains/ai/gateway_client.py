@@ -6,7 +6,10 @@ from uuid import UUID, uuid4
 import httpx
 
 from hring_api.config import get_settings
-from hring_api.domains.ai.service import persist_ai_usage_isolated
+from hring_api.domains.ai.service import (
+    persist_ai_interaction_isolated,
+    persist_ai_usage_isolated,
+)
 
 
 MAX_GENERATED_IMAGE_URL_LENGTH = 64_000_000
@@ -210,6 +213,20 @@ async def generate_with_ai_gateway(
             error_code=None,
             metadata_json=metadata,
         )
+        await persist_ai_interaction_isolated(
+            request_id=request_id,
+            company_id=company_id,
+            user_id=user_id,
+            feature_key=feature_key,
+            provider=actual_provider,
+            model=actual_model,
+            messages=messages,
+            response_text=content,
+            status="success",
+            error_code=None,
+            latency_ms=latency_ms,
+            metadata_json=metadata,
+        )
         return AiGatewayResult(
             request_id=request_id,
             content=content,
@@ -242,6 +259,20 @@ async def generate_with_ai_gateway(
             latency_ms=latency_ms,
             status="failure",
             error_code=error_code,
+            metadata_json=dict(metadata_json or {}),
+        )
+        await persist_ai_interaction_isolated(
+            request_id=request_id,
+            company_id=company_id,
+            user_id=user_id,
+            feature_key=feature_key,
+            provider=provider,
+            model=model,
+            messages=messages,
+            response_text=None,
+            status="failure",
+            error_code=error_code,
+            latency_ms=latency_ms,
             metadata_json=dict(metadata_json or {}),
         )
         if isinstance(exc, AiGatewayError):
