@@ -23,7 +23,6 @@ from hring_api.domains.companies.schemas import (
 )
 from hring_api.domains.companies.service import (
     CompanyAccessDeniedError,
-    CompanyCreditError,
     CompanyCapacityError,
     CompanyError,
     CompanyNotFoundError,
@@ -256,15 +255,6 @@ async def change_company_member_role(
             member_id=member_id,
             role=payload.role,
         )
-        if payload.initial_credits > 0:
-            await allocate_member_credits(
-                db,
-                actor_user_id=principal.user_id,
-                company_id=company_id,
-                member_id=membership.id,
-                amount=payload.initial_credits,
-                reason="Initial company member credit allocation",
-            )
     except CompanyError as exc:
         await db.rollback()
         raise _domain_http_error(exc) from exc
@@ -340,6 +330,15 @@ async def provision_company_user(
             full_name=payload.full_name,
             role=payload.role,
         )
+        if payload.initial_credits > 0:
+            await allocate_member_credits(
+                db,
+                actor_user_id=principal.user_id,
+                company_id=company_id,
+                member_id=membership.id,
+                amount=payload.initial_credits,
+                reason="Initial company member credit allocation",
+            )
     except CompanyError as exc:
         await db.rollback()
         raise _domain_http_error(exc) from exc
