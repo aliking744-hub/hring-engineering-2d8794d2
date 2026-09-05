@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, Copy, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Copy, KeyRound, Loader2, Phone, ShieldCheck } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,15 @@ import type { MfaEnrollment, MfaStatus } from '@/hooks/useAuth';
 import { useUserContext } from '@/hooks/useUserContext';
 import { apiRequest } from '@/lib/api';
 
+interface SmsChallenge {
+  challenge_id: string;
+  expires_at: string;
+}
+
 
 const AccountSecurity = () => {
   const { toast } = useToast();
-  const { context } = useUserContext();
+  const { context, refetch: refetchUserContext } = useUserContext();
   const { beginMfaEnrollment, confirmMfaEnrollment } = useAuth();
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [enrollment, setEnrollment] = useState<MfaEnrollment | null>(null);
@@ -26,6 +31,10 @@ const AccountSecurity = () => {
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [phoneCode, setPhoneCode] = useState('');
+  const [phoneChallengeId, setPhoneChallengeId] = useState<string | null>(null);
+  const [phoneBusy, setPhoneBusy] = useState(false);
 
   const mandatory = Boolean(context?.platformRoles.length || context?.appRoles.includes('admin'));
 
@@ -104,6 +113,51 @@ const AccountSecurity = () => {
   const copy = async (value: string, message: string) => {
     await navigator.clipboard.writeText(value);
     toast({ title: message });
+  };
+
+  const requestPhoneVerification = async () => {
+    setPhoneBusy(true);
+    try {
+      const challenge = await apiRequest<SmsChallenge>('/auth/phone/request-verification', {
+        method: 'POST',
+        body: JSON.stringify({ phone: phone.trim() }),
+      });
+      setPhoneChallengeId(challenge.challenge_id);
+      setPhoneCode('');
+      toast({ title: 'کد تأیید ارسال شد', description: 'کد شش‌رقمی پیامک‌شده را وارد کن.' });
+    } catch (error) {
+      toast({
+        title: 'ارسال کد انجام نشد',
+        description: error instanceof Error ? error.message : 'دوباره تلاش کن',
+        variant: 'destructive',
+      });
+    } finally {
+      setPhoneBusy(false);
+    }
+  };
+
+  const verifyPhone = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!phoneChallengeId) return;
+    setPhoneBusy(true);
+    try {
+      await apiRequest<void>('/auth/phone/verify', {
+        method: 'POST',
+        body: JSON.stringify({ challenge_id: phoneChallengeId, code: phoneCode.trim() }),
+      });
+      setPhoneChallengeId(null);
+      setPhoneCode('');
+      await refetchUserContext();
+      toast({ title: 'شماره موبایل تأیید شد', description: 'از این پس می‌توانی با پیامک وارد شوی.' });
+    } catch (error) {
+      toast({
+        title: 'کد تأیید نشد',
+        description: error instanceof Error ? error.message : 'دوباره تلاش کن',
+        variant: 'destructive',
+      });
+    } finally {
+      setPhoneBusy(false);
+    }
   };
 
   if (loading) {
@@ -188,6 +242,61 @@ const AccountSecurity = () => {
                   )}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-5">
+            <CardHeader>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <Phone className="h-10 w-10 text-primary" />
+                <Badge variant={context?.phoneVerifiedAt ? 'default' : 'secondary'}>{context?.phoneVerifiedAt ? 'فعال' : 'ورود با پیامک'}</Badge>
+              </div>
+              <CardTitle>اتصال شماره موبایل</CardTitle>
+              <CardDescription className="leading-6">با تأیید این شماره، ورود پیامکی برای همین حساب فعال می‌شود. در صفحه ورود، شماره‌های ناشناس پاسخ یکسان می‌گیرند و پیامکی دریافت نمی‌کنند.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {context?.phoneE164 && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <div>
+                    <div className="font-medium">شماره تأییدشده</div>
+                    <div className="mt-1 text-sm text-muted-foreground" dir="ltr">{context.phoneE164}</div>
+                  </div>
+                </div>
+              )}
+              <form onSubmit={verifyPhone} className="space-y-4">
+                <Input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="شماره موبایل (مثلاً 09121234567)"
+                  inputMode="tel"
+                  dir="ltr"
+                  disabled={Boolean(phoneChallengeId) || phoneBusy}
+                  required
+                />
+                {phoneChallengeId ? (
+                  <>
+                    <Input
+                      value={phoneCode}
+                      onChange={(event) => setPhoneCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="کد ۶ رقمی"
+                      inputMode="numeric"
+                      dir="ltr"
+                      className="text-center text-lg tracking-[0.35em]"
+                      autoComplete="one-time-code"
+                      required
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="submit" disabled={phoneBusy || phoneCode.length !== 6}>{phoneBusy && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}تأیید شماره</Button>
+                      <Button type="button" variant="outline" disabled={phoneBusy} onClick={() => { setPhoneChallengeId(null); setPhoneCode(''); }}>تغییر شماره</Button>
+                    </div>
+                  </>
+                ) : (
+                  <Button type="button" className="w-full" onClick={() => void requestPhoneVerification()} disabled={phoneBusy || phone.trim().length < 10}>
+                    {phoneBusy && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}ارسال کد تأیید
+                  </Button>
+                )}
+              </form>
             </CardContent>
           </Card>
         </div>

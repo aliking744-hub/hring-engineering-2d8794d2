@@ -118,6 +118,8 @@ export interface UserContext {
   fullName: string | null;
   title: string | null;
   avatarUrl: string | null;
+  phoneE164: string | null;
+  phoneVerifiedAt: string | null;
 }
 
 export interface FeatureAccess {

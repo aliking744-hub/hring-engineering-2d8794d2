@@ -35,6 +35,8 @@ interface ApiUserContext {
   full_name: string | null;
   title: string | null;
   avatar_url: string | null;
+  phone_e164: string | null;
+  phone_verified_at: string | null;
 }
 
 const UserContextContext = createContext<UserContextState | undefined>(undefined);
@@ -79,6 +81,8 @@ export const UserContextProvider = ({ children }: { children: ReactNode }) => {
         fullName: data.full_name,
         title: data.title,
         avatarUrl: data.avatar_url,
+        phoneE164: data.phone_e164,
+        phoneVerifiedAt: data.phone_verified_at,
       });
     } catch (error) {
       console.error('Error fetching independent user context:', error);
