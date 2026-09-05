@@ -253,6 +253,13 @@ async def invoke_ai_function(
                 "ai_route_source": route.source,
                 "prompt_key": feature_key,
                 "prompt_mode": "embedded_fallback",
+                "session_id": (
+                    str(body.get("sessionId"))[:160]
+                    if support_context is not None
+                    and isinstance(body, dict)
+                    and body.get("sessionId")
+                    else None
+                ),
             },
         )
 
@@ -269,6 +276,15 @@ async def invoke_ai_function(
                     company_id=company_id,
                     fallback=fallback,
                     credits_charged=managed_cost,
+                    metadata_json={
+                        "session_id": (
+                            str(body.get("sessionId"))[:160]
+                            if support_context is not None
+                            and isinstance(body, dict)
+                            and body.get("sessionId")
+                            else None
+                        )
+                    },
                 )
         except (AiGatewayError, PromptRegistryError) as exc:
             raise CompatFunctionError("HRing AI service is unavailable") from exc
@@ -280,7 +296,8 @@ async def invoke_ai_function(
                 return {
                     "content": support_text(
                         value, allowed_phone=support_context.support_phone
-                    )
+                    ),
+                    "requestId": str(result.request_id),
                 }
             except SupportInputError as exc:
                 raise CompatFunctionError(str(exc)) from exc

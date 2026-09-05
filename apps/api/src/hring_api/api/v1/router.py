@@ -6,6 +6,7 @@ from hring_api.domains.admin.routes import router as admin_router
 from hring_api.domains.ai.feature_routes import router as ai_feature_routes_router
 from hring_api.domains.ai.prompt_routes import router as prompt_router
 from hring_api.domains.ai.routes import router as ai_router
+from hring_api.domains.ai.insight_routes import router as ai_insight_router
 from hring_api.domains.billing.routes import router as billing_router
 from hring_api.domains.billing.credit_routes import router as credit_router
 from hring_api.domains.companies.routes import router as companies_router
@@ -40,6 +41,7 @@ api_router.include_router(company_settings_router)
 api_router.include_router(access_router)
 api_router.include_router(admin_router)
 api_router.include_router(ai_router)
+api_router.include_router(ai_insight_router)
 api_router.include_router(ai_feature_routes_router)
 api_router.include_router(prompt_router)
 api_router.include_router(billing_router)

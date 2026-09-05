@@ -8,7 +8,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useCredits } from '@/hooks/useCredits';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -16,7 +15,6 @@ interface Message {
 }
 
 const SupportChatWidget = () => {
-  const { credits, getCost } = useCredits();
   const [isOpen, setIsOpen] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -26,6 +24,7 @@ const SupportChatWidget = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [feedbackOffered, setFeedbackOffered] = useState(false);
   const [hasReceivedReward, setHasReceivedReward] = useState(false);
+  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const [awaitingEndConfirmation, setAwaitingEndConfirmation] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const followUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,7 +254,10 @@ const SupportChatWidget = () => {
   };
 
   const streamChat = async (userMessage: string) => {
+    // End-of-conversation -> offer feedback (no AI call)
     if (handleConversationEnd(userMessage)) return;
+
+    // New message: cancel any pending follow-up
     clearFollowUpTimer();
 
     const newMessages = [...messagesRef.current, { role: 'user' as const, content: userMessage }];
@@ -263,35 +265,19 @@ const SupportChatWidget = () => {
     setIsLoading(true);
 
     try {
-      let data: { content?: string } | null = null;
-      if (user) {
-        const response = await supabase.functions.invoke('hring-support', {
-          body: {
-            messages: newMessages,
-            sessionId,
-            userId: user.id,
-          },
-        });
-        if (response.error) throw new Error(response.error.message || 'خطا در ارتباط');
-        data = response.data;
-      } else {
-        const response = await fetch('/api/v1/compat/public-functions/hring-support', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            body: { messages: newMessages, sessionId, userId: null },
-          }),
-        });
-        if (!response.ok) throw new Error('خطا در ارتباط');
-        const stream = await response.text();
-        const dataLine = stream.split('\n').find((line) => line.startsWith('data: {'));
-        const event = dataLine ? JSON.parse(dataLine.slice(6)) : null;
-        data = { content: event?.choices?.[0]?.delta?.content };
-      }
+      const { data, error } = await supabase.functions.invoke('hring-support', {
+        body: {
+          messages: newMessages,
+          sessionId,
+          userId: user?.id || null,
+        },
+      });
+      if (error) throw new Error(error.message || 'خطا در ارتباط');
       const assistantContent = typeof data?.content === 'string' ? data.content.trim() : '';
-      if (!assistantContent) throw new Error('پاسخی از پشتیبانی دریافت نشد');
-      setMessages([...newMessages, { role: 'assistant', content: assistantContent }]);
-      setTimeout(startFollowUpTimer, 0);
+      if (!assistantContent) throw new Error('پاسخ معتبری دریافت نشد');
+      setMessages((prev) => [...prev, { role: 'assistant', content: assistantContent }]);
+      setLastRequestId(typeof data?.requestId === 'string' ? data.requestId : null);
+      startFollowUpTimer();
     } catch (error) {
       console.error('Chat error:', error);
       toast.error(error instanceof Error ? error.message : 'خطا در ارتباط با پشتیبانی');
@@ -355,7 +341,7 @@ const SupportChatWidget = () => {
     setSubmittingFeedback(true);
     try {
       const { data, error } = await supabase.functions.invoke('submit-feedback', {
-        body: { userId: user.id, rating, comment },
+        body: { userId: user.id, rating, comment, sessionId, requestId: lastRequestId },
       });
 
       if (error) throw error;
@@ -483,12 +469,10 @@ const SupportChatWidget = () => {
                 />
                 <Button
                   onClick={handleSend}
-                  disabled={!input.trim() || isLoading || credits < getCost('HR_SUPPORT')}
-                  size="sm"
-                  className="gap-1"
+                  disabled={!input.trim() || isLoading}
+                  size="icon"
                 >
                   <Send className="w-4 h-4" />
-                  <span className="text-xs">{getCost('HR_SUPPORT')} جم</span>
                 </Button>
               </div>
             </div>

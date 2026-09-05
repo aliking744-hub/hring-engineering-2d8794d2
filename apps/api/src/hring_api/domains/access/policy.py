@@ -26,6 +26,8 @@ PLATFORM_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "platform.feature_access.manage",
             "platform.audit.read",
             "platform.ai_usage.read",
+            "platform.ai_conversations.read",
+            "platform.ai_conversations.manage",
             "platform.ai_rates.manage",
             "platform.billing.read",
             "platform.billing.manage",
@@ -57,6 +59,8 @@ PLATFORM_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "platform.audit.read",
             "platform.billing.read",
             "platform.integrations.read",
+            "platform.ai_conversations.read",
+            "platform.ai_conversations.manage",
         }
     ),
 }
@@ -77,8 +81,6 @@ COMPANY_PERMISSION_CATALOG: dict[str, str] = {
     "company.features.read": "مشاهده دسترسی ماژول‌ها",
     "company.features.manage": "مدیریت دسترسی ماژول‌ها",
     "company.billing.read": "مشاهده پلن، اعتبار و مصرف",
-    "company.integrations.read": "مشاهده وضعیت اتصال‌های شرکت",
-    "company.integrations.manage": "مدیریت کلیدها و اتصال‌های شرکت",
 }
 
 DEFAULT_COMPANY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -92,7 +94,6 @@ DEFAULT_COMPANY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "company.settings.read",
             "company.features.read",
             "company.billing.read",
-            "company.integrations.read",
         }
     ),
     "manager": frozenset(
@@ -102,7 +103,6 @@ DEFAULT_COMPANY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "company.settings.read",
             "company.features.read",
             "company.billing.read",
-            "company.integrations.read",
         }
     ),
     "employee": frozenset(
