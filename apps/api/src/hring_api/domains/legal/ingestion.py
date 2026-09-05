@@ -322,7 +322,7 @@ def _validate_response_peer(response: httpx.Response) -> None:
         raise LegalIngestionError("Remote source resolved to a private or reserved address")
 
 
-async def fetch_public_source(url: str) -> ExtractedDocument:
+async def fetch_public_bytes(url: str) -> tuple[str, bytes, str]:
     safe_url = await validate_public_url(url)
     timeout = httpx.Timeout(20.0, connect=5.0)
     try:
@@ -356,7 +356,18 @@ async def fetch_public_source(url: str) -> ExtractedDocument:
     except (httpx.HTTPError, ValueError) as exc:
         raise LegalIngestionError("Could not retrieve the legal source URL") from exc
 
-    raw = bytes(body)
+    return safe_url, bytes(body), content_type
+
+
+async def fetch_public_html(url: str) -> str:
+    _, raw, content_type = await fetch_public_bytes(url)
+    if "html" not in content_type:
+        raise LegalIngestionError("Remote legal index is not HTML")
+    return raw.decode("utf-8", errors="replace")
+
+
+async def fetch_public_source(url: str) -> ExtractedDocument:
+    safe_url, raw, content_type = await fetch_public_bytes(url)
     if "html" in content_type:
         return ExtractedDocument(
             text=html_to_text(raw.decode("utf-8", errors="replace")),
