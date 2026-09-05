@@ -401,3 +401,21 @@ test('PR78 release keeps payment disabled and documents additive migrations and 
   assert.match(workspaceMigration, /down_revision: str \| None = "20260904_0035"/);
   assert.match(smartAdMigration, /down_revision: str \| None = "20260904_0034"/);
 });
+
+
+test('approved legal policies are public and linked from the landing footer', async () => {
+  const app = await read('src/App.tsx');
+  const footer = await read('src/components/landing/Footer.tsx');
+  const policies = await read('src/pages/LegalPolicy.tsx');
+
+  for (const route of ['/terms', '/privacy', '/refund-policy']) {
+    assert.match(app, new RegExp(`path=["']${route}["']`));
+    assert.match(footer, new RegExp(`to=["']${route}["']`));
+  }
+  assert.match(policies, /علی دهقانی/);
+  assert.match(policies, /ali_dehghani744@yahoo\.com/);
+  assert.match(policies, /09127760516/);
+  assert.match(policies, /خیابان جردن، خیابان تابان غربی/);
+  assert.match(policies, /دو روز کاری/);
+  assert.equal(/مهلت هفت[‌-]روزه/.test(policies), false);
+});
