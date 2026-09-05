@@ -21,19 +21,11 @@ const HeroSection = () => {
   return (
     <section className="min-h-screen flex items-center justify-center pt-24 pb-16 px-4" dir="rtl">
       <div className="container mx-auto text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="space-y-6"
-        >
+        <div className="space-y-6">
           {/* Main Title - Using Dynamic Heading Font */}
-          <motion.h1
+          <h1
             className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-relaxed md:leading-loose font-heading"
             style={{ fontFamily: fonts.heading }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
           >
             <span className="text-foreground">{heroPrefix}</span>
             <br />
@@ -42,18 +34,15 @@ const HeroSection = () => {
             </span>
             <br />
             <span className="text-foreground">{heroSuffix}</span>
-          </motion.h1>
+          </h1>
 
           {/* Subtitle - Using Dynamic Body Font */}
-          <motion.p
+          <p
             className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
             style={{ fontFamily: fonts.body }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
           >
             {heroSubtitle}
-          </motion.p>
+          </p>
 
           {/* CTA Buttons */}
           <motion.div
@@ -84,7 +73,7 @@ const HeroSection = () => {
               </Link>
             )}
           </motion.div>
-        </motion.div>
+        </div>
 
         {/* Floating Elements */}
         <motion.div
