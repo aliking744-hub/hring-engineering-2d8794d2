@@ -81,6 +81,8 @@ COMPANY_PERMISSION_CATALOG: dict[str, str] = {
     "company.features.read": "مشاهده دسترسی ماژول‌ها",
     "company.features.manage": "مدیریت دسترسی ماژول‌ها",
     "company.billing.read": "مشاهده پلن، اعتبار و مصرف",
+    "company.integrations.read": "مشاهده وضعیت اتصال‌های شرکت",
+    "company.integrations.manage": "مدیریت کلیدها و اتصال‌های شرکت",
 }
 
 DEFAULT_COMPANY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -94,6 +96,7 @@ DEFAULT_COMPANY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "company.settings.read",
             "company.features.read",
             "company.billing.read",
+            "company.integrations.read",
         }
     ),
     "manager": frozenset(
@@ -103,6 +106,7 @@ DEFAULT_COMPANY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "company.settings.read",
             "company.features.read",
             "company.billing.read",
+            "company.integrations.read",
         }
     ),
     "employee": frozenset(
