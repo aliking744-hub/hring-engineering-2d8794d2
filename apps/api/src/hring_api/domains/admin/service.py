@@ -3,7 +3,7 @@ import re
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.access.repository import (
@@ -44,6 +44,76 @@ class AdminSafetyError(AdminError):
 
 class SensitiveSettingKeyError(AdminError):
     pass
+
+
+async def create_managed_user(
+    session: AsyncSession,
+    *,
+    actor_user_id: UUID,
+    email: str,
+    password: str,
+    full_name: str,
+    company_id: UUID | None,
+    company_role: str,
+    ip_address: str | None,
+) -> User:
+    normalized_email = normalize_email(email)
+    if await get_user_by_email(session, normalized_email) is not None:
+        raise AdminConflictError("این ایمیل قبلاً ثبت شده است")
+
+    company: Company | None = None
+    if company_id is not None:
+        company = await get_company_for_admin(session, company_id)
+        if company is None:
+            raise AdminNotFoundError("Company not found")
+        if company.status == "suspended":
+            raise AdminConflictError("Company is suspended")
+        active_members = await session.scalar(
+            select(func.count(CompanyMember.id)).where(
+                CompanyMember.company_id == company.id,
+                CompanyMember.is_active.is_(True),
+            )
+        )
+        if int(active_members or 0) >= company.max_members:
+            raise AdminConflictError("ظرفیت اعضای شرکت تکمیل شده است")
+
+    user = await create_user(
+        session,
+        email=normalized_email,
+        password_hash=hash_password(password),
+        full_name=full_name.strip(),
+    )
+    user.email_verified_at = datetime.now(UTC)
+    profile = await session.get(Profile, user.id)
+    if profile is not None and company is not None:
+        profile.user_type = "corporate"
+        profile.subscription_tier = company.subscription_tier
+    if company is not None:
+        session.add(
+            CompanyMember(
+                company_id=company.id,
+                user_id=user.id,
+                role=company_role,
+                can_invite=False,
+                is_active=True,
+                invited_by=actor_user_id,
+            )
+        )
+    await add_audit_log(
+        session,
+        actor_user_id=actor_user_id,
+        company_id=company.id if company is not None else None,
+        action="platform.user.create",
+        resource_type="user",
+        resource_id=str(user.id),
+        metadata_json={
+            "company_id": str(company.id) if company is not None else None,
+            "company_role": company_role if company is not None else None,
+        },
+        ip_address=ip_address,
+    )
+    await session.flush()
+    return user
 
 
 async def create_managed_company(
