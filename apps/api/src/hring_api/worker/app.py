@@ -1,4 +1,5 @@
 from celery import Celery  # type: ignore[import-untyped]
+from celery.schedules import crontab  # type: ignore[import-untyped]
 from kombu import Exchange, Queue  # type: ignore[import-untyped]
 
 from hring_api.worker.config import get_worker_settings
@@ -58,6 +59,10 @@ celery_app.conf.update(
             "queue": MAINTENANCE_QUEUE,
             "routing_key": MAINTENANCE_QUEUE,
         },
+        "hring.legal.sync_sources": {
+            "queue": MAINTENANCE_QUEUE,
+            "routing_key": MAINTENANCE_QUEUE,
+        },
     },
     task_send_sent_event=True,
     task_serializer="json",
@@ -71,5 +76,14 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     worker_send_task_events=True,
 )
+
+# Run after midnight UTC (03:30/04:30 Iran time depending on civil-time rules).
+# The task also performs checksum-based versioning, so unchanged pages remain idempotent.
+celery_app.conf.beat_schedule = {
+    "daily-legal-source-sync": {
+        "task": "hring.legal.sync_sources",
+        "schedule": crontab(hour=0, minute=0),
+    }
+}
 
 install_worker_metrics()
