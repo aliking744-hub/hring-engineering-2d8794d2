@@ -174,12 +174,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       ENVIRONMENT: production
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/2
+      DATABASE_URL: postgresql+asyncpg://hring:${POSTGRES_PASSWORD}@postgres:5432/hring
       WORKER_METRICS_HOST: 0.0.0.0
       WORKER_METRICS_PORT: 9808
     command:
@@ -212,6 +215,36 @@ services:
       - no-new-privileges:true
     stop_grace_period: 1m
     mem_limit: 768m
+    networks: [hring_internal]
+
+  scheduler:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/2
+      DATABASE_URL: postgresql+asyncpg://hring:${POSTGRES_PASSWORD}@postgres:5432/hring
+    command:
+      - celery
+      - --app=hring_api.worker.app:celery_app
+      - beat
+      - --loglevel=INFO
+      - --schedule=/tmp/celerybeat-schedule
+      - --pidfile=/tmp/celerybeat.pid
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
     networks: [hring_internal]
 
   web:
