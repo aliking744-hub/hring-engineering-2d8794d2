@@ -805,7 +805,7 @@ async def transfer_company_credits_to_user(
     """Move available credits from a company account to one user atomically."""
     if amount <= 0:
         raise CreditConflictError("Transfer amount must be positive")
-    transfer_metadata = {
+    transfer_metadata: dict[str, object] = {
         "company_id": str(company_id),
         "user_id": str(user_id),
         "direction": "company_to_user",
