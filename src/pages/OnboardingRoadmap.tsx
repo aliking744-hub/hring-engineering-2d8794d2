@@ -129,9 +129,9 @@ const OnboardingRoadmap = () => {
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link to="/dashboard"><Button variant="outline" className="gap-2 border-border bg-secondary/50"><ArrowRight className="h-5 w-5" />بازگشت به داشبورد</Button></Link>
-          <div><h1 className="flex items-center gap-2 text-2xl font-bold"><UserRound className="h-6 w-6 text-primary" />نقشه راه ۹۰ روزه</h1><p className="text-muted-foreground">تسک‌ها، ارزیابی نهایی و گواهی برنامه در همین صفحه ثبت می‌شود.</p></div>
+          <div><div className="flex flex-wrap items-center gap-2"><h1 className="flex items-center gap-2 text-2xl font-bold"><UserRound className="h-6 w-6 text-primary" />نقشه راه ۹۰ روزه</h1><Badge variant="secondary">گردش‌کار واقعی</Badge></div><p className="text-muted-foreground">تسک‌ها، ارزیابی نهایی و گواهی برنامه در همین صفحه ثبت می‌شود.</p></div>
         </div>
-        <Link to="/success-architect"><Button className="gap-2"><Plus className="h-4 w-4" />ساخت برنامه جدید</Button></Link>
+        <Link to="/success-architect"><Button className="gap-2"><Plus className="h-4 w-4" />ساخت برنامه ۹۰ روزه</Button></Link>
       </motion.div>
 
       <div className="mb-6 flex gap-2">
