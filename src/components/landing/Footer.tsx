@@ -52,6 +52,15 @@ const Footer = () => {
             <Link to="/dashboard" className="hover:text-foreground transition-colors">
               داشبورد
             </Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">
+              شرایط استفاده
+            </Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">
+              حریم خصوصی
+            </Link>
+            <Link to="/refund-policy" className="hover:text-foreground transition-colors">
+              بازگشت وجه
+            </Link>
           </div>
 
           <div className="flex items-center gap-5">

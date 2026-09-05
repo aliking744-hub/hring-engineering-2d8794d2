@@ -49,6 +49,7 @@ const IntegrationCenter = lazy(() => import("./pages/IntegrationCenter"));
 const PromptRegistry = lazy(() => import("./pages/PromptRegistry"));
 const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
 const LearningPath = lazy(() => import("./pages/LearningPath"));
+const LegalPolicy = lazy(() => import("./pages/LegalPolicy"));
 
 const GatedSupportChat = () => {
   const visible = useSectionVisible('support_chat');
@@ -254,6 +255,9 @@ const App = () => (
               />
               <Route path="/faq" element={<PageVisibilityGate sectionId="page_faq"><FAQ /></PageVisibilityGate>} />
               <Route path="/product-catalog" element={<ProductCatalog />} />
+              <Route path="/terms" element={<LegalPolicy policy="terms" />} />
+              <Route path="/privacy" element={<LegalPolicy policy="privacy" />} />
+              <Route path="/refund-policy" element={<LegalPolicy policy="refund" />} />
               <Route 
                 path="/admin" 
                 element={
