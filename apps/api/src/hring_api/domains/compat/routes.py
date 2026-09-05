@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import quote
 
@@ -16,6 +18,7 @@ from hring_api.domains.compat.downloads import (
     create_product_download_url,
     decode_product_download_token,
 )
+from hring_api.domains.compat.models import CompatRecord
 from hring_api.domains.compat.functions import (
     BLOCKED_SENSITIVE_FUNCTIONS,
     NON_AI_SPECIAL_FUNCTIONS,
@@ -68,14 +71,13 @@ from hring_api.domains.compat.storage_policy import (
     validate_storage_upload,
 )
 from hring_api.domains.billing.credit_service import (
+    grant_credits,
     CreditConflictError,
     CreditError,
     CreditForbiddenError,
     CreditNotFoundError,
     InsufficientCreditsError,
-    grant_credits,
 )
-from hring_api.domains.compat.models import CompatRecord
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 
 
@@ -130,6 +132,14 @@ def _upload_size(file: UploadFile) -> int:
     size = file.file.tell()
     file.file.seek(current)
     return int(size)
+
+
+def _upload_header(file: UploadFile, limit: int = 512) -> bytes:
+    current = file.file.tell()
+    file.file.seek(0)
+    header = file.file.read(limit)
+    file.file.seek(current)
+    return bytes(header)
 
 
 async def _storage_admin_for_bucket(
@@ -203,12 +213,12 @@ async def execute_compat_rpc(
     return CompatQueryResponse(data=data, count=1)
 
 
-@router.post("/public-functions/hring-support", response_model=CompatQueryResponse)
+@router.post("/public-functions/hring-support")
 async def public_support(
     payload: CompatFunctionRequest,
     settings: Settings = Depends(get_settings),
     db: AsyncSession = Depends(get_db_session),
-) -> CompatQueryResponse:
+) -> StreamingResponse:
     try:
         data = await invoke_ai_function(
             name="hring-support",
@@ -219,7 +229,26 @@ async def public_support(
         )
     except CompatFunctionError as exc:
         raise _compat_http_error(exc) from exc
-    return CompatQueryResponse(data=data, count=1)
+    answer = data.get("content") if isinstance(data, dict) else None
+    if not isinstance(answer, str) or not answer.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Support assistant returned no content",
+        )
+
+    async def event_stream() -> AsyncIterator[str]:
+        chunk = {
+            "choices": [{"delta": {"content": answer}}],
+            "request_id": data.get("requestId") if isinstance(data, dict) else None,
+        }
+        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/files/extract-document-text")
@@ -467,6 +496,7 @@ async def upload_compat_object(
             object_path=safe_path,
             content_type=file.content_type,
             size_bytes=_upload_size(file),
+            header_bytes=_upload_header(file),
         )
         key = put_object(
             settings,

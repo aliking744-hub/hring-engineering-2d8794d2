@@ -45,6 +45,10 @@ const METERED_COMPAT_FUNCTIONS = new Set([
   'generate-interview-kit',
   'generate-onboarding-plan',
   'generate-job-ad',
+  'generate-job-ad-text',
+  'generate-job-ad-image',
+  'legal-advisor-chat',
+  'defense-builder',
   'hring-support',
 ]);
 
@@ -198,14 +202,69 @@ const invokeFunction = async (functionName: string, options?: { body?: unknown }
   try {
     const body = (options?.body || {}) as Record<string, any>;
 
-    if (functionName === 'hring-support' && !getAccessToken()) {
-      const envelope = await apiRequest<CompatEnvelope>('/compat/public-functions/hring-support', {
+    if (functionName === 'generate-job-ad') {
+      const data = await apiRequest('/job-ads/generate', {
         method: 'POST',
-        body: JSON.stringify({ body: options?.body ?? null }),
-      }, { auth: false, retryAuth: false });
-      return { data: envelope.data ?? null, error: null, count: envelope.count ?? null };
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
     }
-
+    if (functionName === 'generate-job-ad-text') {
+      const data = await apiRequest('/job-ads/generate-text', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'generate-job-ad-image') {
+      const data = await apiRequest('/job-ads/generate-image', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'generate-interview-kit') {
+      const data = await apiRequest('/interview/kits/generate', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'generate-job-profile') {
+      const data = await apiRequest('/job-engineering/job-profiles/generate', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'legal-advisor-chat') {
+      const data = await apiRequest('/legal/advisor/chat', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
+    if (functionName === 'defense-builder') {
+      const data = await apiRequest('/legal/defense/analyze', {
+        method: 'POST',
+        headers: { 'X-Idempotency-Key': newIdempotencyKey() },
+        body: JSON.stringify(body),
+      });
+      notifyCreditsChanged();
+      return { data, error: null };
+    }
     if (functionName === 'auto-headhunt') {
       const campaignId = body.campaignId;
       if (typeof campaignId !== 'string' || !campaignId) throw new Error('campaignId is required');
@@ -421,3 +480,6 @@ export const supabase = {
 
 export type HringCompatibilityClient = typeof supabase;
 export { ApiError };
+
+
+
