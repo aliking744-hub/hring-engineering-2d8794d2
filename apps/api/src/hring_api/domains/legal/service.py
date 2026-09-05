@@ -144,14 +144,14 @@ async def ingest_document(
     *,
     document: ExtractedDocument,
     metadata: LegalSourceMetadata,
-    actor_user_id: UUID,
+    actor_user_id: UUID | None,
     ip_address: str | None,
     request_id: str | None,
 ) -> LegalImportResponse:
     text = _canonical_document_text(document.text)
     checksum = sha256(text.encode("utf-8")).hexdigest()
     existing = await get_source_by_checksum(session, checksum=checksum, for_update=True)
-    if existing is not None and existing.status != "deleted":
+    if existing is not None and existing.status == "active":
         await add_audit_log(
             session,
             actor_user_id=actor_user_id,

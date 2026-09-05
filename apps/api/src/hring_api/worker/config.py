@@ -23,6 +23,7 @@ class WorkerSettings(BaseSettings):
     environment: str = "development"
     celery_broker_url: SecretStr = SecretStr("redis://redis:6379/1")
     celery_result_backend: SecretStr = SecretStr("redis://redis:6379/2")
+    database_url: str = "postgresql+asyncpg://hring:hring@postgres:5432/hring"
     worker_metrics_host: str = "0.0.0.0"
     worker_metrics_port: int = Field(default=9808, ge=1, le=65_535)
     worker_task_soft_time_limit_seconds: int = Field(default=540, ge=1, le=3_600)

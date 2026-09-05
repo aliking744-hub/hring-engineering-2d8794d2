@@ -22,11 +22,22 @@ test("native legal advisor preserves the cited RAG contract", () => {
   const advisor = read("apps/api/src/hring_api/domains/legal/advisor.py");
   assert.match(advisor, /match_count=5/);
   assert.match(advisor, /match_threshold=0\.3/);
-  assert.match(advisor, /for item in results\[:3\]/);
+  assert.match(advisor, /_CITATION_PATTERN/);
+  assert.match(advisor, /reference_number=index/);
   assert.match(advisor, /payload\.conversation_history\[-6:\]/);
   assert.match(advisor, /gemini-2\.5-flash|legal_advisor_ai_model/);
   assert.match(advisor, /extract_upload/);
   assert.match(advisor, /rate_limit_legal_advisor_per_minute/);
+});
+
+test("legal sources are refreshed and versioned by the maintenance worker", () => {
+  const sync = read("apps/api/src/hring_api/domains/legal/source_sync.py");
+  const worker = read("apps/api/src/hring_api/worker/app.py");
+  assert.match(sync, /labor_law/);
+  assert.match(sync, /social_security/);
+  assert.match(sync, /court_rulings/);
+  assert.match(sync, /ROBOTS_CRAWL_DELAY_SECONDS = 10\.0/);
+  assert.match(worker, /daily-legal-source-sync/);
 });
 
 

@@ -28,7 +28,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   attachments?: { type: "image" | "pdf"; name: string; preview?: string }[];
-  sources?: { articleNumber: string | null; category: string; similarity: number; title: string; sourceUrl?: string | null }[];
+  sources?: { referenceNumber?: number; articleNumber: string | null; category: string; similarity: number; title: string; sourceUrl?: string | null; sourceVersion?: number; publishedAt?: string | null }[];
 }
 
 interface Conversation {
@@ -289,7 +289,7 @@ const LegalAdvisor = () => {
       requestKeyRef.current = requestKey;
       const data = await apiRequest<{
         answer: string;
-        sources: { articleNumber: string | null; category: string; similarity: number; title: string; sourceUrl?: string | null }[];
+        sources: { referenceNumber?: number; articleNumber: string | null; category: string; similarity: number; title: string; sourceUrl?: string | null; sourceVersion?: number; publishedAt?: string | null }[];
       }>("/legal/advisor/chat", {
         method: "POST",
         headers: { "X-Idempotency-Key": requestKey },
@@ -622,6 +622,7 @@ const LegalAdvisor = () => {
                             <div className="flex gap-1 mt-2 flex-wrap">
                               {message.sources.map((source, i) => (
                                 <Badge key={i} variant="outline" className="gap-1 text-xs">
+                                  <span>[{source.referenceNumber ?? i + 1}]</span>
                                   {source.sourceUrl ? (
                                     <a href={source.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
                                       {source.title || getCategoryLabel(source.category)}
@@ -631,6 +632,7 @@ const LegalAdvisor = () => {
                                     <span>{source.title || getCategoryLabel(source.category)}</span>
                                   )}
                                   {source.articleNumber && ` - ماده ${source.articleNumber}`}
+                                  {source.sourceVersion ? ` - نسخه ${source.sourceVersion}` : null}
                                 </Badge>
                               ))}
                             </div>

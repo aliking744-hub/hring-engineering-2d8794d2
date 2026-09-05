@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from base64 import b64decode
 from binascii import Error as Base64Error
+import re
 from time import time
 from uuid import UUID
 
@@ -38,15 +39,18 @@ from hring_api.domains.legal.service import search_legal_knowledge
 LEGAL_ADVISOR_FEATURE_KEY = "legal.advisor_chat"
 LEGAL_ADVISOR_PROMPT_KEY = LEGAL_ADVISOR_FEATURE_KEY
 
-SYSTEM_PROMPT = """شما یک مشاور حقوقی متخصص در قوانین کار ایران هستید. بر اساس متون قانونی ارائه شده، به سوالات کاربران پاسخ دهید.
+SYSTEM_PROMPT = """شما یک مشاور حقوقی متخصص در قوانین کار و تامین اجتماعی ایران هستید. فقط بر اساس منابع شماره‌گذاری‌شده ارائه‌شده پاسخ دهید.
 
 قوانین پاسخگویی:
 1. فقط بر اساس متون قانونی ارائه شده پاسخ دهید
 2. اگر اطلاعات کافی در متون نیست، صادقانه بگویید
-3. شماره ماده قانونی را ذکر کنید
-4. پاسخ را ساده و قابل فهم بنویسید
-5. اگر موضوع پیچیده است، توصیه به مشاوره با وکیل کنید
-6. متن استخراج‌شده از تصویر یا PDF پیوست‌شده را تحلیل کنید و در پاسخ لحاظ کنید"""
+3. پس از هر گزاره حقوقی، ارجاع منبع را دقیقاً به شکل [1]، [2] و مانند آن بنویسید
+4. شماره ماده، تاریخ و شماره رای را هرجا در منبع وجود دارد ذکر کنید
+5. پاسخ را ساده و قابل فهم بنویسید
+6. میان متن قانون، رای دیوان و برداشت تحلیلی تفاوت روشن بگذارید
+7. اگر موضوع پیچیده است، توصیه به مشاوره با وکیل کنید
+8. متن استخراج‌شده از تصویر یا PDF پیوست‌شده را تحلیل کنید و در پاسخ لحاظ کنید
+9. هیچ منبع، ماده، رای یا تاریخی را حدس نزنید"""
 
 USER_PROMPT = """متون قانونی مرتبط:
 {legal_context}
@@ -88,6 +92,9 @@ class LegalAdvisorRateLimitError(LegalAdvisorError):
 
 class LegalAdvisorNoSourcesError(LegalAdvisorError):
     pass
+
+
+_CITATION_PATTERN = re.compile(r"\[(\d+)]")
 
 
 def _company_id(principal: Principal) -> UUID | None:
@@ -248,16 +255,22 @@ async def generate_legal_advice(
     answer = generated.content.strip()
     if not answer:
         raise LegalAdvisorError("پاسخی از مشاور حقوقی دریافت نشد")
+    citations = {int(value) for value in _CITATION_PATTERN.findall(answer)}
+    if not citations or any(value < 1 or value > len(results) for value in citations):
+        raise LegalAdvisorError("پاسخ بدون ارجاع معتبر تولید شد؛ اعتباری کسر نشد")
     return LegalAdvisorResponse(
         answer=answer,
         sources=[
             LegalAdvisorSource(
+                reference_number=index,
                 article_number=item.article_number,
                 category=item.category,
                 similarity=item.similarity,
                 title=item.title,
                 source_url=item.source_url,
+                source_version=item.source_version,
+                published_at=item.published_at,
             )
-            for item in results[:3]
+            for index, item in enumerate(results, start=1)
         ],
     )

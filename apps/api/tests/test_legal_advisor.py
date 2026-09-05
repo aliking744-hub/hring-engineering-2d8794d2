@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiGatewayResult
 from hring_api.domains.legal.advisor import (
+    LegalAdvisorError,
     LegalAdvisorNoSourcesError,
     _decode_data_url,
     generate_legal_advice,
@@ -64,7 +65,7 @@ def test_legal_advisor_uses_five_rag_results_and_returns_three_sources(monkeypat
         captured["variables"] = kwargs["variables"]
         return AiGatewayResult(
             request_id=uuid4(),
-            content="طبق ماده ۱ قانون کار، پاسخ مستند این است.",
+            content="طبق ماده ۱ قانون کار، پاسخ مستند این است [1].",
             provider="test",
             model="test-model",
             usage={},
@@ -100,7 +101,8 @@ def test_legal_advisor_uses_five_rag_results_and_returns_three_sources(monkeypat
     search_payload = captured["search_payload"]
     assert search_payload.match_count == 5
     assert search_payload.match_threshold == 0.3
-    assert len(result.sources) == 3
+    assert len(result.sources) == 5
+    assert result.sources[0].reference_number == 1
     assert result.sources[0].article_number == "1"
     variables = captured["variables"]
     assert "ماده 1" in variables["legal_context"]
@@ -134,6 +136,50 @@ def test_legal_advisor_refuses_to_generate_without_retrieved_sources(monkeypatch
         )
 
 
+def test_legal_advisor_rejects_answer_without_valid_source_marker(monkeypatch) -> None:
+    result = LegalSearchResult(
+        id=uuid4(),
+        source_id=uuid4(),
+        title="قانون کار",
+        content="ماده ۱ متن قانونی معتبر",
+        category="labor_law",
+        source_url="https://example.com/law",
+        article_number="1",
+        similarity=0.9,
+        source_version=1,
+        published_at=None,
+    )
+
+    async def fake_search(*_args: object, **_kwargs: object) -> list[LegalSearchResult]:
+        return [result]
+
+    async def fake_managed(*_args: object, **_kwargs: object) -> AiGatewayResult:
+        return AiGatewayResult(
+            request_id=uuid4(),
+            content="پاسخی که هیچ ارجاع قابل بررسی ندارد.",
+            provider="test",
+            model="test-model",
+            usage={},
+            provider_cost_microusd=1,
+        )
+
+    monkeypatch.setattr("hring_api.domains.legal.advisor.search_legal_knowledge", fake_search)
+    monkeypatch.setattr(
+        "hring_api.domains.legal.advisor.generate_with_managed_prompt",
+        fake_managed,
+    )
+
+    with pytest.raises(LegalAdvisorError, match="بدون ارجاع"):
+        asyncio.run(
+            generate_legal_advice(
+                SimpleNamespace(),
+                payload=LegalAdvisorRequest(query="پرسش حقوقی"),
+                principal=SimpleNamespace(user_id=uuid4(), memberships=[]),
+                settings=Settings(),
+            )
+        )
+
+
 def test_legal_advisor_route_requires_auth_and_preserves_ui_contract(monkeypatch) -> None:
     async def fake_limit(**_kwargs: object) -> None:
         return None
@@ -143,11 +189,14 @@ def test_legal_advisor_route_requires_auth_and_preserves_ui_contract(monkeypatch
             answer="پاسخ مستند",
             sources=[
                 LegalAdvisorSource(
+                    reference_number=1,
                     article_number="7",
                     category="labor_law",
                     similarity=0.91,
                     title="قانون کار",
                     source_url="https://example.com/labor-law",
+                    source_version=2,
+                    published_at=None,
                 )
             ],
         )
@@ -184,10 +233,13 @@ def test_legal_advisor_route_requires_auth_and_preserves_ui_contract(monkeypatch
             "sources": [
                 {
                     "articleNumber": "7",
+                    "referenceNumber": 1,
                     "category": "labor_law",
                     "similarity": 0.91,
                     "title": "قانون کار",
                     "sourceUrl": "https://example.com/labor-law",
+                    "sourceVersion": 2,
+                    "publishedAt": None,
                 }
             ],
         }

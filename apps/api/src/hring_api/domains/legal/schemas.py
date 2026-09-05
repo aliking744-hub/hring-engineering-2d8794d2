@@ -158,17 +158,20 @@ class LegalAdvisorRequest(BaseModel):
 
 
 class LegalAdvisorSource(BaseModel):
+    reference_number: int = Field(serialization_alias="referenceNumber", ge=1, le=5)
     article_number: str | None = Field(serialization_alias="articleNumber")
     category: str
     similarity: float
     title: str
     source_url: str | None = Field(default=None, serialization_alias="sourceUrl")
+    source_version: int = Field(serialization_alias="sourceVersion", ge=1)
+    published_at: date | None = Field(default=None, serialization_alias="publishedAt")
 
 
 class LegalAdvisorResponse(BaseModel):
     success: bool = True
     answer: str = Field(min_length=1, max_length=40_000)
-    sources: list[LegalAdvisorSource] = Field(default_factory=list, max_length=3)
+    sources: list[LegalAdvisorSource] = Field(default_factory=list, max_length=5)
 
 
 class LegalDefenseEvidenceInput(BaseModel):
