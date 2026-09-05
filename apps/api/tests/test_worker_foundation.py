@@ -18,6 +18,10 @@ def test_worker_uses_durable_isolated_json_queues() -> None:
     assert celery_app.conf.task_acks_late is True
     assert celery_app.conf.task_reject_on_worker_lost is True
     assert celery_app.conf.task_routes["hring.worker.healthcheck"]["queue"] == MAINTENANCE_QUEUE
+    assert celery_app.conf.task_routes["hring.legal.sync_sources"]["queue"] == MAINTENANCE_QUEUE
+    assert celery_app.conf.beat_schedule["daily-legal-source-sync"]["task"] == (
+        "hring.legal.sync_sources"
+    )
 
 
 def test_worker_health_task_runs_without_external_side_effects() -> None:
