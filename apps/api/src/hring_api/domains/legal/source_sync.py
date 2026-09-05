@@ -138,16 +138,21 @@ async def sync_online_legal_sources(
 ) -> LegalSourceSyncResult:
     sources = list(CORE_SOURCES)
     failures: list[str] = []
+    critical_failures: list[str] = []
 
     try:
         index_html = await fetch_html(COURT_RULINGS_INDEX_URL)
-        sources.extend(discover_recent_court_rulings(index_html))
+        recent_rulings = discover_recent_court_rulings(index_html)
+        if not recent_rulings:
+            raise LegalSourceSyncError("Court-rulings index returned no usable rulings")
+        sources.extend(recent_rulings)
     except (LegalIngestionError, LegalSourceSyncError) as exc:
-        failures.append(f"court_rulings_index: {exc}")
+        failure = f"court_rulings_index: {exc}"
+        failures.append(failure)
+        critical_failures.append(failure)
 
     changed = 0
     unchanged = 0
-    critical_failures: list[str] = []
     for index, source in enumerate(sources):
         if index or sources:
             await sleep(crawl_delay_seconds)
