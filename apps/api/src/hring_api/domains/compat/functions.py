@@ -108,6 +108,21 @@ def _response_with_citations(
     return value
 
 
+def _validate_smart_ad_response(body: Any, value: Any) -> Any:
+    if not isinstance(value, dict) or not isinstance(value.get("generatedText"), str):
+        raise CompatFunctionError("Smart-ad service returned an invalid structured response")
+    generated = value["generatedText"].strip()
+    if not generated:
+        raise CompatFunctionError("Smart-ad service returned empty text")
+    platform = body.get("platform") if isinstance(body, dict) else None
+    if platform == "jobboard":
+        required = ("معرفی موقعیت", "مسئولیت", "شرایط احراز", "مزایا", "نحوه ارسال")
+        if any(section not in generated for section in required):
+            raise CompatFunctionError("Smart-ad output omitted a required job-board section")
+    value["generatedText"] = generated
+    return value
+
+
 async def invoke_ai_function(
     *,
     name: str,
@@ -134,6 +149,9 @@ async def invoke_ai_function(
             return evidence_contract
 
     serialized = json.dumps(body, ensure_ascii=False, default=str)
+    is_smart_ad_text = name == "generate-job-ad" and not (
+        isinstance(body, dict) and body.get("generateImage") is True
+    )
     labor_context: LaborComplaintContext | None = None
     support_context: SupportContext | None = None
     if name == "labor-complaint-assistant":
@@ -159,18 +177,29 @@ async def invoke_ai_function(
         user_prompt = support_context.conversation_json
         feature_key = "support.hring"
     else:
-        system_prompt = (
-            "You are the HRing compatibility execution layer. Execute the named HR product capability "
-            "using only the supplied request data. Never invent identity/contact facts or sensitive "
-            "personal traits. Preserve the response contract implied by the request. Return valid JSON "
-            "only, without markdown. If evidence is missing, represent uncertainty explicitly rather "
-            "than fabricating facts. Respond in Persian unless the request requires another language."
-        )
-        user_prompt = (
-            f"HRing capability: {name}\n"
-            f"Request JSON: {serialized}\n\n"
-            "Return the structured result expected by this HRing capability as JSON."
-        )
+        if is_smart_ad_text:
+            system_prompt = (
+                "تو آگهی‌نویس حرفه‌ای منابع انسانی هستی. خروجی باید فقط JSON معتبر "
+                "با کلید generatedText باشد. آگهی فارسی را با حفظ لحن درخواستی تولید کن. "
+                "اگر platform برابر jobboard است، generatedText باید حتماً تیترهای «معرفی "
+                "موقعیت»، «مسئولیت‌ها»، «شرایط احراز»، «مزایا» و «نحوه ارسال درخواست» را "
+                "جداگانه داشته باشد. صمیمی بودن لحن هرگز مجوز حذف شرایط احراز یا مسئولیت‌ها "
+                "نیست. اطلاعات تماس را دقیقاً از ورودی بگیر و چیزی حدس نزن."
+            )
+            user_prompt = f"داده آگهی: {serialized}"
+        else:
+            system_prompt = (
+                "You are the HRing compatibility execution layer. Execute the named HR product capability "
+                "using only the supplied request data. Never invent identity/contact facts or sensitive "
+                "personal traits. Preserve the response contract implied by the request. Return valid JSON "
+                "only, without markdown. If evidence is missing, represent uncertainty explicitly rather "
+                "than fabricating facts. Respond in Persian unless the request requires another language."
+            )
+            user_prompt = (
+                f"HRing capability: {name}\n"
+                f"Request JSON: {serialized}\n\n"
+                "Return the structured result expected by this HRing capability as JSON."
+            )
         feature_key = f"compat.{name}"
         prompt_variables = {
             "capability_name": name,
@@ -197,10 +226,15 @@ async def invoke_ai_function(
     )
 
     async def fallback() -> AiGatewayResult:
+        default_provider = settings.recruiting_ai_provider
+        default_model = settings.recruiting_ai_model
+        if is_smart_ad_text:
+            default_provider = settings.smart_ad_text_ai_provider
+            default_model = settings.smart_ad_text_ai_model
         route = await resolve_runtime_feature_route(
             feature_key=feature_key,
-            default_provider=settings.recruiting_ai_provider,
-            default_model=settings.recruiting_ai_model,
+            default_provider=default_provider,
+            default_model=default_model,
         )
         return await generate_with_ai_gateway(
             feature_key=feature_key,
@@ -224,15 +258,18 @@ async def invoke_ai_function(
 
     async def generate() -> Any:
         try:
-            result = await generate_with_managed_prompt(
-                session,
-                prompt_key=feature_key,
-                variables=prompt_variables,
-                user_id=principal.user_id if principal is not None else None,
-                company_id=company_id,
-                fallback=fallback,
-                credits_charged=managed_cost,
-            )
+            if is_smart_ad_text:
+                result = await fallback()
+            else:
+                result = await generate_with_managed_prompt(
+                    session,
+                    prompt_key=feature_key,
+                    variables=prompt_variables,
+                    user_id=principal.user_id if principal is not None else None,
+                    company_id=company_id,
+                    fallback=fallback,
+                    credits_charged=managed_cost,
+                )
         except (AiGatewayError, PromptRegistryError) as exc:
             raise CompatFunctionError("HRing AI service is unavailable") from exc
         value = _response_with_citations(result.content, result.citations)
@@ -247,6 +284,8 @@ async def invoke_ai_function(
                 }
             except SupportInputError as exc:
                 raise CompatFunctionError(str(exc)) from exc
+        if is_smart_ad_text:
+            return _validate_smart_ad_response(body, value)
         return value
 
     if principal is None:

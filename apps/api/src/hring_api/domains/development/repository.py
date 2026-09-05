@@ -50,13 +50,15 @@ async def get_onboarding_plan(
     *,
     plan_id: UUID,
     owner_user_id: UUID,
+    for_update: bool = False,
 ) -> OnboardingPlan | None:
-    result = await session.execute(
-        select(OnboardingPlan).where(
+    query = select(OnboardingPlan).where(
             OnboardingPlan.id == plan_id,
             OnboardingPlan.owner_user_id == owner_user_id,
         )
-    )
+    if for_update:
+        query = query.with_for_update()
+    result = await session.execute(query)
     return result.scalar_one_or_none()
 
 

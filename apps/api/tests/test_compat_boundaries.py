@@ -6,7 +6,11 @@ from pydantic import SecretStr
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiCitation
 from hring_api.domains.compat.access import PERSONAL_OPERATION_RULES
-from hring_api.domains.compat.functions import _response_with_citations
+from hring_api.domains.compat.functions import (
+    CompatFunctionError,
+    _response_with_citations,
+    _validate_smart_ad_response,
+)
 from hring_api.domains.compat.support import SupportInputError, support_text
 from hring_api.domains.compat.schemas import CompatQueryRequest
 from hring_api.domains.compat.storage import PUBLIC_LOGICAL_BUCKETS, StorageCompatError, logical_key
@@ -38,6 +42,19 @@ def test_compat_ai_response_keeps_provider_citation_urls() -> None:
         "https://example.com/two",
     ]
     assert result["researchMeta"]["sourcesFound"] == 2
+
+
+def test_smart_ad_jobboard_requires_all_sections() -> None:
+    with pytest.raises(CompatFunctionError):
+        _validate_smart_ad_response(
+            {"platform": "jobboard"},
+            {"generatedText": "معرفی موقعیت\nمسئولیت‌ها\nشرایط احراز"},
+        )
+
+    value = {"generatedText": "\n".join((
+        "معرفی موقعیت", "مسئولیت‌ها", "شرایط احراز", "مزایا", "نحوه ارسال درخواست",
+    ))}
+    assert _validate_smart_ad_response({"platform": "jobboard"}, value) == value
 
 
 def test_compat_tables_are_deny_by_default() -> None:

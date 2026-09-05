@@ -22,6 +22,7 @@ import { useSiteName } from "@/hooks/useSiteSettings";
 import { useCredits } from "@/hooks/useCredits";
 import jsPDF from "jspdf";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
+import { waitForPrintableAssets } from "@/lib/printDocument";
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface HardSoftSkill { skill: string; reason: string; }
@@ -221,9 +222,13 @@ export default function LearningPath() {
     }
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = async () => {
+    await waitForPrintableAssets(printRef.current || document);
+    window.print();
+  };
   const handleDownload = async () => {
     if (!printRef.current) return;
+    await waitForPrintableAssets(printRef.current);
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     await pdf.html(printRef.current, {
       callback: (document) => document.save('HRing-learning-path.pdf'),

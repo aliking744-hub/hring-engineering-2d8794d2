@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { 
@@ -77,6 +77,11 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setFullName(context?.fullName || "");
+    setTitle(context?.title || "");
+  }, [context?.fullName, context?.title]);
 
   // Dynamic texts
   const profilePageTitle = getSetting('profile_page_title', 'پروفایل کاربری');

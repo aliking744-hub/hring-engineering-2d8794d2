@@ -8,6 +8,7 @@ import { Employee } from '@/types/employee';
 import { parseExcelData, generateSampleData } from '@/utils/sampleData';
 import logo from '@/assets/logo.png';
 import { useCredits } from '@/hooks/useCredits';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UploadPageProps {
   onDataLoaded: (data: Employee[], name: string) => Promise<void>;
@@ -41,18 +42,28 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
 
       const employees = parseExcelData(jsonData);
+      const uploadCost = uploadBaseCost + Math.max(0, Math.ceil(employees.length / 500) - 1) * 2;
+
+      const { data: charged, error: billingError } = await supabase.rpc('deduct_credits', {
+        amount: uploadCost,
+        feature_key: 'hr_dashboard.excel_import',
+      });
+      if (billingError || charged !== true) {
+        throw new Error(`برای تحلیل این فایل اکسل ${uploadCost} جم لازم است`);
+      }
+      window.dispatchEvent(new Event('hring:credits-changed'));
 
       await onDataLoaded(employees, file.name);
     } catch (error) {
       toast({
         title: 'خطا',
-        description: 'مشکلی در خواندن فایل اکسل پیش آمد',
+        description: error instanceof Error ? error.message : 'مشکلی در خواندن فایل اکسل پیش آمد',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
-  }, [onDataLoaded]);
+  }, [onDataLoaded, uploadBaseCost]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -234,7 +245,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
             className="gap-2 px-6 py-3"
           >
             <Sparkles className="w-4 h-4" />
-            <span>مشاهده با داده نمونه ({demoCost} اعتبار)</span>
+            <span>مشاهده رایگان با داده نمونه</span>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-3 text-center">

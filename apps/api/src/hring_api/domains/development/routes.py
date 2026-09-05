@@ -27,6 +27,7 @@ from hring_api.domains.development.schemas import (
 from hring_api.domains.development.service import (
     DevelopmentConflictError,
     DevelopmentNotFoundError,
+    complete_onboarding_workflow,
     create_onboarding_workflow_task,
     deliver_learning_path,
     generate_learning_path,
@@ -171,6 +172,28 @@ async def update_onboarding_task_route(
             plan_id=plan_id,
             task_id=task_id,
             payload=payload,
+            principal=principal,
+        )
+        await db.commit()
+        return response
+    except (DevelopmentNotFoundError, DevelopmentConflictError) as exc:
+        await db.rollback()
+        raise _development_http_error(exc) from exc
+
+
+@router.post(
+    "/onboarding-plans/{plan_id}/complete",
+    response_model=OnboardingPlanResponse,
+)
+async def complete_onboarding_plan_route(
+    plan_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> OnboardingPlanResponse:
+    try:
+        response = await complete_onboarding_workflow(
+            db,
+            plan_id=plan_id,
             principal=principal,
         )
         await db.commit()
