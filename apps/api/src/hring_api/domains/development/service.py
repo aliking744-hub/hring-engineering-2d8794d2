@@ -117,18 +117,27 @@ async def _seed_onboarding_tasks(
     seeds = [
         ("روزهای ۱ تا ۳۰", 30, [
             "تکمیل تجهیزات، حساب‌ها و دسترسی‌های کاری",
+            "آشنایی با سیاست‌ها، امنیت اطلاعات و آیین‌نامه‌های سازمان",
+            "آموزش محصول یا خدمت، فرایندهای اصلی و نیاز مشتریان",
+            "همراهی با همکار باتجربه و ثبت پرسش‌ها و آموخته‌ها",
             "معرفی به تیم، منتور و ذی‌نفعان اصلی",
             "مرور شرح نقش، اهداف و شاخص‌های موفقیت",
             "تحویل نخستین خروجی و دریافت بازخورد ۳۰روزه",
         ]),
         ("روزهای ۳۱ تا ۶۰", 60, [
             "پذیرش مسئولیت مستقل برای یک خروجی اصلی",
+            "تحویل یک خروجی سنجش‌پذیر متناسب با نقش",
+            "همکاری با یک تیم یا ذی‌نفع بین‌واحدی",
+            "مرور شاخص‌های کیفیت، زمان و عملکرد در جلسه میانی",
             "شناسایی و ثبت موانع عملکردی یا آموزشی",
             "جلسه بازخورد میانه دوره با مدیر و منتور",
             "تنظیم برنامه اصلاح و اولویت‌های ماه سوم",
         ]),
         ("روزهای ۶۱ تا ۹۰", 90, [
             "تحویل خروجی نهایی دوره آزمایشی",
+            "برنامه‌ریزی مستقل اولویت‌های هفتگی و گزارش پیشرفت",
+            "حل یک مسئله واقعی یا پیشنهاد یک بهبود فرایندی",
+            "مستندسازی آموخته‌ها و انتقال دانش به تیم",
             "ارزیابی استقلال، همکاری و کیفیت عملکرد",
             "جمع‌بندی بازخورد کارمند، مدیر و منتور",
             "توافق روی اهداف و برنامه توسعه پس از دوره",
@@ -478,6 +487,34 @@ async def complete_onboarding_workflow(
     plan.score = score
     plan.status = "completed"
     plan.completed_at = datetime.now(UTC)
+    await session.flush()
+    return await onboarding_workflow_response(session, plan=plan)
+
+
+async def reopen_onboarding_workflow(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    principal: Principal,
+) -> OnboardingPlanResponse:
+    plan = await get_onboarding_plan(
+        session,
+        plan_id=plan_id,
+        owner_user_id=principal.user_id,
+        for_update=True,
+    )
+    if plan is None:
+        raise DevelopmentNotFoundError("Onboarding plan was not found")
+    if plan.status == "active":
+        return await onboarding_workflow_response(session, plan=plan)
+    if plan.certificate_number:
+        raise DevelopmentConflictError(
+            "A certificate has already been issued; this plan cannot be reopened"
+        )
+
+    plan.status = "active"
+    plan.score = None
+    plan.completed_at = None
     await session.flush()
     return await onboarding_workflow_response(session, plan=plan)
 
