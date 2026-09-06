@@ -166,8 +166,8 @@ const OnboardingRoadmap = () => {
     <AuroraBackground />
     <div className="relative z-10 container mx-auto px-4 py-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4"><Link to="/dashboard"><Button variant="outline" className="gap-2"><ArrowRight className="h-5 w-5" />داشبورد</Button></Link><div><h1 className="flex items-center gap-2 text-2xl font-bold"><UserRound className="h-6 w-6 text-primary" />نقشه راه ۹۰ روزه</h1><p className="text-muted-foreground">زیرتسک‌ها، پیشرفت دوره، تاریخچه و گواهی پایان دوره</p></div></div>
-        <Link to="/success-architect"><Button className="gap-2"><Plus className="h-4 w-4" />ساخت نقشه راه جدید</Button></Link>
+        <div className="flex items-center gap-4"><Link to="/dashboard"><Button variant="outline" className="gap-2"><ArrowRight className="h-5 w-5" />بازگشت به داشبورد</Button></Link><div><div className="flex items-center gap-2"><h1 className="flex items-center gap-2 text-2xl font-bold"><UserRound className="h-6 w-6 text-primary" />نقشه راه ۹۰ روزه</h1><Badge variant="secondary">گردش‌کار واقعی</Badge></div><p className="text-muted-foreground">زیرتسک‌ها، پیشرفت دوره، تاریخچه و گواهی پایان دوره</p></div></div>
+        <Link to="/success-architect"><Button className="gap-2"><Plus className="h-4 w-4" />ساخت برنامه ۹۰ روزه جدید</Button></Link>
       </div>
       <div className="mb-6 flex gap-2"><Button variant={viewMode === "active" ? "default" : "outline"} onClick={() => switchView("active")}>دوره‌های فعال</Button><Button variant={viewMode === "history" ? "default" : "outline"} onClick={() => switchView("history")} className="gap-2"><History className="h-4 w-4" />تاریخچه</Button></div>
       {loading ? <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div> : !selectedPlan
