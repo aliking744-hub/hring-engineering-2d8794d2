@@ -70,6 +70,9 @@ class OnboardingPlan(Base):
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="active", index=True)
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    certificate_number: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    certificate_recipient_title: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    certificate_issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
@@ -93,6 +96,12 @@ class OnboardingTask(Base):
         PGUUID(as_uuid=True),
         ForeignKey("development_onboarding_plans.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
+    )
+    parent_task_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("development_onboarding_tasks.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     company_id: Mapped[UUID | None] = mapped_column(
