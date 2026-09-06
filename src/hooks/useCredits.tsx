@@ -13,6 +13,7 @@ export const DIAMOND_COSTS = {
 
   // Medium Text Generation - 15 Diamonds
   ONBOARDING_PLAN: 12,
+  ONBOARDING_CERTIFICATE: 2,
   LEARNING_PATH: 12,
   LEGAL_ADVISOR: 5,
   LABOR_COMPLAINT: 25,
@@ -40,6 +41,7 @@ export const DIAMOND_COST_LABELS: Record<keyof typeof DIAMOND_COSTS, string> = {
   INTERVIEW_KIT: 'کیت مصاحبه',
   SMART_AD_TEXT: 'متن آگهی هوشمند',
   ONBOARDING_PLAN: 'برنامه آنبوردینگ ۹۰ روزه',
+  ONBOARDING_CERTIFICATE: 'گواهی پایان دوره ۹۰ روزه',
   LEARNING_PATH: 'مسیر یادگیری',
   LEGAL_ADVISOR: 'مشاور حقوقی',
   LABOR_COMPLAINT: 'تنظیم شکایت کار',
