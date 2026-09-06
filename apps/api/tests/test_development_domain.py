@@ -11,6 +11,8 @@ from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiGatewayResult
 from hring_api.domains.ai.prompt_service import PromptValidationError
 from hring_api.domains.development.ai_service import (
+    _markdown_text,
+    _message_text,
     _normalize_learning_payload,
     generate_learning_path_content,
     generate_onboarding_content,
@@ -141,6 +143,28 @@ def test_learning_ai_omits_employee_identity_from_provider_payload(monkeypatch) 
     assert result.skill_gap_analysis == "شکاف مهارتی مستند"
 
 
+
+
+def test_onboarding_structured_values_render_as_readable_markdown() -> None:
+    plan = _markdown_text(
+        {
+            "days_1_30": {
+                "focus": "شناخت سازمان",
+                "goals": ["آشنایی با تیم", "تحویل نخستین خروجی"],
+                "success_metric": "تأیید مدیر مستقیم",
+            },
+            "days_31_60": [
+                {"tasks": ["پذیرش مسئولیت مستقل"]},
+            ],
+        }
+    )
+    email = _message_text({"subject": "خوش آمدید", "body": "سلام و خوش آمدید"})
+
+    assert "## روزهای ۱ تا ۳۰" in plan
+    assert "### اهداف" in plan
+    assert "- آشنایی با تیم" in plan
+    assert "## روزهای ۳۱ تا ۶۰" in plan
+    assert email == "سلام و خوش آمدید"
 
 def test_onboarding_ai_uses_embedded_fallback_for_legacy_prompt_contract(monkeypatch) -> None:
     calls = {"gateway": 0}

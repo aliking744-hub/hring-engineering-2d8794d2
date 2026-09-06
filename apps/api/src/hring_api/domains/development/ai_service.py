@@ -92,6 +92,79 @@ def _string_list(value: Any) -> list[str]:
     return []
 
 
+_ONBOARDING_LABELS = {
+    "pre_start": "پیش از شروع",
+    "before_start": "پیش از شروع",
+    "first_day": "روز اول",
+    "first_week": "هفته اول",
+    "days_1_30": "روزهای ۱ تا ۳۰",
+    "days_8_30": "روزهای ۸ تا ۳۰",
+    "days_31_60": "روزهای ۳۱ تا ۶۰",
+    "days_61_90": "روزهای ۶۱ تا ۹۰",
+    "goals": "اهداف",
+    "tasks": "اقدام‌ها و وظایف",
+    "actions": "اقدام‌ها",
+    "milestones": "نقاط عطف",
+    "owner": "مسئول",
+    "due_date": "موعد",
+    "status": "وضعیت",
+    "deliverable": "خروجی",
+    "success_metric": "معیار موفقیت",
+    "focus": "تمرکز اصلی",
+}
+
+
+def _display_key(value: object) -> str:
+    key = str(value).strip()
+    return _ONBOARDING_LABELS.get(key, key.replace("_", " ").strip())
+
+
+def _markdown_text(value: Any, *, level: int = 2) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, bool):
+        return "بله" if value else "خیر"
+    if isinstance(value, int | float):
+        return str(value)
+    if isinstance(value, list):
+        rows: list[str] = []
+        for item in value:
+            rendered = _markdown_text(item, level=min(level + 1, 6))
+            if not rendered:
+                continue
+            if isinstance(item, dict):
+                rows.append(rendered)
+            else:
+                rows.append(f"- {rendered}")
+        return "\n".join(rows)
+    if isinstance(value, dict):
+        sections: list[str] = []
+        for key, item in value.items():
+            rendered = _markdown_text(item, level=min(level + 1, 6))
+            if not rendered:
+                continue
+            label = _display_key(key)
+            if isinstance(item, dict | list):
+                sections.append(f"{'#' * level} {label}\n{rendered}")
+            else:
+                sections.append(f"**{label}:** {rendered}")
+        return "\n\n".join(sections)
+    return str(value).strip()
+
+
+def _message_text(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("body", "content", "text", "message", "email"):
+            candidate = value.get(key)
+            if candidate is not None:
+                rendered = _markdown_text(candidate)
+                if rendered:
+                    return rendered
+    return _markdown_text(value)
+
+
 def _normalize_skills(value: Any) -> list[dict[str, str]]:
     if not isinstance(value, list):
         return []
@@ -268,13 +341,15 @@ async def generate_onboarding_content(
         or payload.get("welcome_email")
         or payload.get("email")
     )
-    if not isinstance(plan, str) or not plan.strip():
+    plan_text = _markdown_text(plan)
+    welcome_text = _message_text(welcome_email)
+    if not plan_text:
         raise DevelopmentAiError("AI service returned no onboarding plan")
-    if not isinstance(welcome_email, str) or not welcome_email.strip():
+    if not welcome_text:
         raise DevelopmentAiError("AI service returned no welcome email")
-    if len(plan) > 40_000 or len(welcome_email) > 20_000:
+    if len(plan_text) > 40_000 or len(welcome_text) > 20_000:
         raise DevelopmentAiError("AI service returned an oversized onboarding response")
-    clean_email = welcome_email.strip()
+    clean_email = welcome_text
     replacements = {
         "[نام کارمند]": employee_label,
         "{{employee_name}}": employee_label,
@@ -287,7 +362,7 @@ async def generate_onboarding_content(
     clean_email = re.sub(r"\[[^\]\n]{2,80}\]", "", clean_email)
     if employee_label not in clean_email:
         clean_email = f"سلام {employee_label} عزیز،\n\n{clean_email}"
-    return plan.strip(), clean_email
+    return plan_text, clean_email
 
 
 async def generate_learning_path_content(
