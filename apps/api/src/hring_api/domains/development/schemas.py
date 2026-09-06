@@ -46,6 +46,7 @@ class OnboardingGenerateRequest(BaseModel):
 
 
 class OnboardingTaskCreateRequest(BaseModel):
+    parent_task_id: UUID | None = None
     title: str = Field(min_length=2, max_length=500)
     details: str | None = Field(default=None, max_length=4_000)
     assignee_label: str | None = Field(default=None, max_length=240)
@@ -110,6 +111,7 @@ class OnboardingTaskResponse(BaseModel):
 
     id: UUID
     plan_id: UUID
+    parent_task_id: UUID | None
     title: str
     details: str | None
     assignee_label: str | None
@@ -138,8 +140,26 @@ class OnboardingPlanResponse(BaseModel):
     status: Literal["active", "completed", "failed"]
     score: int | None
     completed_at: datetime | None
+    certificate_number: str | None
+    certificate_recipient_title: str | None
+    certificate_issued_at: datetime | None
     created_at: datetime
     tasks: list[OnboardingTaskResponse] = Field(default_factory=list)
+
+
+class OnboardingCertificateRequest(BaseModel):
+    recipient_title: Literal["mr", "ms"]
+
+
+class OnboardingCertificateResponse(BaseModel):
+    certificate_number: str
+    recipient_title: Literal["mr", "ms"]
+    recipient_name: str
+    job_title: str
+    score: int
+    completed_at: datetime
+    issued_at: datetime
+    statement: str
 
 
 class SkillRecommendation(BaseModel):

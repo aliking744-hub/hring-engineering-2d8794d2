@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
-from uuid import UUID
+from typing import Literal, cast
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +45,7 @@ from hring_api.domains.development.repository import (
 )
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
+    OnboardingCertificateResponse,
     OnboardingGenerateRequest,
     OnboardingPlanResponse,
     OnboardingTaskCreateRequest,
@@ -54,6 +56,8 @@ from hring_api.domains.identity.dependencies import Principal
 
 
 ONBOARDING_DEFAULT_CREDIT_COST = 12
+ONBOARDING_CERTIFICATE_FEATURE_KEY = "development.onboarding_certificate"
+ONBOARDING_CERTIFICATE_DEFAULT_CREDIT_COST = 2
 LEARNING_PATH_DEFAULT_CREDIT_COST = 12
 
 
@@ -111,52 +115,55 @@ async def _seed_onboarding_tasks(
     start = plan.starts_on or date.today()
     owner = plan.mentor_role or "مدیر مستقیم"
     seeds = [
-        (
-            "پیش از شروع: آماده‌سازی تجهیزات، دسترسی‌ها و برنامه روز اول",
-            "خروجی: چک‌لیست آماده‌سازی تکمیل‌شده. معیار موفقیت: همه دسترسی‌های ضروری پیش از شروع فعال باشد.",
-            -3,
-        ),
-        (
-            "روز اول: خوش‌آمدگویی، معرفی تیم و دسترسی‌ها",
-            "خروجی: صورت‌جلسه معرفی و دسترسی‌ها. معیار موفقیت: کارمند بتواند بدون مانع وارد ابزارهای کاری شود.",
-            0,
-        ),
-        (
-            "هفتهٔ اول: مرور نقش، اهداف و مستندات",
-            "خروجی: اهداف و برنامه هفته اول. معیار موفقیت: نقش، خروجی‌ها و کانال‌های ارتباطی روشن باشد.",
-            7,
-        ),
-        (
-            "پایان ماه اول: بازخورد و تثبیت برنامه",
-            "خروجی: گزارش بازخورد ۳۰روزه. معیار موفقیت: نخستین خروجی شغلی تحویل و موانع ثبت شده باشد.",
-            30,
-        ),
-        (
-            "روزهای ۳۱ تا ۶۰: بررسی مشارکت و موانع",
-            "خروجی: مرور پیشرفت و برنامه رفع موانع. معیار موفقیت: مسئولیت‌های اصلی با نظارت محدود انجام شود.",
-            60,
-        ),
-        (
-            "روزهای ۶۱ تا ۹۰: ارزیابی استقلال و گام بعدی",
-            "خروجی: ارزیابی ۹۰روزه و برنامه توسعه. معیار موفقیت: اهداف دوره جمع‌بندی و گام بعدی تأیید شود.",
-            90,
-        ),
+        ("روزهای ۱ تا ۳۰", 30, [
+            "تکمیل تجهیزات، حساب‌ها و دسترسی‌های کاری",
+            "معرفی به تیم، منتور و ذی‌نفعان اصلی",
+            "مرور شرح نقش، اهداف و شاخص‌های موفقیت",
+            "تحویل نخستین خروجی و دریافت بازخورد ۳۰روزه",
+        ]),
+        ("روزهای ۳۱ تا ۶۰", 60, [
+            "پذیرش مسئولیت مستقل برای یک خروجی اصلی",
+            "شناسایی و ثبت موانع عملکردی یا آموزشی",
+            "جلسه بازخورد میانه دوره با مدیر و منتور",
+            "تنظیم برنامه اصلاح و اولویت‌های ماه سوم",
+        ]),
+        ("روزهای ۶۱ تا ۹۰", 90, [
+            "تحویل خروجی نهایی دوره آزمایشی",
+            "ارزیابی استقلال، همکاری و کیفیت عملکرد",
+            "جمع‌بندی بازخورد کارمند، مدیر و منتور",
+            "توافق روی اهداف و برنامه توسعه پس از دوره",
+        ]),
     ]
-    for order, (title, details, offset) in enumerate(seeds):
-        await create_onboarding_task(
+    for order, (title, offset, subtasks) in enumerate(seeds):
+        parent = await create_onboarding_task(
             session,
             plan=plan,
             actor_user_id=actor_user_id,
             values={
                 "title": title,
-                "details": details,
+                "details": "با تکمیل زیرتسک‌ها، درصد پیشرفت این مرحله خودکار محاسبه می‌شود.",
                 "assignee_label": owner,
                 "due_on": start + timedelta(days=offset),
                 "status": "todo",
                 "sort_order": order,
             },
-            event_summary="تسک آغازین برنامهٔ ۹۰ روزه ساخته شد",
+            event_summary="مرحله آغازین نقشه راه ۹۰ روزه ساخته شد",
         )
+        for child_order, child_title in enumerate(subtasks):
+            await create_onboarding_task(
+                session,
+                plan=plan,
+                actor_user_id=actor_user_id,
+                values={
+                    "parent_task_id": parent.id,
+                    "title": child_title,
+                    "assignee_label": owner,
+                    "due_on": start + timedelta(days=offset),
+                    "status": "todo",
+                    "sort_order": child_order,
+                },
+                event_summary="زیرتسک آغازین نقشه راه ۹۰ روزه ساخته شد",
+            )
 
 
 def _task_response(
@@ -322,6 +329,17 @@ async def create_onboarding_workflow_task(
         raise DevelopmentNotFoundError("Onboarding plan was not found")
     if plan.status != "active":
         raise DevelopmentConflictError("Finalized onboarding plans cannot be changed")
+    if payload.parent_task_id is not None:
+        parent = await get_onboarding_task(
+            session,
+            plan_id=plan_id,
+            task_id=payload.parent_task_id,
+            owner_user_id=principal.user_id,
+        )
+        if parent is None:
+            raise DevelopmentNotFoundError("Parent onboarding task was not found")
+        if parent.parent_task_id is not None:
+            raise DevelopmentConflictError("Onboarding subtasks support one nesting level")
     task = await create_onboarding_task(
         session,
         plan=plan,
@@ -383,7 +401,53 @@ async def update_onboarding_workflow_task(
         event_type=event_type,
         event_summary=event_summary,
     )
+    if task.parent_task_id is not None:
+        await _sync_parent_task_status(
+            session,
+            plan=plan,
+            parent_task_id=task.parent_task_id,
+            actor_user_id=principal.user_id,
+        )
     return await _single_task_response(session, updated)
+
+
+async def _sync_parent_task_status(
+    session: AsyncSession,
+    *,
+    plan: OnboardingPlan,
+    parent_task_id: UUID,
+    actor_user_id: UUID,
+) -> None:
+    task_map, _ = await list_onboarding_tasks(session, plan_ids=[plan.id])
+    tasks = task_map.get(plan.id, [])
+    parent = next((item for item in tasks if item.id == parent_task_id), None)
+    children = [item for item in tasks if item.parent_task_id == parent_task_id]
+    if parent is None or not children:
+        return
+    completed = sum(item.status == "completed" for item in children)
+    next_status = "completed" if completed == len(children) else "in_progress" if completed else "todo"
+    if parent.status == next_status:
+        return
+    await update_onboarding_task(
+        session,
+        task=parent,
+        actor_user_id=actor_user_id,
+        values={
+            "status": next_status,
+            "completed_at": datetime.now(UTC) if next_status == "completed" else None,
+        },
+        event_type="completed" if next_status == "completed" else "updated",
+        event_summary="وضعیت مرحله بر اساس زیرتسک‌ها به‌روزرسانی شد",
+    )
+
+
+def _scorable_tasks(tasks: list[OnboardingTask]) -> list[OnboardingTask]:
+    parent_ids = {
+        getattr(task, "parent_task_id", None)
+        for task in tasks
+        if getattr(task, "parent_task_id", None) is not None
+    }
+    return [task for task in tasks if getattr(task, "id", None) not in parent_ids]
 
 
 async def complete_onboarding_workflow(
@@ -408,13 +472,83 @@ async def complete_onboarding_workflow(
     if not tasks:
         raise DevelopmentConflictError("Onboarding plan has no tasks to score")
 
-    completed_count = sum(task.status == "completed" for task in tasks)
-    score = round((completed_count / len(tasks)) * 100)
+    scorable_tasks = _scorable_tasks(tasks)
+    completed_count = sum(task.status == "completed" for task in scorable_tasks)
+    score = round((completed_count / len(scorable_tasks)) * 100)
     plan.score = score
-    plan.status = "completed" if score >= 50 else "failed"
+    plan.status = "completed"
     plan.completed_at = datetime.now(UTC)
     await session.flush()
     return await onboarding_workflow_response(session, plan=plan)
+
+
+def onboarding_certificate_response(plan: OnboardingPlan) -> OnboardingCertificateResponse:
+    if not plan.certificate_number or not plan.certificate_recipient_title or not plan.certificate_issued_at:
+        raise DevelopmentConflictError("Onboarding certificate has not been issued")
+    if plan.score is None or plan.completed_at is None:
+        raise DevelopmentConflictError("Onboarding plan has no final score")
+    if plan.certificate_recipient_title not in {"mr", "ms"}:
+        raise DevelopmentConflictError("Onboarding certificate title is invalid")
+    recipient_title = cast(Literal["mr", "ms"], plan.certificate_recipient_title)
+    title = "جناب آقای" if recipient_title == "mr" else "سرکار خانم"
+    name = plan.employee_name or "کارمند گرامی"
+    return OnboardingCertificateResponse(
+        certificate_number=plan.certificate_number,
+        recipient_title=recipient_title,
+        recipient_name=name,
+        job_title=plan.job_title,
+        score=plan.score,
+        completed_at=plan.completed_at,
+        issued_at=plan.certificate_issued_at,
+        statement=f"{title} {name} دوره آزمایشی را با نمره {plan.score} از ۱۰۰ به پایان رسانده است.",
+    )
+
+
+async def issue_onboarding_certificate(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    recipient_title: str,
+    principal: Principal,
+    request_id: str | None,
+) -> OnboardingCertificateResponse:
+    plan = await get_onboarding_plan(
+        session, plan_id=plan_id, owner_user_id=principal.user_id, for_update=True
+    )
+    if plan is None:
+        raise DevelopmentNotFoundError("Onboarding plan was not found")
+    if plan.status == "active" or plan.score is None or plan.completed_at is None:
+        raise DevelopmentConflictError("Complete the onboarding plan before issuing a certificate")
+    if plan.certificate_number:
+        if plan.certificate_recipient_title != recipient_title:
+            raise DevelopmentConflictError("Certificate was already issued with another title")
+        return onboarding_certificate_response(plan)
+
+    cost = await feature_credit_cost(
+        session,
+        feature_key=ONBOARDING_CERTIFICATE_FEATURE_KEY,
+        default_cost=ONBOARDING_CERTIFICATE_DEFAULT_CREDIT_COST,
+    )
+
+    async def operation() -> OnboardingCertificateResponse:
+        plan.certificate_number = f"HRING-90-{datetime.now(UTC):%Y%m%d}-{uuid4().hex[:10].upper()}"
+        plan.certificate_recipient_title = recipient_title
+        plan.certificate_issued_at = datetime.now(UTC)
+        await session.flush()
+        return onboarding_certificate_response(plan)
+
+    if cost == 0:
+        return await operation()
+    return await run_with_credit_reservation(
+        session,
+        principal=principal,
+        amount=cost,
+        idempotency_key=f"{ONBOARDING_CERTIFICATE_FEATURE_KEY}:{plan.id}",
+        feature_key=ONBOARDING_CERTIFICATE_FEATURE_KEY,
+        description="Issue 90-day onboarding certificate",
+        request_id=request_id,
+        operation=operation,
+    )
 
 
 async def _single_task_response(
