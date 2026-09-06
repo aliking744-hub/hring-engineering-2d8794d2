@@ -355,7 +355,10 @@ const CompanySettings = () => {
               <Button variant="ghost" size="icon" asChild><Link to="/dashboard"><ChevronLeft className="h-5 w-5" /></Link></Button>
               <div><h1 className="text-2xl font-bold">تنظیمات شرکت</h1><p className="text-sm text-muted-foreground">{company.name} · {context.companyRole ? ROLE_NAMES[context.companyRole] : ''}</p></div>
             </div>
-            {canManageSettings && <Button onClick={() => void saveCompany()} disabled={saving}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}ذخیره تنظیمات</Button>}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline"><Link to="/company-members"><Users className="ml-2 h-4 w-4" />کاربران، نقش‌ها و اعتبار</Link></Button>
+              {canManageSettings && <Button onClick={() => void saveCompany()} disabled={saving}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}ذخیره تنظیمات</Button>}
+            </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
