@@ -19,6 +19,8 @@ from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
     LearningPathResponse,
     OnboardingGenerateRequest,
+    OnboardingCertificateRequest,
+    OnboardingCertificateResponse,
     OnboardingPlanResponse,
     OnboardingTaskCreateRequest,
     OnboardingTaskResponse,
@@ -32,6 +34,7 @@ from hring_api.domains.development.service import (
     deliver_learning_path,
     generate_learning_path,
     generate_onboarding_plan,
+    issue_onboarding_certificate,
     list_learning_paths,
     list_onboarding_workflows,
     onboarding_workflow_response,
@@ -198,6 +201,35 @@ async def complete_onboarding_plan_route(
         )
         await db.commit()
         return response
+    except (DevelopmentNotFoundError, DevelopmentConflictError) as exc:
+        await db.rollback()
+        raise _development_http_error(exc) from exc
+
+
+@router.post(
+    "/onboarding-plans/{plan_id}/certificate",
+    response_model=OnboardingCertificateResponse,
+)
+async def issue_onboarding_certificate_route(
+    plan_id: UUID,
+    payload: OnboardingCertificateRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> OnboardingCertificateResponse:
+    try:
+        response = await issue_onboarding_certificate(
+            db,
+            plan_id=plan_id,
+            recipient_title=payload.recipient_title,
+            principal=principal,
+            request_id=_request_id(request),
+        )
+        await db.commit()
+        return response
+    except CreditError as exc:
+        await db.rollback()
+        raise _credit_http_error(exc) from exc
     except (DevelopmentNotFoundError, DevelopmentConflictError) as exc:
         await db.rollback()
         raise _development_http_error(exc) from exc
