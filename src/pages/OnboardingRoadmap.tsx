@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Award, Calendar, CheckCircle2, Circle, ClipboardList, History, Loader2, Plus, Printer, UserRound } from "lucide-react";
+import { ArrowRight, Award, Calendar, CheckCircle2, Circle, ClipboardList, History, Loader2, Plus, Printer, RotateCcw, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import AuroraBackground from "@/components/AuroraBackground";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ const OnboardingRoadmap = () => {
   const [creatingTask, setCreatingTask] = useState(false);
   const [completingPlan, setCompletingPlan] = useState(false);
   const [issuingCertificate, setIssuingCertificate] = useState(false);
+  const [reopeningPlan, setReopeningPlan] = useState(false);
   const [recipientTitle, setRecipientTitle] = useState<RecipientTitle>("mr");
   const [certificate, setCertificate] = useState<CertificateResponse | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -146,6 +147,25 @@ const OnboardingRoadmap = () => {
     } finally { setCompletingPlan(false); }
   };
 
+
+  const reopenPlan = async () => {
+    if (!selectedPlan || selectedPlan.status === "active") return;
+    if (!window.confirm("دوره دوباره فعال شود؟ نمره نهایی حذف می‌شود و وضعیت تیک‌ها حفظ خواهد شد.")) return;
+    setReopeningPlan(true);
+    try {
+      const reopened = await apiRequest<OnboardingPlan>(
+        `/development/onboarding-plans/${selectedPlan.id}/reopen`,
+        { method: "POST" },
+      );
+      setCertificate(null);
+      setViewMode("active");
+      await loadPlans(reopened.id);
+      toast({ title: "دوره دوباره فعال شد", description: "تسک‌ها و درصد پیشرفت قبلی حفظ شده‌اند." });
+    } catch (error) {
+      toast({ title: "بازگشت به دوره انجام نشد", description: error instanceof Error ? error.message : "دوباره تلاش کنید", variant: "destructive" });
+    } finally { setReopeningPlan(false); }
+  };
+
   const issueCertificate = async () => {
     if (!selectedPlan) return;
     setIssuingCertificate(true);
@@ -181,7 +201,7 @@ const OnboardingRoadmap = () => {
             return <motion.section key={root.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .05 }} className="glass-card p-5"><div className="mb-3 flex items-start gap-3">{children.length === 0 && <button onClick={() => void updateTaskStatus(root)}>{root.status === "completed" ? <CheckCircle2 className="h-6 w-6 text-emerald-500" /> : <Circle className="h-6 w-6 text-primary" />}</button>}<div className="flex-1"><h3 className="font-bold">{root.title}</h3>{root.details && <p className="mt-1 text-sm text-muted-foreground">{root.details}</p>}</div></div><div className="mb-4"><div className="mb-1 flex justify-between text-xs"><span>پیشرفت مرحله</span><span>{rootProgress.toLocaleString("fa-IR")}٪</span></div><Progress value={rootProgress} /></div><div className="space-y-2">{children.map((child) => <button key={child.id} disabled={busyTaskId === child.id} onClick={() => void updateTaskStatus(child)} className="flex w-full items-start gap-2 rounded-lg border p-3 text-right hover:bg-muted/50 disabled:opacity-60">{busyTaskId === child.id ? <Loader2 className="mt-0.5 h-5 w-5 animate-spin" /> : child.status === "completed" ? <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-500" /> : <Circle className="mt-0.5 h-5 w-5 text-muted-foreground" />}<span className={child.status === "completed" ? "text-muted-foreground line-through" : ""}>{child.title}</span></button>)}</div>{root.due_on && <p className="mt-4 flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5" />موعد: {formatDate(root.due_on)}</p>}</motion.section>;
           })}</div>}
           {selectedPlan.status === "active" && <div className="glass-card mt-6 p-6"><h2 className="mb-4 text-lg font-semibold">افزودن مرحله یا زیرتسک</h2><div className="grid gap-3 md:grid-cols-4"><div className="space-y-1"><Label>نوع / مرحله مادر</Label><select value={newTaskParentId} onChange={(event) => setNewTaskParentId(event.target.value)} className="h-10 w-full rounded-md border bg-background px-3"><option value="root">مرحله جدید</option>{roots.map((root) => <option key={root.id} value={root.id}>زیرتسکِ {root.title}</option>)}</select></div><div className="space-y-1"><Label>عنوان *</Label><Input value={newTaskTitle} onChange={(event) => setNewTaskTitle(event.target.value)} /></div><div className="space-y-1"><Label>مسئول</Label><Input value={newTaskAssignee} onChange={(event) => setNewTaskAssignee(event.target.value)} /></div><div className="space-y-1"><Label>موعد</Label><Input type="date" value={newTaskDueOn} onChange={(event) => setNewTaskDueOn(event.target.value)} /></div></div><Button className="mt-4" onClick={() => void addTask()} disabled={creatingTask || !newTaskTitle.trim()}>{creatingTask ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />}افزودن</Button></div>}
-          {selectedPlan.status !== "active" && <div className="glass-card p-6"><div className="mb-5 flex items-center gap-3"><Award className="h-10 w-10 text-amber-500" /><div><h2 className="text-xl font-bold">گواهی پایان دوره آزمایشی</h2><p className="text-sm text-muted-foreground">نمره ثبت‌شده تغییر نمی‌کند و گواهی در تاریخچه باقی می‌ماند.</p></div></div>{!certificate ? <div className="flex flex-wrap items-end gap-3"><div className="space-y-1"><Label>عنوان خطاب</Label><select value={recipientTitle} onChange={(event) => setRecipientTitle(event.target.value as RecipientTitle)} className="h-10 rounded-md border bg-background px-3"><option value="mr">جناب آقای</option><option value="ms">سرکار خانم</option></select></div><Button onClick={() => void issueCertificate()} disabled={issuingCertificate || credits < getCost("ONBOARDING_CERTIFICATE")} className="gap-2">{issuingCertificate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}صدور گواهی ({getCost("ONBOARDING_CERTIFICATE")} جم)</Button></div> : <><div id="onboarding-certificate" className="mx-auto max-w-3xl rounded-2xl border-4 border-double border-amber-600/60 bg-background p-10 text-center"><Award className="mx-auto mb-4 h-16 w-16 text-amber-500" /><p className="text-sm tracking-widest text-muted-foreground">HRING · گواهی پایان دوره آزمایشی</p><h2 className="my-7 text-2xl font-black leading-loose">{certificate.statement}</h2><p>عنوان شغلی: {certificate.job_title}</p><p className="mt-2">تاریخ پایان: {formatDate(certificate.completed_at)}</p><div className="mt-8 flex justify-between border-t pt-4 text-xs"><span>شماره گواهی: {certificate.certificate_number}</span><span>تاریخ صدور: {formatDate(certificate.issued_at)}</span></div></div><Button className="mt-5 gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />چاپ گواهی</Button></>}</div>}
+          {selectedPlan.status !== "active" && <div className="glass-card p-6"><div className="mb-5 flex items-center gap-3"><Award className="h-10 w-10 text-amber-500" /><div><h2 className="text-xl font-bold">گواهی پایان دوره آزمایشی</h2><p className="text-sm text-muted-foreground">نمره ثبت‌شده تغییر نمی‌کند و گواهی در تاریخچه باقی می‌ماند.</p></div></div>{!selectedPlan.certificate_number && <Button className="mb-5 gap-2" variant="outline" onClick={() => void reopenPlan()} disabled={reopeningPlan}>{reopeningPlan ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}بازگشت به دوره فعال</Button>}{selectedPlan.certificate_number && <p className="mb-5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">پس از صدور گواهی، برای حفظ اعتبار سند امکان بازگشت دوره وجود ندارد.</p>}{!certificate ? <div className="flex flex-wrap items-end gap-3"><div className="space-y-1"><Label>عنوان خطاب</Label><select value={recipientTitle} onChange={(event) => setRecipientTitle(event.target.value as RecipientTitle)} className="h-10 rounded-md border bg-background px-3"><option value="mr">جناب آقای</option><option value="ms">سرکار خانم</option></select></div><Button onClick={() => void issueCertificate()} disabled={issuingCertificate || credits < getCost("ONBOARDING_CERTIFICATE")} className="gap-2">{issuingCertificate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}صدور گواهی ({getCost("ONBOARDING_CERTIFICATE")} جم)</Button></div> : <><div id="onboarding-certificate" className="mx-auto max-w-3xl rounded-2xl border-4 border-double border-amber-600/60 bg-background p-10 text-center"><Award className="mx-auto mb-4 h-16 w-16 text-amber-500" /><p className="text-sm tracking-widest text-muted-foreground">HRING · گواهی پایان دوره آزمایشی</p><h2 className="my-7 text-2xl font-black leading-loose">{certificate.statement}</h2><p>عنوان شغلی: {certificate.job_title}</p><p className="mt-2">تاریخ پایان: {formatDate(certificate.completed_at)}</p><div className="mt-8 flex justify-between border-t pt-4 text-xs"><span>شماره گواهی: {certificate.certificate_number}</span><span>تاریخ صدور: {formatDate(certificate.issued_at)}</span></div></div><Button className="mt-5 gap-2" onClick={() => window.print()}><Printer className="h-4 w-4" />چاپ گواهی</Button></>}</div>}
         </>}
     </div>
   </div>;
