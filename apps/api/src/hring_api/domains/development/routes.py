@@ -40,6 +40,7 @@ from hring_api.domains.development.service import (
     onboarding_workflow_response,
     remove_learning_path,
     remove_onboarding_plan,
+    reopen_onboarding_workflow,
     update_onboarding_workflow_task,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
@@ -195,6 +196,28 @@ async def complete_onboarding_plan_route(
 ) -> OnboardingPlanResponse:
     try:
         response = await complete_onboarding_workflow(
+            db,
+            plan_id=plan_id,
+            principal=principal,
+        )
+        await db.commit()
+        return response
+    except (DevelopmentNotFoundError, DevelopmentConflictError) as exc:
+        await db.rollback()
+        raise _development_http_error(exc) from exc
+
+
+@router.post(
+    "/onboarding-plans/{plan_id}/reopen",
+    response_model=OnboardingPlanResponse,
+)
+async def reopen_onboarding_plan_route(
+    plan_id: UUID,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db_session),
+) -> OnboardingPlanResponse:
+    try:
+        response = await reopen_onboarding_workflow(
             db,
             plan_id=plan_id,
             principal=principal,
