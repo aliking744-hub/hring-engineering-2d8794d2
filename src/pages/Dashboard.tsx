@@ -258,6 +258,18 @@ const Dashboard = () => {
 
       {/* Bottom Actions */}
       <div className="mt-auto pt-3 space-y-1 border-t border-border/30">
+        {/* Company members */}
+        {context?.companyId && (context.companyRole === 'ceo' || context.companyPermissions.includes('company.members.read')) && (
+          <Link
+            to="/company-members"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors text-sm"
+          >
+            <Users className="w-4 h-4" />
+            <span>کاربران و اعتبار شرکت</span>
+          </Link>
+        )}
+
         {/* Settings */}
         {context?.userType === 'corporate' && context.companyRole === 'ceo' && (
           <Link
