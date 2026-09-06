@@ -102,8 +102,8 @@ const CompanyMembers = () => {
   const [editTitle, setEditTitle] = useState('');
 
   const permissions = context?.companyPermissions || [];
-  const canReadMembers = permissions.includes('company.members.read');
-  const canManageMembers = permissions.includes('company.members.manage');
+  const canReadMembers = context?.companyRole === 'ceo' || permissions.includes('company.members.read');
+  const canManageMembers = context?.companyRole === 'ceo' || permissions.includes('company.members.manage');
   const canManageInvites = permissions.includes('company.invites.manage') || canInvite;
 
   const sortedMembers = useMemo(
