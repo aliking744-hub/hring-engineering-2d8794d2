@@ -9,12 +9,19 @@ from pydantic import ValidationError
 
 from hring_api.config import Settings
 from hring_api.domains.ai.gateway_client import AiGatewayResult
+from hring_api.domains.ai.prompt_service import PromptValidationError
 from hring_api.domains.development.ai_service import (
     _normalize_learning_payload,
     generate_learning_path_content,
+    generate_onboarding_content,
 )
 from hring_api.domains.development.email import build_learning_path_html
-from hring_api.domains.development.service import complete_onboarding_workflow
+from hring_api.domains.development.service import (
+    DevelopmentConflictError,
+    _seed_onboarding_tasks,
+    complete_onboarding_workflow,
+    reopen_onboarding_workflow,
+)
 from hring_api.domains.development.schemas import (
     LearningPathGenerateRequest,
     LearningPathResult,
@@ -134,6 +141,100 @@ def test_learning_ai_omits_employee_identity_from_provider_payload(monkeypatch) 
     assert result.skill_gap_analysis == "شکاف مهارتی مستند"
 
 
+
+def test_onboarding_ai_uses_embedded_fallback_for_legacy_prompt_contract(monkeypatch) -> None:
+    calls = {"gateway": 0}
+
+    async def incompatible_prompt(*_args: object, **_kwargs: object) -> AiGatewayResult:
+        raise PromptValidationError("unknown variables: employee_name")
+
+    async def fake_route(**_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(provider="avalai", model="test-model", source="override")
+
+    async def fake_generate(**_kwargs: Any) -> AiGatewayResult:
+        calls["gateway"] += 1
+        return AiGatewayResult(
+            request_id=uuid4(),
+            content='{"plan":"# برنامه سالم","welcome_email":"سلام همکار"}',
+            provider="avalai",
+            model="test-model",
+            usage={"input_tokens": 10, "output_tokens": 20},
+            provider_cost_microusd=1,
+        )
+
+    monkeypatch.setattr(
+        "hring_api.domains.development.ai_service.generate_with_managed_prompt",
+        incompatible_prompt,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.development.ai_service.resolve_runtime_feature_route",
+        fake_route,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.development.ai_service.generate_with_ai_gateway",
+        fake_generate,
+    )
+
+    plan, welcome = asyncio.run(
+        generate_onboarding_content(
+            employee_name="مینا",
+            starts_on=None,
+            starts_on_display="اول مهر",
+            company_name="نمونه",
+            job_title="کارشناس محصول",
+            seniority="mid",
+            expectation="learning",
+            mentor_role="مدیر محصول",
+            user_id=uuid4(),
+            company_id=uuid4(),
+            credits_charged=12,
+            settings=Settings(),
+        )
+    )
+
+    assert calls["gateway"] == 1
+    assert plan == "# برنامه سالم"
+    assert welcome.startswith("سلام مینا عزیز،")
+
+
+def test_default_onboarding_checklist_has_seven_distinct_tasks_per_month(monkeypatch) -> None:
+    created: list[dict[str, Any]] = []
+
+    async def fake_create(
+        _session: object,
+        *,
+        plan: object,
+        actor_user_id: object,
+        values: dict[str, Any],
+        event_summary: str,
+    ) -> SimpleNamespace:
+        row = SimpleNamespace(id=uuid4(), **values)
+        created.append({"id": row.id, "values": values, "summary": event_summary})
+        return row
+
+    monkeypatch.setattr(
+        "hring_api.domains.development.service.create_onboarding_task",
+        fake_create,
+    )
+    plan = SimpleNamespace(starts_on=None, mentor_role=None)
+    asyncio.run(
+        _seed_onboarding_tasks(
+            SimpleNamespace(),
+            plan=plan,
+            actor_user_id=uuid4(),
+        )
+    )
+
+    parents = [row for row in created if row["values"].get("parent_task_id") is None]
+    children = [row for row in created if row["values"].get("parent_task_id") is not None]
+    assert len(parents) == 3
+    assert len(children) == 21
+    for parent in parents:
+        parent_id = parent["id"]
+        matching = [row for row in children if row["values"]["parent_task_id"] == parent_id]
+        assert len(matching) == 7
+    assert len({row["values"]["title"] for row in children}) == 21
+
 def test_learning_email_html_escapes_customer_content() -> None:
     result = _learning_result().model_dump(by_alias=True)
     result["skillGapAnalysis"] = "<script>alert('x')</script>"
@@ -215,6 +316,57 @@ def test_onboarding_completion_scores_tasks_and_issues_success(monkeypatch) -> N
     assert result.score == 60
     assert result.completed_at is not None
 
+
+
+def test_onboarding_reopen_clears_final_score_but_preserves_tasks(monkeypatch) -> None:
+    plan = SimpleNamespace(
+        id=uuid4(),
+        status="completed",
+        score=75,
+        completed_at=object(),
+        certificate_number=None,
+    )
+
+    async def fake_get_plan(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return plan
+
+    async def fake_response(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return plan
+
+    class FakeSession:
+        async def flush(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "hring_api.domains.development.service.get_onboarding_plan",
+        fake_get_plan,
+    )
+    monkeypatch.setattr(
+        "hring_api.domains.development.service.onboarding_workflow_response",
+        fake_response,
+    )
+
+    result = asyncio.run(
+        reopen_onboarding_workflow(
+            FakeSession(),
+            plan_id=plan.id,
+            principal=SimpleNamespace(user_id=uuid4()),
+        )
+    )
+    assert result.status == "active"
+    assert result.score is None
+    assert result.completed_at is None
+
+    plan.status = "completed"
+    plan.certificate_number = "HRING-90-TEST"
+    with pytest.raises(DevelopmentConflictError):
+        asyncio.run(
+            reopen_onboarding_workflow(
+                FakeSession(),
+                plan_id=plan.id,
+                principal=SimpleNamespace(user_id=uuid4()),
+            )
+        )
 
 def test_native_development_records_are_owner_scoped_and_idempotent(monkeypatch) -> None:
     async def fake_learning(**_kwargs: object) -> LearningPathResult:
