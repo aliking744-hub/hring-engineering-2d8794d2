@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import date
 from typing import Any
@@ -18,6 +19,7 @@ from hring_api.domains.ai.gateway_client import (
 )
 from hring_api.domains.ai.prompt_service import (
     PromptRegistryError,
+    PromptValidationError,
     generate_with_managed_prompt,
 )
 from hring_api.domains.development.schemas import (
@@ -28,6 +30,7 @@ from hring_api.domains.development.schemas import (
 
 ONBOARDING_FEATURE_KEY = "development.onboarding_plan"
 LEARNING_PATH_FEATURE_KEY = "development.learning_path"
+logger = logging.getLogger(__name__)
 
 SENIORITY_LABELS = {
     "junior": "جونیور (۰-۲ سال)",
@@ -243,12 +246,28 @@ async def generate_onboarding_content(
             fallback=fallback,
             credits_charged=credits_charged,
         )
+    except PromptValidationError:
+        # Older published versions declare only the original four variables. Keep
+        # the feature available through the configured route until admins publish
+        # a version with the expanded employee/company/date contract.
+        logger.warning(
+            "Onboarding prompt contract is incompatible; using embedded fallback",
+            exc_info=True,
+        )
+        try:
+            result = await fallback()
+        except AiGatewayError as exc:
+            raise DevelopmentAiError("سرویس تولید برنامه آنبوردینگ در دسترس نیست") from exc
     except (AiGatewayError, PromptRegistryError) as exc:
         raise DevelopmentAiError("سرویس تولید برنامه آنبوردینگ در دسترس نیست") from exc
 
-    payload = _json_object(result.content)
-    plan = payload.get("plan")
-    welcome_email = payload.get("welcomeEmail")
+    payload = _unwrap(_json_object(result.content), "data", "result", "response")
+    plan = payload.get("plan") or payload.get("onboardingPlan") or payload.get("roadmap")
+    welcome_email = (
+        payload.get("welcomeEmail")
+        or payload.get("welcome_email")
+        or payload.get("email")
+    )
     if not isinstance(plan, str) or not plan.strip():
         raise DevelopmentAiError("AI service returned no onboarding plan")
     if not isinstance(welcome_email, str) or not welcome_email.strip():
