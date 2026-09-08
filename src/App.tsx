@@ -45,6 +45,7 @@ const FAQ = lazy(() => import("./pages/FAQ"));
 const Admin = lazy(() => import("./pages/Admin"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const ProductAdmin = lazy(() => import("./pages/ProductAdmin"));
+const PricingAdmin = lazy(() => import("./pages/PricingAdmin"));
 const IntegrationCenter = lazy(() => import("./pages/IntegrationCenter"));
 const PromptRegistry = lazy(() => import("./pages/PromptRegistry"));
 const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
@@ -282,7 +283,15 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              <Route 
+                            <Route 
+                path="/admin/pricing" 
+                element={
+                  <ProtectedRoute>
+                    <PricingAdmin />
+                  </ProtectedRoute>
+                } 
+              />
+<Route 
                 path="/admin/integrations" 
                 element={
                   <ProtectedRoute>
@@ -321,3 +330,4 @@ const App = () => (
 );
 
 export default App;
+

@@ -38,31 +38,16 @@ celery_app.conf.update(
     task_default_routing_key=DEFAULT_QUEUE,
     task_ignore_result=True,
     task_publish_retry=True,
-    task_publish_retry_policy={
-        "interval_start": 0,
-        "interval_step": 0.5,
-        "interval_max": 2,
-        "max_retries": 3,
-    },
+    task_publish_retry_policy={"interval_start": 0, "interval_step": 0.5, "interval_max": 2, "max_retries": 3},
     task_queues=tuple(
-        Queue(
-            name,
-            Exchange(name, type="direct", durable=True),
-            routing_key=name,
-            durable=True,
-        )
+        Queue(name, Exchange(name, type="direct", durable=True), routing_key=name, durable=True)
         for name in WORKER_QUEUES
     ),
     task_reject_on_worker_lost=True,
     task_routes={
-        "hring.worker.healthcheck": {
-            "queue": MAINTENANCE_QUEUE,
-            "routing_key": MAINTENANCE_QUEUE,
-        },
-        "hring.legal.sync_sources": {
-            "queue": MAINTENANCE_QUEUE,
-            "routing_key": MAINTENANCE_QUEUE,
-        },
+        "hring.worker.healthcheck": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+        "hring.legal.sync_sources": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+        "hring.billing.refresh_exchange_rate": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
     },
     task_send_sent_event=True,
     task_serializer="json",
@@ -77,13 +62,15 @@ celery_app.conf.update(
     worker_send_task_events=True,
 )
 
-# Run after midnight UTC (03:30/04:30 Iran time depending on civil-time rules).
-# The task also performs checksum-based versioning, so unchanged pages remain idempotent.
 celery_app.conf.beat_schedule = {
     "daily-legal-source-sync": {
         "task": "hring.legal.sync_sources",
         "schedule": crontab(hour=0, minute=0),
-    }
+    },
+    "daily-exchange-rate-refresh": {
+        "task": "hring.billing.refresh_exchange_rate",
+        "schedule": crontab(hour=5, minute=0),
+    },
 }
 
 install_worker_metrics()
