@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 import httpx
@@ -23,6 +23,11 @@ ZARINPAL_API_BASE_URL = "https://api.zarinpal.com/pg/v4/payment"
 ZARINPAL_START_URL = "https://www.zarinpal.com/pg/StartPay"
 ZARINPAL_SANDBOX_BASE_URL = "https://sandbox.zarinpal.com/pg/v4/payment"
 ZARINPAL_SANDBOX_START_URL = "https://sandbox.zarinpal.com/pg/StartPay"
+SEP_TOKEN_URL = "https://sep.shaparak.ir/onlinepg/onlinepg"
+SEP_START_URL = "https://sep.shaparak.ir/OnlinePG/SendToken"
+SEP_VERIFY_URL = (
+    "https://sep.shaparak.ir/verifyTxnRandomSessionkey/ipg/VerifyTransaction"
+)
 
 
 class DisabledPaymentProvider:
@@ -36,6 +41,7 @@ class DisabledPaymentProvider:
         callback_url: str,
         email: str,
         plan_type: str,
+        order_id: str | None = None,
     ) -> PaymentRequestResult:
         raise PaymentProviderError("Payment provider is not configured")
 
@@ -44,6 +50,7 @@ class DisabledPaymentProvider:
         *,
         amount_rial: int,
         authority: str,
+        reference_number: str | None = None,
     ) -> PaymentVerifyResult:
         raise PaymentProviderError("Payment provider is not configured")
 
@@ -106,6 +113,7 @@ class ZarinpalPaymentProvider:
         callback_url: str,
         email: str,
         plan_type: str,
+        order_id: str | None = None,
     ) -> PaymentRequestResult:
         if amount_rial <= 0:
             raise PaymentProviderError("Payment amount must be positive")
@@ -119,7 +127,7 @@ class ZarinpalPaymentProvider:
                         "currency": "IRR",
                         "description": description,
                         "callback_url": callback_url,
-                        "metadata": {"email": email, "order_id": plan_type},
+                        "metadata": {"email": email, "order_id": order_id or plan_type},
                     },
                 )
                 response.raise_for_status()
@@ -143,6 +151,7 @@ class ZarinpalPaymentProvider:
         *,
         amount_rial: int,
         authority: str,
+        reference_number: str | None = None,
     ) -> PaymentVerifyResult:
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -173,6 +182,129 @@ class ZarinpalPaymentProvider:
         )
 
 
+def _validate_sep_terminal_id(value: str) -> str:
+    terminal_id = value.strip()
+    if not terminal_id.isascii() or not terminal_id.isdigit():
+        raise PaymentProviderError("SEP terminal id must contain digits only")
+    if not 1 <= len(terminal_id) <= 32:
+        raise PaymentProviderError("SEP terminal id length is invalid")
+    return terminal_id
+
+
+def _mapping_with_trimmed_keys(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key.strip(): item
+        for key, item in value.items()
+        if isinstance(key, str)
+    }
+
+
+def _integer(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+class SepPaymentProvider:
+    """Saman Electronic Payment (SEP) Internet Payment Gateway."""
+
+    name = "sep"
+
+    def __init__(self, *, terminal_id: str, timeout_seconds: float = 20.0) -> None:
+        self.terminal_id = _validate_sep_terminal_id(terminal_id)
+        self.timeout_seconds = timeout_seconds
+
+    async def request_payment(
+        self,
+        *,
+        amount_rial: int,
+        description: str,
+        callback_url: str,
+        email: str,
+        plan_type: str,
+        order_id: str | None = None,
+    ) -> PaymentRequestResult:
+        if amount_rial <= 0:
+            raise PaymentProviderError("Payment amount must be positive")
+        if not order_id:
+            raise PaymentProviderError("SEP order id is required")
+        callback = urlsplit(callback_url)
+        if callback.scheme not in {"http", "https"} or not callback.netloc:
+            raise PaymentProviderError("SEP callback URL is invalid")
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                response = await client.post(
+                    SEP_TOKEN_URL,
+                    json={
+                        "action": "token",
+                        "TerminalId": int(self.terminal_id),
+                        "Amount": amount_rial,
+                        "ResNum": order_id,
+                        "RedirectUrl": callback_url,
+                    },
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            raise PaymentProviderError("SEP payment request failed") from None
+
+        if not isinstance(payload, dict) or _integer(payload.get("status")) != 1:
+            raise PaymentProviderError("SEP rejected the payment request")
+        token = payload.get("token")
+        if not isinstance(token, str) or not token.strip():
+            raise PaymentProviderError("SEP returned an invalid payment token")
+        token = token.strip()
+        return PaymentRequestResult(
+            authority=token,
+            payment_url=f"{SEP_START_URL}?token={quote(token, safe='')}",
+        )
+
+    async def verify_payment(
+        self,
+        *,
+        amount_rial: int,
+        authority: str,
+        reference_number: str | None = None,
+    ) -> PaymentVerifyResult:
+        if not reference_number:
+            raise PaymentProviderError("SEP reference number is required")
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                response = await client.post(
+                    SEP_VERIFY_URL,
+                    json={
+                        "RefNum": reference_number,
+                        "TerminalNumber": int(self.terminal_id),
+                    },
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            raise PaymentProviderError("SEP verification request failed") from None
+
+        normalized = _mapping_with_trimmed_keys(payload)
+        if _integer(normalized.get("ResultCode")) != 0 or normalized.get("Success") is not True:
+            return PaymentVerifyResult(verified=False, ref_id=None)
+        detail = _mapping_with_trimmed_keys(normalized.get("TransactionDetail"))
+        returned_amount = _integer(detail.get("OrginalAmount"))
+        returned_terminal = _integer(detail.get("TerminalNumber"))
+        returned_ref = detail.get("RefNum")
+        if returned_amount != amount_rial or returned_terminal != int(self.terminal_id):
+            return PaymentVerifyResult(verified=False, ref_id=None)
+        if returned_ref is not None and str(returned_ref).strip() != reference_number:
+            return PaymentVerifyResult(verified=False, ref_id=None)
+        return PaymentVerifyResult(verified=True, ref_id=reference_number)
+
+
 async def get_payment_provider(
     session: AsyncSession,
     settings: Settings,
@@ -181,14 +313,19 @@ async def get_payment_provider(
         runtime = await resolve_runtime_provider(
             session,
             provider_type="payment",
-            adapters=frozenset({"zarinpal"}),
+            adapters=frozenset({"zarinpal", "sep"}),
             settings=settings,
         )
     except RuntimeProviderConfigurationError as exc:
         raise PaymentProviderError("Payment provider secret is unavailable") from exc
     if runtime is not None:
         if runtime.secret is None:
-            raise PaymentProviderError("Zarinpal merchant id is not configured")
+            raise PaymentProviderError("Payment provider credential is not configured")
+        if runtime.adapter == "sep":
+            return SepPaymentProvider(
+                terminal_id=runtime.secret,
+                timeout_seconds=float(runtime.timeout_seconds),
+            )
         return ZarinpalPaymentProvider(
             merchant_id=runtime.secret,
             base_url=runtime.base_url,

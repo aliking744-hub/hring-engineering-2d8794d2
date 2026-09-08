@@ -60,7 +60,7 @@ RUNTIME_ADAPTERS_BY_TYPE: dict[str, frozenset[str]] = {
     ),
     "email": frozenset({"resend"}),
     "sms": frozenset({"kavenegar"}),
-    "payment": frozenset({"zarinpal"}),
+    "payment": frozenset({"zarinpal", "sep"}),
 }
 
 
@@ -356,12 +356,32 @@ def _validate_zarinpal_probe(provider: IntegrationProvider, secret: str | None) 
         raise IntegrationValidationError("Zarinpal base URL is not an official payment endpoint")
 
 
+def _validate_sep_probe(provider: IntegrationProvider, secret: str | None) -> None:
+    terminal_id = (secret or "").strip()
+    if not terminal_id.isascii() or not terminal_id.isdigit():
+        raise IntegrationValidationError("SEP terminal id must contain digits only")
+    if not 1 <= len(terminal_id) <= 32:
+        raise IntegrationValidationError("SEP terminal id length is invalid")
+    if provider.base_url is None:
+        raise IntegrationValidationError("Provider base URL is not configured")
+    parsed = urlsplit(provider.base_url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "sep.shaparak.ir"
+        or parsed.path.rstrip("/").lower() != "/onlinepg/onlinepg"
+    ):
+        raise IntegrationValidationError("SEP base URL is not the official token endpoint")
+
+
 def _probe_url(provider: IntegrationProvider, secret: str | None) -> str:
     if provider.base_url is None:
         raise IntegrationValidationError("Provider base URL is not configured")
     if provider.adapter == "zarinpal":
         _validate_zarinpal_probe(provider, secret)
         return f"{provider.base_url.rstrip('/')}/request.json"
+    if provider.adapter == "sep":
+        _validate_sep_probe(provider, secret)
+        return provider.base_url
     if provider.adapter == "kavenegar":
         if not secret:
             raise IntegrationValidationError("Kavenegar API key is not configured")
@@ -386,7 +406,7 @@ def _probe_url(provider: IntegrationProvider, secret: str | None) -> str:
 
 
 def _probe_headers(provider: IntegrationProvider, secret: str | None) -> dict[str, str]:
-    if provider.adapter in {"zarinpal", "kavenegar"}:
+    if provider.adapter in {"zarinpal", "sep", "kavenegar"}:
         return {"Accept": "application/json", "User-Agent": "HRing-Integration-Health/1.0"}
     if provider.auth_scheme == "none":
         return {"Accept": "application/json", "User-Agent": "HRing-Integration-Health/1.0"}
@@ -486,10 +506,16 @@ async def test_provider_connection(
         ) as client:
             response = await client.get(url, headers=headers)
         http_status = response.status_code
-        if provider.adapter == "zarinpal":
-            healthy = response.status_code < 500
+        if provider.adapter in {"zarinpal", "sep"}:
+            healthy = (
+                response.status_code < 500
+                if provider.adapter == "zarinpal"
+                else response.status_code in {200, 400, 405}
+            )
+            provider_name = "Zarinpal" if provider.adapter == "zarinpal" else "SEP"
+            credential_name = "merchant" if provider.adapter == "zarinpal" else "terminal"
             message = (
-                "Zarinpal endpoint is reachable and merchant format is valid; "
+                f"{provider_name} endpoint is reachable and {credential_name} format is valid; "
                 "no payment was created"
                 if healthy
                 else f"Provider returned HTTP {http_status}"

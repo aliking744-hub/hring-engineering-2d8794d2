@@ -30,6 +30,7 @@ class PaymentProvider(Protocol):
         callback_url: str,
         email: str,
         plan_type: str,
+        order_id: str | None = None,
     ) -> PaymentRequestResult:
         """Create a provider payment request."""
 
@@ -38,5 +39,6 @@ class PaymentProvider(Protocol):
         *,
         amount_rial: int,
         authority: str,
+        reference_number: str | None = None,
     ) -> PaymentVerifyResult:
         """Verify a previously issued authority."""

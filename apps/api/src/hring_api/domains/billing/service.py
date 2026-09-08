@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from hmac import compare_digest
 from uuid import UUID
 
 from sqlalchemy import select
@@ -13,8 +14,8 @@ from hring_api.domains.billing.credit_service import CreditError, replace_availa
 from hring_api.domains.billing.models import BillingPlan, PaymentTransaction
 from hring_api.domains.identity.dependencies import Principal
 from hring_api.domains.identity.models import Company, Profile
-from hring_api.integrations.payment.base import PaymentProviderError
-from hring_api.integrations.payment.providers import get_payment_provider
+from hring_api.integrations.payment.base import PaymentProviderError, PaymentVerifyResult
+from hring_api.integrations.payment.providers import SepPaymentProvider, get_payment_provider
 
 
 class BillingError(RuntimeError):
@@ -49,6 +50,14 @@ class PaymentVerifiedResult:
     already_verified: bool
 
 
+@dataclass(frozen=True)
+class SepCallbackResult:
+    authority: str
+    verified: bool
+    ref_id: str | None = None
+    already_verified: bool = False
+
+
 def _corporate_company_id(principal: Principal) -> UUID | None:
     for membership in principal.memberships:
         if membership.is_active and membership.role in {"ceo", "deputy"}:
@@ -56,8 +65,13 @@ def _corporate_company_id(principal: Principal) -> UUID | None:
     return None
 
 
-def _callback_url(settings: Settings) -> str:
-    return f"{settings.public_app_url.rstrip('/')}{settings.payment_callback_path}"
+def _callback_url(settings: Settings, *, provider: str) -> str:
+    path = (
+        "/api/v1/billing/payments/sep/callback"
+        if provider == "sep"
+        else settings.payment_callback_path
+    )
+    return f"{settings.public_app_url.rstrip('/')}{path}"
 
 
 async def list_billing_plans(
@@ -123,9 +137,10 @@ async def initialize_payment(
         requested = await payment_provider.request_payment(
             amount_rial=plan.price_toman * 10,
             description=transaction.description or f"HRing {plan.plan_type}",
-            callback_url=_callback_url(settings),
+            callback_url=_callback_url(settings, provider=payment_provider.name),
             email=principal.user.email,
             plan_type=plan.plan_type,
+            order_id=str(transaction.id),
         )
     except PaymentProviderError as exc:
         transaction.status = "failed"
@@ -140,37 +155,15 @@ async def initialize_payment(
     )
 
 
-async def verify_payment(
+async def _finalize_verified_payment(
     db: AsyncSession,
     *,
-    principal: Principal,
-    authority: str,
-    settings: Settings,
+    transaction: PaymentTransaction,
+    verified: PaymentVerifyResult,
+    actor_user_id: UUID,
     request_id: str | None = None,
     ip_address: str | None = None,
 ) -> PaymentVerifiedResult:
-    result = await db.execute(
-        select(PaymentTransaction).where(PaymentTransaction.authority == authority)
-    )
-    transaction = result.scalar_one_or_none()
-    if transaction is None:
-        raise BillingNotFoundError("Payment transaction not found")
-    if transaction.user_id != principal.user_id:
-        raise BillingForbiddenError("Payment transaction does not belong to this account")
-    if transaction.status == "verified":
-        return PaymentVerifiedResult(ref_id=transaction.ref_id, already_verified=True)
-    if transaction.status != "pending":
-        raise PaymentVerificationError("Payment transaction is not pending")
-
-    try:
-        payment_provider = await get_payment_provider(db, settings)
-        verified = await payment_provider.verify_payment(
-            amount_rial=transaction.amount_toman * 10,
-            authority=authority,
-        )
-    except PaymentProviderError as exc:
-        raise BillingUnavailableError("Payment verification service is unavailable") from exc
-
     locked_result = await db.execute(
         select(PaymentTransaction)
         .where(PaymentTransaction.id == transaction.id)
@@ -198,7 +191,7 @@ async def verify_payment(
             owner_id=owner_id,
             target_credits=plan.monthly_credits,
             operation_key=f"payment:{locked.id}",
-            actor_user_id=principal.user_id,
+            actor_user_id=actor_user_id,
             request_id=request_id,
             grant_reason="Verified plan credit grant",
             source="verified_payment",
@@ -230,7 +223,7 @@ async def verify_payment(
     locked.verified_at = now
     await add_audit_log(
         db,
-        actor_user_id=principal.user_id,
+        actor_user_id=actor_user_id,
         company_id=locked.company_id,
         action="billing.payment.verified",
         resource_type="payment_transaction",
@@ -238,7 +231,7 @@ async def verify_payment(
         metadata_json={
             "plan_type": plan.plan_type,
             "monthly_credits": plan.monthly_credits,
-            "authority": authority,
+            "authority": locked.authority or "",
             "ref_id": verified.ref_id or "",
             "request_id": request_id or "",
         },
@@ -248,4 +241,127 @@ async def verify_payment(
     return PaymentVerifiedResult(
         ref_id=verified.ref_id,
         already_verified=verified.already_verified,
+    )
+
+
+async def verify_payment(
+    db: AsyncSession,
+    *,
+    principal: Principal,
+    authority: str,
+    settings: Settings,
+    request_id: str | None = None,
+    ip_address: str | None = None,
+) -> PaymentVerifiedResult:
+    result = await db.execute(
+        select(PaymentTransaction).where(PaymentTransaction.authority == authority)
+    )
+    transaction = result.scalar_one_or_none()
+    if transaction is None:
+        raise BillingNotFoundError("Payment transaction not found")
+    if transaction.user_id != principal.user_id:
+        raise BillingForbiddenError("Payment transaction does not belong to this account")
+    if transaction.status == "verified":
+        return PaymentVerifiedResult(ref_id=transaction.ref_id, already_verified=True)
+    if transaction.status != "pending":
+        raise PaymentVerificationError("Payment transaction is not pending")
+
+    try:
+        payment_provider = await get_payment_provider(db, settings)
+        if payment_provider.name != transaction.provider:
+            raise PaymentProviderError("Payment provider does not match the transaction")
+        verified = await payment_provider.verify_payment(
+            amount_rial=transaction.amount_toman * 10,
+            authority=authority,
+        )
+    except PaymentProviderError as exc:
+        raise BillingUnavailableError("Payment verification service is unavailable") from exc
+
+    return await _finalize_verified_payment(
+        db,
+        transaction=transaction,
+        verified=verified,
+        actor_user_id=principal.user_id,
+        request_id=request_id,
+        ip_address=ip_address,
+    )
+
+
+async def verify_sep_callback(
+    db: AsyncSession,
+    *,
+    res_num: str,
+    token: str,
+    ref_num: str | None,
+    state: str,
+    terminal_id: str,
+    amount_rial: int,
+    settings: Settings,
+    request_id: str | None = None,
+    ip_address: str | None = None,
+) -> SepCallbackResult:
+    try:
+        transaction_id = UUID(res_num)
+    except ValueError as exc:
+        raise BillingNotFoundError("Payment transaction not found") from exc
+    transaction = await db.get(PaymentTransaction, transaction_id)
+    if transaction is None or transaction.provider != "sep" or not transaction.authority:
+        raise BillingNotFoundError("Payment transaction not found")
+
+    try:
+        payment_provider = await get_payment_provider(db, settings)
+    except PaymentProviderError as exc:
+        raise BillingUnavailableError("Payment verification service is unavailable") from exc
+    if not isinstance(payment_provider, SepPaymentProvider):
+        raise BillingUnavailableError("SEP provider is not active")
+    configured_terminal = payment_provider.terminal_id
+    if (
+        not compare_digest(transaction.authority, token.strip())
+        or not configured_terminal
+        or not compare_digest(configured_terminal, terminal_id.strip())
+        or amount_rial != transaction.amount_toman * 10
+    ):
+        raise PaymentVerificationError("SEP callback validation failed")
+
+    if transaction.status == "verified":
+        return SepCallbackResult(
+            authority=transaction.authority,
+            verified=True,
+            ref_id=transaction.ref_id,
+            already_verified=True,
+        )
+    if transaction.status != "pending":
+        return SepCallbackResult(authority=transaction.authority, verified=False)
+    if state.strip().upper() != "OK":
+        transaction.status = "cancelled"
+        await db.commit()
+        return SepCallbackResult(authority=transaction.authority, verified=False)
+    if not ref_num or not ref_num.strip():
+        raise PaymentVerificationError("SEP reference number is missing")
+
+    try:
+        verified = await payment_provider.verify_payment(
+            amount_rial=transaction.amount_toman * 10,
+            authority=transaction.authority,
+            reference_number=ref_num.strip(),
+        )
+    except PaymentProviderError as exc:
+        raise BillingUnavailableError("Payment verification service is unavailable") from exc
+
+    try:
+        finalized = await _finalize_verified_payment(
+            db,
+            transaction=transaction,
+            verified=verified,
+            actor_user_id=transaction.user_id,
+            request_id=request_id,
+            ip_address=ip_address,
+        )
+    except PaymentVerificationError:
+        return SepCallbackResult(authority=transaction.authority, verified=False)
+    return SepCallbackResult(
+        authority=transaction.authority,
+        verified=True,
+        ref_id=finalized.ref_id,
+        already_verified=finalized.already_verified,
     )
