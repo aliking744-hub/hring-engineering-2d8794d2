@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.domains.legal.schemas import LegalSearchRequest
+from hring_api.domains.legal.official import is_official_legal_url
 from hring_api.domains.legal.service import search_legal_knowledge
 
 
@@ -47,13 +48,15 @@ CLAIM_LABELS = {
     "severance_pay": "سنوات و پایان کار",
 }
 
-LABOR_SYSTEM_TEMPLATE = """شما یک وکیل متخصص حقوق کار ایران هستید. وظیفه شما تحلیل پرونده شکایت کارگر و ارزیابی شانس موفقیت است.
+LABOR_SYSTEM_TEMPLATE = """شما دستیار تحلیل شکایت کارگر در حقوق کار ایران هستید.
+فقط بر اساس منابع رسمی مستقیم از mcls.gov.ir، qavanin.ir، sso.ir و divan-edalat.ir پاسخ دهید.
+هر حکم، ماده، مهلت و عدد حقوقی باید ارجاع [شماره] داشته باشد و هیچ URL یا ماده‌ای حدس زده نشود.
 
 قوانین مرتبط:
 {legal_context}
 
 شما باید:
-1. بر اساس مدارک موجود و الزامات قانونی، احتمال موفقیت را از 0 تا 100 تخمین بزنید
+1. احتمال موفقیت را فقط به‌عنوان برآورد تحلیلی غیرتضمینی از 0 تا 100 تخمین بزنید
 2. نقاط قوت پرونده را شناسایی کنید
 3. نقاط ضعف و مدارک ناقص را مشخص کنید
 4. توصیه مشخص ارائه دهید (طرح دادخواست یا مذاکره)
@@ -65,7 +68,7 @@ LABOR_SYSTEM_TEMPLATE = """شما یک وکیل متخصص حقوق کار ای�
 - فرمت رسمی سامانه جامع روابط کار را رعایت کند
 - با عبارت «با احترام» و جای امضا پایان یابد
 
-پاسخ فقط یک شیء JSON معتبر با فیلدهای winProbability، riskLevel، strongPoints، weakPoints، missingEvidence، recommendation، complaintText و relevantArticles باشد."""
+پاسخ فقط یک شیء JSON معتبر با فیلدهای winProbability، riskLevel، strongPoints، weakPoints، missingEvidence، recommendation، complaintText و relevantArticles باشد. در relevantArticles شماره ماده همراه ارجاع [شماره] را بنویسید."""
 
 LABOR_USER_TEMPLATE = """موضوع شکایت: {claim_label}
 
@@ -152,13 +155,19 @@ async def build_context(
             match_threshold=0.5,
         ),
     )
+    search_results = [
+        result for result in search_results
+        if is_official_legal_url(result.source_url, direct=True)
+    ]
     legal_context = "\n\n".join(
-        f"[{result.article_number or result.category}]: {result.content}"
-        for result in search_results
+        f"[{index}] {result.title}\nنشانی رسمی: {result.source_url}\n"
+        f"{('ماده ' + result.article_number) if result.article_number else result.category}: "
+        f"{result.content}"
+        for index, result in enumerate(search_results, start=1)
     ) or "اطلاعات قانونی در دسترس نیست. از ساختن ماده قانونی خودداری کنید."
     articles = list(
         dict.fromkeys(
-            result.article_number
+            f"ماده {result.article_number}"
             for result in search_results
             if result.article_number is not None
         )

@@ -23,4 +23,9 @@ test("native defense builder preserves the three-phase Lovable contract", () => 
   assert.match(defense, /extract_upload/);
   assert.match(defense, /rate_limit_legal_defense_per_minute/);
   assert.match(defense, /legal_defense_ai_model/);
+  assert.match(defense, /search_domain_filter=list\(OFFICIAL_LEGAL_DOMAINS\)/);
+  assert.match(defense, /official_citations/);
+  const ui = read("src/components/legal/DefenseBuilder.tsx");
+  assert.doesNotMatch(ui, /asyncUpgradePending/);
+  assert.match(ui, /law\.sourceUrl/);
 });

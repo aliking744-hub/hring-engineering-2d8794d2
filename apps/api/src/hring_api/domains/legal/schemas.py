@@ -207,11 +207,16 @@ class LegalDefenseClaim(BaseModel):
 
 
 class LegalDefenseRelevantLaw(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     claim_type: str
     article_number: str | None
     category: str
     content: str
     similarity: float = Field(ge=0, le=1)
+    reference_number: int | None = Field(default=None, serialization_alias="referenceNumber")
+    source_title: str | None = Field(default=None, serialization_alias="sourceTitle")
+    source_url: str | None = Field(default=None, serialization_alias="sourceUrl")
 
 
 class LegalDefenseEvidenceAnalysis(BaseModel):

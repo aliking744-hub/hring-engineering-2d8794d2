@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from hashlib import sha256
 from typing import Any
 from uuid import UUID
@@ -41,6 +42,7 @@ from hring_api.domains.compat.support import (
     support_text,
 )
 from hring_api.domains.identity.dependencies import Principal
+from hring_api.domains.legal.official import OFFICIAL_LEGAL_DOMAINS, official_citations
 
 
 AI_FUNCTIONS = COMPAT_AI_FUNCTIONS
@@ -74,6 +76,9 @@ class CompatFunctionError(RuntimeError):
 
 class CompatFunctionUnavailableError(CompatFunctionError):
     pass
+
+
+_CITATION_PATTERN = re.compile(r"\[(\d+)]")
 
 
 def _company_id(principal: Principal | None) -> UUID | None:
@@ -231,17 +236,21 @@ async def invoke_ai_function(
         if is_smart_ad_text:
             default_provider = settings.smart_ad_text_ai_provider
             default_model = settings.smart_ad_text_ai_model
-        route = await resolve_runtime_feature_route(
-            feature_key=feature_key,
-            default_provider=default_provider,
-            default_model=default_model,
-        )
+        if labor_context is not None:
+            provider, model, route_source = "avalai.search", "sonar", "official_live_search"
+        else:
+            route = await resolve_runtime_feature_route(
+                feature_key=feature_key,
+                default_provider=default_provider,
+                default_model=default_model,
+            )
+            provider, model, route_source = route.provider, route.model, route.source
         return await generate_with_ai_gateway(
             feature_key=feature_key,
             user_id=principal.user_id if principal is not None else None,
             company_id=company_id,
-            provider=route.provider,
-            model=route.model,
+            provider=provider,
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -249,8 +258,11 @@ async def invoke_ai_function(
             credits_charged=managed_cost,
             max_output_tokens=4_000 if labor_context is not None else 5_000,
             response_format="json_object" if labor_context is not None else "text",
+            search_domain_filter=(
+                list(OFFICIAL_LEGAL_DOMAINS) if labor_context is not None else None
+            ),
             metadata_json={
-                "ai_route_source": route.source,
+                "ai_route_source": route_source,
                 "prompt_key": feature_key,
                 "prompt_mode": "embedded_fallback",
                 "session_id": (
@@ -265,7 +277,7 @@ async def invoke_ai_function(
 
     async def generate() -> Any:
         try:
-            if is_smart_ad_text:
+            if is_smart_ad_text or labor_context is not None:
                 result = await fallback()
             else:
                 result = await generate_with_managed_prompt(
@@ -290,7 +302,32 @@ async def invoke_ai_function(
             raise CompatFunctionError("HRing AI service is unavailable") from exc
         value = _response_with_citations(result.content, result.citations)
         if labor_context is not None:
-            return normalize_result(value, labor_context)
+            citations = official_citations(result.citations)
+            if not isinstance(value, dict) or not citations:
+                raise CompatFunctionError("منبع رسمی مستقیم برای تحلیل شکایت پیدا نشد")
+            legal_text = "\n".join(
+                str(value.get(key) or "")
+                for key in ("recommendation", "complaintText", "relevantArticles")
+            )
+            references = {int(item) for item in _CITATION_PATTERN.findall(legal_text)}
+            allowed = {citation.reference_number for citation in citations}
+            if not references or not references.issubset(allowed):
+                raise CompatFunctionError("تحلیل شکایت بدون ارجاع معتبر به منبع رسمی تولید شد")
+            normalized = normalize_result(value, labor_context)
+            normalized["sources"] = [
+                {
+                    "referenceNumber": citation.reference_number,
+                    "title": citation.title,
+                    "url": citation.url,
+                    "publishedAt": citation.published_at,
+                }
+                for citation in citations
+                if citation.reference_number in references
+            ]
+            normalized["probabilityDisclaimer"] = (
+                "درصد نمایش‌داده‌شده برآورد تحلیلی است و نتیجه مرجع رسیدگی را تضمین نمی‌کند."
+            )
+            return normalized
         if support_context is not None:
             try:
                 return {

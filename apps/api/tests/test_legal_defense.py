@@ -89,7 +89,7 @@ def test_legal_defense_preserves_three_phase_lovable_contract(monkeypatch) -> No
                 "risk_score": 62,
                 "risk_level": "high",
                 "recommendation": "needs_more_info",
-                "reasoning": "مدرک ساعات کار ناقص است.",
+                "reasoning": "مدرک ساعات کار طبق منبع رسمی ناقص است.[1]",
                 "key_strengths": ["فیش حقوقی موجود است"],
                 "key_weaknesses": ["حضور و غیاب موجود نیست"],
             }
@@ -112,7 +112,7 @@ def test_legal_defense_preserves_three_phase_lovable_contract(monkeypatch) -> No
                 title="قانون کار",
                 content="برای هر ساعت کار اضافی چهل درصد اضافه پرداخت می‌شود.",
                 category="labor_law",
-                source_url=None,
+                source_url="https://qavanin.ir/Law/TreeText/?IDS=3983654531606411392",
                 article_number="59",
                 similarity=0.91,
                 source_version=1,
@@ -148,6 +148,7 @@ def test_legal_defense_preserves_three_phase_lovable_contract(monkeypatch) -> No
     assert searches[0].match_count == 3
     assert searches[0].match_threshold == 0.4
     assert result.relevant_laws[0].article_number == "59"
+    assert result.relevant_laws[0].source_url.startswith("https://qavanin.ir/")
     assert result.verdict.risk_score == 62
     assert result.gap_analysis.can_proceed is False
     assert "محتوای استخراج‌شده فیش" in calls[1]["variables"]["evidence_context"]
@@ -175,7 +176,7 @@ def test_legal_defense_route_requires_auth_and_preserves_ui_aliases(monkeypatch)
                 risk_score=25,
                 risk_level="low",
                 recommendation="fight",
-                reasoning="مدارک کافی است.",
+                reasoning="مدارک کافی است.[1]",
                 key_strengths=["قرارداد موجود است"],
                 key_weaknesses=[],
                 defense_bill="متن لایحه",
