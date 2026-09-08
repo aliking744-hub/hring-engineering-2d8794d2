@@ -48,7 +48,10 @@ def test_legal_advisor_uses_five_rag_results_and_returns_three_sources(monkeypat
             title=f"قانون کار {index}",
             content=f"ماده {index} متن قانونی مرتبط با مرخصی کارگر",
             category="labor_law",
-            source_url=f"https://example.com/law/{index}",
+            source_url=(
+                "https://qavanin.ir/Law/TreeText/"
+                f"?IDS=3983654531606411392&article={index}"
+            ),
             article_number=str(index),
             similarity=0.9 - (index / 100),
             source_version=1,
@@ -143,7 +146,7 @@ def test_legal_advisor_rejects_answer_without_valid_source_marker(monkeypatch) -
         title="قانون کار",
         content="ماده ۱ متن قانونی معتبر",
         category="labor_law",
-        source_url="https://example.com/law",
+        source_url="https://qavanin.ir/Law/TreeText/?IDS=3983654531606411392",
         article_number="1",
         similarity=0.9,
         source_version=1,

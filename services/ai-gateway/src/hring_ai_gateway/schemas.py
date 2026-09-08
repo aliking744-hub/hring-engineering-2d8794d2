@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -29,6 +30,11 @@ class GenerateRequest(BaseModel):
         min_length=1,
         max_length=2,
     )
+    search_domain_filter: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=10,
+    )
 
     @field_validator("provider", "model")
     @classmethod
@@ -44,6 +50,27 @@ class GenerateRequest(BaseModel):
         if len(value) != len(set(value)):
             raise ValueError("Modalities must be unique")
         return value
+
+    @field_validator("search_domain_filter")
+    @classmethod
+    def safe_search_domains(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized: list[str] = []
+        domain_pattern = re.compile(
+            r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
+        )
+        for item in value:
+            domain = item.strip().lower().rstrip(".")
+            if not domain_pattern.fullmatch(domain):
+                raise ValueError(
+                    "Search domain filters must contain domain names only"
+                )
+            if domain not in normalized:
+                normalized.append(domain)
+        if not normalized:
+            raise ValueError("Search domain filters must not be empty")
+        return normalized
 
 
 class GatewayCitation(BaseModel):
@@ -98,3 +125,4 @@ class GenerateResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     enabled_providers: list[str]
+
