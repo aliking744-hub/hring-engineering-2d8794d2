@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import TypeVar
 from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
@@ -13,22 +13,36 @@ from hring_api.domains.legal.ingestion import (
     ExtractedDocument,
     LegalIngestionError,
     fetch_public_html,
+    fetch_public_source,
     html_to_text,
 )
 from hring_api.domains.legal.schemas import Category, LegalSourceMetadata
 from hring_api.domains.legal.service import LegalError, ingest_document
 
 
-SOURCE_HOST = "davoudabadi.ir"
-SOURCE_ORIGIN = f"https://{SOURCE_HOST}"
-COURT_RULINGS_INDEX_URL = (
-    f"{SOURCE_ORIGIN}/tag/1045296/"
-    "%D8%A2%D8%B1%D8%A7%DB%8C-%D9%87%DB%8C%D8%A7%D8%AA-%D8%B9%D9%85%D9%88%D9%85%DB%8C-"
-    "%D8%AF%DB%8C%D9%88%D8%A7%D9%86-%D8%B9%D8%AF%D8%A7%D9%84%D8%AA-%D8%A7%D8%AF%D8%A7%D8%B1%DB%8C"
+OFFICIAL_SOURCE_HOSTS = frozenset(
+    {
+        "mcls.gov.ir",
+        "www.mcls.gov.ir",
+        "qavanin.ir",
+        "www.qavanin.ir",
+        "divan-edalat.ir",
+        "www.divan-edalat.ir",
+    }
+)
+MCLS_INDEX_URL = (
+    "https://www.mcls.gov.ir/fa/rahnamayemorajein/"
+    "karegaran-%D9%82%D9%88%D8%A7%D9%86%DB%8C%D9%86-"
+    "%D9%85%D8%B1%D8%AA%D8%A8%D8%B7-%D8%A8%D8%A7-"
+    "%DA%A9%D8%A7%D8%B1%DA%AF%D8%B1%D8%A7%D9%86"
+)
+QAVANIN_LABOR_LAW_URL = (
+    "https://qavanin.ir/Law/TreeText/?IDS=3983654531606411392"
 )
 ROBOTS_CRAWL_DELAY_SECONDS = 10.0
-MAX_RECENT_RULINGS = 8
-_RULING_PATH = re.compile(r"^/page/\d+/?$")
+MAX_OFFICIAL_DOCUMENTS = 250
+_DOWNLOADABLE_SUFFIXES = (".pdf", ".doc", ".docx", ".rtf", ".htm", ".html")
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -51,20 +65,7 @@ CORE_SOURCES = (
     OnlineLegalSource(
         title="قانون کار با اصلاحات بعدی",
         category="labor_law",
-        url=(
-            f"{SOURCE_ORIGIN}/page/1874639/"
-            "%D9%82%D8%A7%D9%86%D9%88%D9%86-%DA%A9%D8%A7%D8%B1"
-        ),
-        critical=True,
-    ),
-    OnlineLegalSource(
-        title="قانون تامین اجتماعی با اصلاحات بعدی",
-        category="social_security",
-        url=(
-            f"{SOURCE_ORIGIN}/page/2793614/"
-            "%D9%82%D8%A7%D9%86%D9%88%D9%86-%D8%AA%D8%A7%D9%85%DB%8C%D9%86-"
-            "%D8%A7%D8%AC%D8%AA%D9%85%D8%A7%D8%B9%DB%8C"
-        ),
+        url=QAVANIN_LABOR_LAW_URL,
         critical=True,
     ),
 )
@@ -74,35 +75,92 @@ class LegalSourceSyncError(RuntimeError):
     pass
 
 
+async def _fetch_with_retry(
+    fetcher: Callable[[str], Awaitable[_T]],
+    url: str,
+    *,
+    sleep: Callable[[float], Awaitable[None]],
+    attempts: int = 3,
+) -> _T:
+    last_error: LegalIngestionError | None = None
+    for attempt in range(attempts):
+        try:
+            return await fetcher(url)
+        except LegalIngestionError as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                await sleep(float(2 ** attempt))
+    raise LegalIngestionError(
+        f"Official source remained unavailable after {attempts} attempts: {url}"
+    ) from last_error
+
+
 def _require_trusted_source_url(url: str) -> str:
     parsed = urlsplit(url)
-    if parsed.scheme != "https" or parsed.hostname != SOURCE_HOST:
+    hostname = parsed.hostname
+    trusted_host = hostname is not None and any(
+        hostname == official_host
+        or hostname.endswith(f".{official_host}")
+        for official_host in OFFICIAL_SOURCE_HOSTS
+    )
+    if parsed.scheme != "https" or not trusted_host:
         raise LegalSourceSyncError("Online legal source is outside the trusted allowlist")
     return url
 
 
-def discover_recent_court_rulings(
+def _category_for_document(title: str, url: str) -> Category:
+    value = f"{title} {url}".casefold()
+    if any(token in value for token in ("تامین اجتماعی", "تأمین اجتماعی", "بیمه")):
+        return "social_security"
+    if any(token in value for token in ("رای", "رأی", "دیوان عدالت")):
+        return "court_rulings"
+    return "labor_law"
+
+
+def discover_official_documents(
     raw_html: str,
     *,
-    limit: int = MAX_RECENT_RULINGS,
+    base_url: str = MCLS_INDEX_URL,
+    limit: int = MAX_OFFICIAL_DOCUMENTS,
 ) -> list[OnlineLegalSource]:
     soup = BeautifulSoup(raw_html, "html.parser")
     main = soup.find("main") or soup
     discovered: list[OnlineLegalSource] = []
     seen: set[str] = set()
     for anchor in main.find_all("a", href=True):
-        path = str(anchor.get("href", "")).strip()
-        if not _RULING_PATH.fullmatch(path):
+        href = str(anchor.get("href", "")).strip()
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
             continue
-        title = " ".join(anchor.get_text(" ", strip=True).split()).lstrip("❯ ")
-        if "دیوان عدالت اداری" not in title or not title.startswith(("رای", "رأی")):
+        url = urljoin(base_url, href)
+        try:
+            url = _require_trusted_source_url(url)
+        except LegalSourceSyncError:
             continue
-        url = _require_trusted_source_url(urljoin(SOURCE_ORIGIN, path))
         if url in seen:
+            continue
+        title = " ".join(anchor.get_text(" ", strip=True).split()).strip()
+        path = urlsplit(url).path.casefold()
+        looks_legal = any(
+            token in title
+            for token in (
+                "قانون",
+                "آیین نامه",
+                "آیین‌نامه",
+                "دستورالعمل",
+                "بخشنامه",
+                "رأی",
+                "رای",
+            )
+        )
+        if not title or not (path.endswith(_DOWNLOADABLE_SUFFIXES) or looks_legal):
             continue
         seen.add(url)
         discovered.append(
-            OnlineLegalSource(title=title, category="court_rulings", url=url)
+            OnlineLegalSource(
+                title=title,
+                category=_category_for_document(title, url),
+                url=url,
+            )
         )
         if len(discovered) >= limit:
             break
@@ -111,28 +169,30 @@ def discover_recent_court_rulings(
 
 def extract_legal_page(raw_html: str) -> str:
     soup = BeautifulSoup(raw_html, "html.parser")
-    main = soup.find("main")
+    for element in soup.select(
+        "script,style,noscript,nav,footer,header,form,aside,.breadcrumb,.menu"
+    ):
+        element.decompose()
+    main = (
+        soup.find("main")
+        or soup.find("article")
+        or soup.select_one("#content")
+        or soup.select_one(".content")
+        or soup.body
+    )
     if main is None:
         raise LegalIngestionError("Legal source page has no main document content")
-    articles = main.find_all("article")
-    if len(articles) >= 5:
-        title = main.find("h1")
-        stable_document = BeautifulSoup("<main></main>", "html.parser")
-        stable_main = stable_document.main
-        if stable_main is None:
-            raise LegalIngestionError("Could not construct stable legal document")
-        if title is not None:
-            stable_main.append(title)
-        for article in articles:
-            stable_main.append(article)
-        return html_to_text(str(stable_main))
-    return html_to_text(str(main))
+    text = html_to_text(str(main))
+    if len(text) < 100:
+        raise LegalIngestionError("Official legal document content is unexpectedly short")
+    return text
 
 
 async def sync_online_legal_sources(
     session: AsyncSession,
     *,
     fetch_html: Callable[[str], Awaitable[str]] = fetch_public_html,
+    fetch_source: Callable[[str], Awaitable[ExtractedDocument]] = fetch_public_source,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     crawl_delay_seconds: float = ROBOTS_CRAWL_DELAY_SECONDS,
 ) -> LegalSourceSyncResult:
@@ -141,29 +201,34 @@ async def sync_online_legal_sources(
     critical_failures: list[str] = []
 
     try:
-        index_html = await fetch_html(COURT_RULINGS_INDEX_URL)
-        recent_rulings = discover_recent_court_rulings(index_html)
-        if not recent_rulings:
-            raise LegalSourceSyncError("Court-rulings index returned no usable rulings")
-        sources.extend(recent_rulings)
+        index_html = await _fetch_with_retry(
+            fetch_html,
+            MCLS_INDEX_URL,
+            sleep=sleep,
+        )
+        official_documents = discover_official_documents(index_html)
+        if not official_documents:
+            raise LegalSourceSyncError("Official MCLS index returned no usable documents")
+        known_urls = {source.url for source in sources}
+        sources.extend(
+            source for source in official_documents if source.url not in known_urls
+        )
     except (LegalIngestionError, LegalSourceSyncError) as exc:
-        failure = f"court_rulings_index: {exc}"
+        failure = f"mcls_official_index: {exc}"
         failures.append(failure)
         critical_failures.append(failure)
 
     changed = 0
     unchanged = 0
     for index, source in enumerate(sources):
-        if index or sources:
+        if index:
             await sleep(crawl_delay_seconds)
         try:
             _require_trusted_source_url(source.url)
-            raw_html = await fetch_html(source.url)
-            document = ExtractedDocument(
-                text=extract_legal_page(raw_html),
-                mime_type="text/html",
-                filename=None,
-                source_type="scheduled-url-html",
+            document = await _fetch_with_retry(
+                fetch_source,
+                source.url,
+                sleep=sleep,
             )
             async with session.begin_nested():
                 imported = await ingest_document(
@@ -190,7 +255,7 @@ async def sync_online_legal_sources(
 
     if critical_failures:
         raise LegalSourceSyncError(
-            "Critical labor-law or social-security source could not be synchronized: "
+            "Official legal sources could not be synchronized: "
             + "; ".join(critical_failures)
         )
     return LegalSourceSyncResult(
@@ -199,3 +264,4 @@ async def sync_online_legal_sources(
         unchanged=unchanged,
         failed=tuple(failures),
     )
+

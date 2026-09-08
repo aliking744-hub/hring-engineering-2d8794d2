@@ -417,6 +417,8 @@ async def _generate_once(
                     "Perplexity structured output requires an explicit JSON schema"
                 )
             payload["response_format"] = {"type": "json_object"}
+        if request.search_domain_filter is not None:
+            payload["search_domain_filter"] = request.search_domain_filter
 
     timeout = httpx.Timeout(
         provider.timeout_seconds,
@@ -515,4 +517,5 @@ async def generate_openai_compatible(
     if last_error is not None:
         raise last_error
     raise ProviderUnavailableError("No AI provider route is available")
+
 

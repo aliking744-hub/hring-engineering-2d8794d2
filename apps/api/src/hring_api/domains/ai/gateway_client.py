@@ -130,6 +130,7 @@ async def generate_with_ai_gateway(
     max_output_tokens: int | None = None,
     response_format: str = "text",
     modalities: list[str] | None = None,
+    search_domain_filter: list[str] | None = None,
     metadata_json: dict[str, object] | None = None,
 ) -> AiGatewayResult:
     """Call the internal provider hub and persist billing telemetry.
@@ -156,6 +157,8 @@ async def generate_with_ai_gateway(
         payload["max_output_tokens"] = max_output_tokens
     if modalities is not None:
         payload["modalities"] = modalities
+    if search_domain_filter is not None:
+        payload["search_domain_filter"] = search_domain_filter
 
     started = monotonic()
     url = f"{settings.ai_base_url.rstrip('/')}/generate"
@@ -278,4 +281,5 @@ async def generate_with_ai_gateway(
         if isinstance(exc, AiGatewayError):
             raise
         raise AiGatewayError("AI Gateway request failed") from exc
+
 
