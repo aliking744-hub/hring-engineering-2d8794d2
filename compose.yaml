@@ -252,7 +252,8 @@ services:
       context: .
       dockerfile: infra/docker/web.Dockerfile
       args:
-        PUBLIC_BASE_URL: ${PUBLIC_APP_URL:-https://hring.ir}
+        # SEO output must never inherit an API/runtime URL from staging.
+        PUBLIC_BASE_URL: ${PUBLIC_SITE_URL:-https://hring.ir}
     restart: unless-stopped
     depends_on:
       api:
