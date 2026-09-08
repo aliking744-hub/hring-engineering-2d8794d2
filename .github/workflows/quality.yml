@@ -47,6 +47,16 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Package production web artifact
+        run: tar -czf hring-pr95-web-dist.tar.gz -C dist .
+
+      - name: Upload production web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hring-pr95-web-dist
+          path: hring-pr95-web-dist.tar.gz
+          retention-days: 3
+
       - name: Lint baseline report (non-blocking)
         continue-on-error: true
         run: npm run lint
