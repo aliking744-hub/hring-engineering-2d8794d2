@@ -44,7 +44,10 @@ def test_official_document_discovery_is_limited_and_allowlisted() -> None:
 def test_legal_page_extraction_keeps_document_and_removes_navigation() -> None:
     html = """
     <html><body><nav>فهرست غیرمرتبط</nav><main>
-      <h1>قانون کار</h1><article><h2>ماده ۱</h2><p>متن معتبر قانون کار است.</p></article>
+      <h1>قانون کار</h1><article><h2>ماده ۱</h2>
+      <p>متن معتبر قانون کار است و برای آزمون استخراج سند رسمی،
+      توضیحات تکمیلی درباره حقوق و تعهدات کارگر و کارفرما در این بخش درج شده است.
+      این متن باید بدون عناصر ناوبری و تبلیغاتی استخراج و پردازش شود.</p></article>
       <script>danger()</script>
     </main><footer>تبلیغات</footer></body></html>
     """
