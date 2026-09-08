@@ -38,8 +38,37 @@ type ExchangeRate = {
 
 const toman = (value: number | null) => value == null ? '—' : `${value.toLocaleString('fa-IR')} تومان`;
 
+const toLatinDigits = (value: string) => value
+  .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+  .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+
+const normalizeUsdDraft = (value: string) => {
+  const normalized = toLatinDigits(value)
+    .replace(/[٫,]/g, '.')
+    .replace(/[^\d.]/g, '');
+  const [whole = '', ...fractions] = normalized.split('.');
+  return fractions.length === 0 ? whole : `${whole}.${fractions.join('').slice(0, 2)}`;
+};
+
+const usdCentsToDraft = (value: number | null) => {
+  if (value == null) return '';
+  const whole = Math.floor(value / 100);
+  const fraction = String(value % 100).padStart(2, '0').replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : String(whole);
+};
+
+const usdDraftToCents = (value: string): number | null | undefined => {
+  const normalized = normalizeUsdDraft(value);
+  if (normalized === '') return null;
+  if (!/^\d+(?:\.\d{0,2})?$/.test(normalized)) return undefined;
+  const [whole, fraction = ''] = normalized.split('.');
+  const cents = Number(whole) * 100 + Number((fraction + '00').slice(0, 2));
+  return Number.isSafeInteger(cents) && cents <= 100_000_000 ? cents : undefined;
+};
+
 const PricingAdmin = () => {
   const [plans, setPlans] = useState<BillingPlan[]>([]);
+  const [usdDrafts, setUsdDrafts] = useState<Record<string, string>>({});
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -52,6 +81,7 @@ const PricingAdmin = () => {
         apiRequest<ExchangeRate>('/platform/billing/exchange-rate'),
       ]);
       setPlans(nextPlans);
+      setUsdDrafts(Object.fromEntries(nextPlans.map((plan) => [plan.plan_type, usdCentsToDraft(plan.price_usd_cents)])));
       setRate(nextRate);
       setRateDraft({
         manual: nextRate.manual_rate_toman?.toString() || '',
@@ -106,14 +136,26 @@ const PricingAdmin = () => {
     setPlans((current) => current.map((plan) => plan.plan_type === planType ? { ...plan, ...changes } : plan));
   };
 
+  const updateUsdDraft = (planType: string, value: string) => {
+    const normalized = normalizeUsdDraft(value);
+    if (/^\d*(?:\.\d{0,2})?$/.test(normalized)) {
+      setUsdDrafts((current) => ({ ...current, [planType]: normalized }));
+    }
+  };
+
   const savePlan = async (plan: BillingPlan) => {
+    const priceUsdCents = usdDraftToCents(usdDrafts[plan.plan_type] ?? '');
+    if (priceUsdCents === undefined) {
+      toast.error('قیمت دلاری باید یک عدد معتبر با حداکثر دو رقم اعشار باشد');
+      return;
+    }
     setBusy(plan.plan_type);
     try {
       await apiRequest(`/platform/billing/plans/${encodeURIComponent(plan.plan_type)}`, {
         method: 'PATCH',
         body: JSON.stringify({
           display_name: plan.display_name,
-          price_usd_cents: plan.price_usd_cents,
+          price_usd_cents: priceUsdCents,
           monthly_credits: plan.monthly_credits,
           is_active: plan.is_active,
         }),
@@ -172,7 +214,7 @@ const PricingAdmin = () => {
                 <CardContent className="space-y-4">
                   <div className="space-y-2"><Label>نام نمایشی</Label><Input value={plan.display_name} onChange={(e) => patchPlan(plan.plan_type, { display_name: e.target.value })} /></div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2"><Label>قیمت پایه (دلار)</Label><Input inputMode="decimal" value={plan.price_usd_cents == null ? '' : (plan.price_usd_cents / 100).toString()} onChange={(e) => { const value = e.target.value; patchPlan(plan.plan_type, { price_usd_cents: value === '' ? null : Math.round(Number(value) * 100) }); }} placeholder="مثلاً 19.9" /></div>
+                    <div className="space-y-2"><Label>قیمت پایه (دلار)</Label><Input inputMode="decimal" value={usdDrafts[plan.plan_type] ?? ''} onChange={(e) => updateUsdDraft(plan.plan_type, e.target.value)} placeholder="مثلاً 1.5" aria-label={`قیمت دلاری ${plan.display_name}`} /></div>
                     <div className="space-y-2"><Label>اعتبار/توکن پلن</Label><Input inputMode="numeric" value={plan.monthly_credits} onChange={(e) => patchPlan(plan.plan_type, { monthly_credits: Number(e.target.value.replace(/\D/g, '')) })} /></div>
                   </div>
                   <div className="rounded-lg bg-muted p-3"><div className="text-xs text-muted-foreground">قیمت نهایی فعلی</div><div className="mt-1 text-lg font-bold">{toman(plan.price_toman)}</div></div>

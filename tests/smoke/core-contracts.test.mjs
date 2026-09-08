@@ -419,3 +419,24 @@ test('approved legal policies are public and linked from the landing footer', as
   assert.match(policies, /دو روز کاری/);
   assert.equal(/مهلت هفت[‌-]روزه/.test(policies), false);
 });
+
+test('pricing admin accepts exact decimal dollar amounts without float-rounding input loss', async () => {
+  const pricing = await read('src/pages/PricingAdmin.tsx');
+  assert.match(pricing, /usdDrafts/);
+  assert.match(pricing, /usdDraftToCents/);
+  assert.match(pricing, /inputMode="decimal"/);
+  assert.match(pricing, /fraction \+ '00'/);
+  assert.equal(pricing.includes('Math.round(Number(value) * 100)'), false);
+});
+
+test('headhunting is visibly coming soon and direct routes cannot enter unfinished flows', async () => {
+  const app = await read('src/App.tsx');
+  const dashboard = await read('src/pages/Dashboard.tsx');
+  const comingSoon = await read('src/pages/HeadhuntingComingSoon.tsx');
+  assert.match(dashboard, /id: "headhunting"[\s\S]{0,220}comingSoon: true/);
+  assert.equal(dashboard.includes('id: "headhunting", label: "شکار مدیران", desc: "ماژول اختصاصی جذب پوزیشن‌های حساس C-Level", icon: Crosshair, path: "/smart-headhunting"'), false);
+  assert.equal((app.match(/<HeadhuntingComingSoon \/>/g) || []).length, 3);
+  assert.equal(/<SmartHeadhunting \/>|<CampaignDetail \/>|<CandidateDetail \/>/.test(app), false);
+  assert.match(comingSoon, /به‌زودی/);
+  assert.match(comingSoon, /WorkspaceHeader/);
+});
