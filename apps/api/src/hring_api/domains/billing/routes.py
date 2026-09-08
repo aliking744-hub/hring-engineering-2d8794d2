@@ -4,16 +4,31 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
 from hring_api.db.session import get_db_session
 from hring_api.domains.access.policy import PlatformPrincipal, require_platform_permission
 from hring_api.domains.admin.repository import add_audit_log
-from hring_api.domains.billing.models import BillingPlan
+from hring_api.domains.billing.models import (
+    BillingExchangeRateHistory,
+    BillingExchangeRateSetting,
+    BillingPlan,
+)
+from hring_api.domains.billing.pricing import (
+    ExchangeRateError,
+    get_exchange_rate_setting,
+    pricing_snapshot,
+    recalculate_usd_plans,
+    refresh_exchange_rate,
+)
 from hring_api.domains.billing.schemas import (
     BillingPlanResponse,
     BillingPlanUpdateRequest,
+    ExchangeRateHistoryResponse,
+    ExchangeRateResponse,
+    ExchangeRateUpdateRequest,
     PaymentInitRequest,
     PaymentInitResponse,
     PaymentTransactionResponse,
@@ -36,6 +51,15 @@ from hring_api.domains.identity.dependencies import Principal, get_current_princ
 
 
 router = APIRouter(tags=["billing"])
+
+
+def _exchange_rate_response(setting: BillingExchangeRateSetting) -> ExchangeRateResponse:
+    snapshot = pricing_snapshot(setting)
+    return ExchangeRateResponse(
+        **snapshot.__dict__,
+        stale_after_hours=setting.stale_after_hours,
+        auto_refresh_enabled=setting.auto_refresh_enabled,
+    )
 
 
 def _sep_redirect(settings: Settings, *, verified: bool, authority: str = "") -> str:
@@ -210,12 +234,22 @@ async def update_platform_billing_plan(
     before = {
         "display_name": plan.display_name,
         "price_toman": plan.price_toman,
+        "price_usd_cents": plan.price_usd_cents,
         "monthly_credits": plan.monthly_credits,
         "is_active": plan.is_active,
     }
     changes = payload.model_dump(exclude_unset=True)
     for key, value in changes.items():
         setattr(plan, key, value)
+    if plan.price_usd_cents is not None:
+        setting = await get_exchange_rate_setting(db)
+        snapshot = pricing_snapshot(setting)
+        if snapshot.effective_rate_toman is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="ابتدا نرخ دلار را بروزرسانی یا دستی ثبت کنید",
+            )
+        await recalculate_usd_plans(db, setting)
     await add_audit_log(
         db,
         actor_user_id=platform.user_id,
@@ -229,3 +263,82 @@ async def update_platform_billing_plan(
     await db.commit()
     await db.refresh(plan)
     return BillingPlanResponse.model_validate(plan)
+
+
+@router.get("/platform/billing/exchange-rate", response_model=ExchangeRateResponse)
+async def platform_exchange_rate(
+    _platform: PlatformPrincipal = Depends(require_platform_permission("platform.billing.read")),
+    db: AsyncSession = Depends(get_db_session),
+) -> ExchangeRateResponse:
+    return _exchange_rate_response(await get_exchange_rate_setting(db))
+
+
+@router.patch("/platform/billing/exchange-rate", response_model=ExchangeRateResponse)
+async def update_platform_exchange_rate(
+    payload: ExchangeRateUpdateRequest,
+    request: Request,
+    platform: PlatformPrincipal = Depends(require_platform_permission("platform.billing.manage")),
+    db: AsyncSession = Depends(get_db_session),
+) -> ExchangeRateResponse:
+    setting = await get_exchange_rate_setting(db, lock=True)
+    before = _exchange_rate_response(setting).model_dump(mode="json")
+    changes = payload.model_dump(exclude_unset=True)
+    for key, value in changes.items():
+        setattr(setting, key, value)
+    setting.updated_by = platform.user_id
+    await recalculate_usd_plans(db, setting)
+    await add_audit_log(
+        db,
+        actor_user_id=platform.user_id,
+        company_id=None,
+        action="billing.exchange_rate.update",
+        resource_type="billing_exchange_rate",
+        resource_id="1",
+        metadata_json={"before": before, "changes": changes},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    await db.refresh(setting)
+    return _exchange_rate_response(setting)
+
+
+@router.post("/platform/billing/exchange-rate/refresh", response_model=ExchangeRateResponse)
+async def refresh_platform_exchange_rate(
+    request: Request,
+    platform: PlatformPrincipal = Depends(require_platform_permission("platform.billing.manage")),
+    db: AsyncSession = Depends(get_db_session),
+) -> ExchangeRateResponse:
+    try:
+        setting = await refresh_exchange_rate(db, actor_user_id=platform.user_id, force=True)
+    except ExchangeRateError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    await add_audit_log(
+        db,
+        actor_user_id=platform.user_id,
+        company_id=None,
+        action="billing.exchange_rate.refresh",
+        resource_type="billing_exchange_rate",
+        resource_id="1",
+        metadata_json={"rate_toman": setting.automatic_rate_toman, "source": setting.source},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return _exchange_rate_response(setting)
+
+
+@router.get(
+    "/platform/billing/exchange-rate/history",
+    response_model=list[ExchangeRateHistoryResponse],
+)
+async def platform_exchange_rate_history(
+    _platform: PlatformPrincipal = Depends(require_platform_permission("platform.billing.read")),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[ExchangeRateHistoryResponse]:
+    rows = (
+        await db.execute(
+            select(BillingExchangeRateHistory)
+            .order_by(BillingExchangeRateHistory.created_at.desc())
+            .limit(30)
+        )
+    ).scalars()
+    return [ExchangeRateHistoryResponse.model_validate(row) for row in rows]

@@ -28,12 +28,17 @@ class BillingPlan(Base):
         CheckConstraint("scope IN ('individual','corporate')", name="billing_plans_scope"),
         CheckConstraint("price_toman >= 0", name="billing_plans_price_nonnegative"),
         CheckConstraint("monthly_credits >= 0", name="billing_plans_credits_nonnegative"),
+        CheckConstraint(
+            "price_usd_cents IS NULL OR price_usd_cents >= 0",
+            name="billing_plans_price_usd_nonnegative",
+        ),
     )
 
     plan_type: Mapped[str] = mapped_column(String(80), primary_key=True)
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     scope: Mapped[str] = mapped_column(String(20), nullable=False)
     price_toman: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_usd_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     monthly_credits: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -41,6 +46,65 @@ class BillingPlan(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class BillingExchangeRateSetting(Base):
+    __tablename__ = "billing_exchange_rate_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="billing_exchange_rate_settings_singleton"),
+        CheckConstraint("markup_toman >= 0", name="billing_exchange_rate_markup_nonnegative"),
+        CheckConstraint(
+            "automatic_rate_toman IS NULL OR automatic_rate_toman BETWEEN 10000 AND 10000000",
+            name="billing_exchange_rate_automatic_bounds",
+        ),
+        CheckConstraint(
+            "manual_rate_toman IS NULL OR manual_rate_toman BETWEEN 10000 AND 10000000",
+            name="billing_exchange_rate_manual_bounds",
+        ),
+        CheckConstraint(
+            "stale_after_hours BETWEEN 1 AND 168",
+            name="billing_exchange_rate_stale_hours_bounds",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    source: Mapped[str] = mapped_column(String(40), nullable=False, default="tgju")
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    automatic_rate_toman: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    manual_rate_toman: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    markup_toman: Mapped[int] = mapped_column(Integer, nullable=False, default=10_000)
+    auto_refresh_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    stale_after_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=36)
+    source_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class BillingExchangeRateHistory(Base):
+    __tablename__ = "billing_exchange_rate_history"
+    __table_args__ = (
+        CheckConstraint("rate_toman BETWEEN 10000 AND 10000000", name="billing_rate_history_bounds"),
+        Index("ix_billing_rate_history_created", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    rate_toman: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
 

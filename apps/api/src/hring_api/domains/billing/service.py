@@ -12,6 +12,7 @@ from hring_api.config import Settings
 from hring_api.domains.admin.repository import add_audit_log
 from hring_api.domains.billing.credit_service import CreditError, replace_available_credits_for_plan
 from hring_api.domains.billing.models import BillingPlan, PaymentTransaction
+from hring_api.domains.billing.pricing import ExchangeRateError, assert_pricing_is_safe
 from hring_api.domains.identity.dependencies import Principal
 from hring_api.domains.identity.models import Company, Profile
 from hring_api.integrations.payment.base import PaymentProviderError, PaymentVerifyResult
@@ -109,6 +110,10 @@ async def initialize_payment(
     plan = await db.get(BillingPlan, plan_type)
     if plan is None or not plan.is_active or plan.price_toman <= 0:
         raise BillingNotFoundError("Selected billing plan is not available")
+    try:
+        await assert_pricing_is_safe(db, plan)
+    except ExchangeRateError as exc:
+        raise BillingUnavailableError(str(exc)) from exc
 
     company_id: UUID | None = None
     if plan.scope == "corporate":
