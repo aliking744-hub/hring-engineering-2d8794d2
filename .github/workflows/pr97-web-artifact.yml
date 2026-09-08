@@ -1,0 +1,30 @@
+name: pr97-web-artifact
+
+on:
+  push:
+    branches:
+      - feature/pr97-web-artifact
+
+permissions:
+  contents: read
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          PUBLIC_BASE_URL: https://hring.ir
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr97-web-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 3
