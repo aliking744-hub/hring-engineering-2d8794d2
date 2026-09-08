@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings, get_settings
@@ -26,12 +29,24 @@ from hring_api.domains.billing.service import (
     initialize_payment,
     list_billing_plans,
     list_payment_transactions,
+    verify_sep_callback,
     verify_payment,
 )
 from hring_api.domains.identity.dependencies import Principal, get_current_principal
 
 
 router = APIRouter(tags=["billing"])
+
+
+def _sep_redirect(settings: Settings, *, verified: bool, authority: str = "") -> str:
+    query = urlencode(
+        {
+            "Status": "OK" if verified else "NOK",
+            "Authority": authority,
+            "provider": "sep",
+        }
+    )
+    return f"{settings.public_app_url.rstrip('/')}{settings.payment_callback_path}?{query}"
 
 
 def _billing_http_error(exc: BillingError) -> HTTPException:
@@ -107,6 +122,67 @@ async def verify_payment_route(
     return PaymentVerifyResponse(
         ref_id=result.ref_id,
         already_verified=result.already_verified,
+    )
+
+
+@router.post(
+    "/billing/payments/sep/callback",
+    response_class=RedirectResponse,
+    include_in_schema=False,
+)
+async def sep_payment_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> RedirectResponse:
+    authority = ""
+    try:
+        form = await request.form()
+
+        def field(name: str, *, required: bool = True) -> str:
+            value = form.get(name)
+            if not isinstance(value, str):
+                if required:
+                    raise PaymentVerificationError(f"SEP callback field {name} is missing")
+                return ""
+            normalized = value.strip()
+            if (required and not normalized) or len(normalized) > 4096:
+                raise PaymentVerificationError(f"SEP callback field {name} is invalid")
+            return normalized
+
+        authority = field("Token")
+        amount_text = field("Amount")
+        try:
+            amount_rial = int(amount_text)
+        except ValueError as exc:
+            raise PaymentVerificationError("SEP callback amount is invalid") from exc
+        if amount_rial <= 0:
+            raise PaymentVerificationError("SEP callback amount is invalid")
+
+        result = await verify_sep_callback(
+            db,
+            res_num=field("ResNum"),
+            token=authority,
+            ref_num=field("RefNum", required=False) or None,
+            state=field("State"),
+            terminal_id=field("TerminalId"),
+            amount_rial=amount_rial,
+            settings=settings,
+            request_id=str(getattr(request.state, "request_id", ""))[:160] or None,
+            ip_address=request.client.host if request.client else None,
+        )
+    except BillingError:
+        return RedirectResponse(
+            _sep_redirect(settings, verified=False, authority=authority),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return RedirectResponse(
+        _sep_redirect(
+            settings,
+            verified=result.verified,
+            authority=result.authority,
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
