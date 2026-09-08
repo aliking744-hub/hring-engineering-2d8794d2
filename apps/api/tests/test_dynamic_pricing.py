@@ -26,7 +26,7 @@ def test_parse_tgju_rate_rejects_missing_or_implausible_values() -> None:
 
 
 def test_plan_price_uses_effective_rate_and_rounds_up() -> None:
-    assert calculate_plan_price_toman(1_999, 236_700) == 4_729_000
+    assert calculate_plan_price_toman(1_999, 236_700) == 4_732_000
 
 
 def test_manual_rate_overrides_market_and_is_not_stale() -> None:
