@@ -128,7 +128,7 @@ const RUNTIME_ADAPTERS_BY_TYPE: Record<string, readonly string[]> = {
   ],
   email: ['resend'],
   sms: ['kavenegar'],
-  payment: ['zarinpal'],
+  payment: ['zarinpal', 'sep'],
 };
 
 const emptyEditor: EditorState = {
@@ -166,7 +166,7 @@ const statusVariant = (status: ProviderStatus): 'default' | 'destructive' | 'sec
   return 'outline';
 };
 
-type PresetKey = 'zarinpal' | 'kavenegar' | 'resend' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'custom';
+type PresetKey = 'zarinpal' | 'sep' | 'kavenegar' | 'resend' | 'openai' | 'anthropic' | 'gemini' | 'ollama' | 'custom';
 
 const parseObject = (value: string, label: string): Record<string, unknown> => {
   const parsed: unknown = value.trim() ? JSON.parse(value) : {};
@@ -278,6 +278,18 @@ const IntegrationCenter = () => {
         providerType: 'payment',
         adapter: 'zarinpal',
         baseUrl: 'https://api.zarinpal.com/pg/v4/payment',
+        authScheme: 'none',
+        isInternal: false,
+        routingAliases: '',
+        fallbackFor: '',
+        settings: '{}',
+      },
+      sep: {
+        providerKey: 'sep.primary',
+        displayName: 'پرداخت الکترونیک سامان (SEP)',
+        providerType: 'payment',
+        adapter: 'sep',
+        baseUrl: 'https://sep.shaparak.ir/onlinepg/onlinepg',
         authScheme: 'none',
         isInternal: false,
         routingAliases: '',
@@ -505,8 +517,8 @@ const IntegrationCenter = () => {
       );
       if (result.healthy) {
         toast.success(
-          provider.adapter === 'zarinpal'
-            ? 'درگاه رسمی در دسترس است و قالب Merchant ID معتبر است؛ برای ایمنی هیچ تراکنشی در تست ساخته نشد'
+          ['zarinpal', 'sep'].includes(provider.adapter)
+            ? 'درگاه رسمی در دسترس است و قالب شناسه پذیرنده معتبر است؛ برای ایمنی هیچ تراکنشی در تست ساخته نشد'
             : `اتصال سالم است${result.latency_ms !== null ? ` (${result.latency_ms}ms)` : ''}`,
         );
       } else {
@@ -704,6 +716,7 @@ const IntegrationCenter = () => {
               <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
                 <span className="text-xs text-muted-foreground">قالب آماده:</span>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('zarinpal')}>زرین‌پال</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('sep')}>سامان SEP</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('kavenegar')}>کاوه‌نگار OTP</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('resend')}>Resend</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => applyPreset('openai')}>OpenAI (ChatGPT)</Button>
@@ -726,7 +739,7 @@ const IntegrationCenter = () => {
               <div className="grid gap-2"><Label>Base URL</Label><Input dir="ltr" value={editor.baseUrl} onChange={(event) => setEditor((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="https://api.example.com/v1" /></div>
               <div className="grid gap-2"><Label>مدل پیش‌فرض</Label><Input dir="ltr" value={editor.defaultModel} onChange={(event) => setEditor((current) => ({ ...current, defaultModel: event.target.value }))} placeholder="model-name" /></div>
             </div>
-            {!editingId && <div className="grid gap-2"><Label>Secret / API Key (اختیاری)</Label><Input dir="ltr" type="password" autoComplete="new-password" value={editor.secret} onChange={(event) => setEditor((current) => ({ ...current, secret: event.target.value }))} /><p className="text-xs text-muted-foreground">پس از ذخیره قابل مشاهده نیست؛ برای تغییر از «تعویض کلید» استفاده کنید.</p></div>}
+            {!editingId && <div className="grid gap-2"><Label>{editor.adapter === 'sep' ? 'Terminal ID درگاه SEP' : 'Secret / API Key (اختیاری)'}</Label><Input dir="ltr" type="password" autoComplete="new-password" value={editor.secret} onChange={(event) => setEditor((current) => ({ ...current, secret: event.target.value }))} /><p className="text-xs text-muted-foreground">پس از ذخیره قابل مشاهده نیست؛ برای تغییر از «تعویض کلید» استفاده کنید.</p></div>}
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2"><Label>اولویت</Label><Input type="number" min={0} value={editor.priority} onChange={(event) => setEditor((current) => ({ ...current, priority: Number(event.target.value) }))} /></div>
               <div className="grid gap-2"><Label>Timeout (ثانیه)</Label><Input type="number" min={1} max={60} value={editor.timeoutSeconds} onChange={(event) => setEditor((current) => ({ ...current, timeoutSeconds: Number(event.target.value) }))} /></div>
