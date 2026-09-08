@@ -41,10 +41,10 @@ test("legal sources are refreshed and versioned by the maintenance worker", () =
 });
 
 
-test("legal defense is unavailable until its async execution is observable", () => {
+test("legal defense is enabled with direct official citations", () => {
   const defense = read("src/components/legal/DefenseBuilder.tsx");
-  assert.match(defense, /const asyncUpgradePending = true/);
-  assert.match(defense, /لایحه دفاعیه هوشمند — به‌زودی/);
-  assert.match(defense, /هیچ فایل یا اعتباری دریافت نمی‌شود/);
-  assert.match(defense, /اجرای غیرهمزمان و پیگیری‌پذیر/);
+  assert.doesNotMatch(defense, /asyncUpgradePending/);
+  assert.match(defense, /شروع تحلیل پرونده/);
+  assert.match(defense, /law\.sourceUrl/);
+  assert.match(defense, /noopener noreferrer/);
 });
