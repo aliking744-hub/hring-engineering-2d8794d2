@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from base64 import b64decode
 from binascii import Error as Base64Error
 from time import time
@@ -28,6 +29,11 @@ from hring_api.domains.legal.ingestion import (
     MAX_DOCUMENT_BYTES,
     LegalIngestionError,
     extract_upload,
+)
+from hring_api.domains.legal.official import (
+    OFFICIAL_LEGAL_DOMAINS,
+    is_official_legal_url,
+    official_citations,
 )
 from hring_api.domains.legal.schemas import (
     LegalDefenseClaim,
@@ -88,6 +94,9 @@ VERDICT_SYSTEM_PROMPT = """شما یک وکیل باتجربه در دعاوی �
 VERDICT_USER_PROMPT = """ادعاهای کارگر:
 {claims}
 
+منابع رسمی شماره‌گذاری‌شده:
+{relevant_laws}
+
 تحلیل مدارک:
 {evidence_analysis}
 
@@ -97,7 +106,8 @@ VERDICT_USER_PROMPT = """ادعاهای کارگر:
 مدارک ناقص:
 {missing_evidence}
 
-احتمال باخت را از ۰ تا ۱۰۰، سطح ریسک، توصیه راهبردی و استدلال را برگردانید.
+احتمال باخت را صرفاً به‌عنوان برآورد تحلیلی از ۰ تا ۱۰۰، سطح ریسک، توصیه راهبردی و استدلال را برگردانید.
+هر گزاره حقوقی در reasoning، defense_bill و settlement_advice باید ارجاع [شماره] داشته باشد.
 نقاط قوت و ضعف را مشخص کنید. اگر توصیه fight است متن کامل لایحه دفاعیه و اگر settle است توصیه سازش را بنویسید."""
 
 _ATTACHMENT_TYPES = {
@@ -143,11 +153,69 @@ class _VerdictOutput(BaseModel):
     settlement_advice: str | None = None
 
 
+_CITATION_PATTERN = re.compile(r"\[(\d+)]")
+_LIVE_RESEARCH_SYSTEM_PROMPT = """شما پژوهشگر حقوق کار ایران هستید.
+فقط در mcls.gov.ir، qavanin.ir، sso.ir و divan-edalat.ir و زیردامنه‌های آنها جست‌وجو کنید.
+فقط بر اساس منابع رسمی مستقیم پاسخ دهید؛ URL یا ماده قانونی را حدس نزنید.
+خروجی فقط JSON معتبر با ساختار {"research":"متن فارسی با ارجاع‌های [1] و [2]"} باشد.
+برای هر حکم، ماده، رأی، مهلت یا عدد ارجاع بگذارید. اگر منبع رسمی کافی نیست، research را خالی برگردانید."""
+
+
 def _company_id(principal: Principal) -> UUID | None:
     for membership in principal.memberships:
         if membership.is_active:
             return membership.company_id
     return None
+
+
+async def _live_official_laws(
+    *,
+    claims: list[LegalDefenseClaim],
+    principal: Principal,
+) -> tuple[list[LegalDefenseRelevantLaw], str]:
+    query = "\n".join(f"- {claim.claim_type}: {claim.description}" for claim in claims)
+    generated = await generate_with_ai_gateway(
+        feature_key=LEGAL_DEFENSE_FEATURE_KEY,
+        user_id=principal.user_id,
+        company_id=_company_id(principal),
+        provider="avalai.search",
+        model="sonar",
+        messages=[
+            {"role": "system", "content": _LIVE_RESEARCH_SYSTEM_PROMPT},
+            {"role": "user", "content": f"برای دفاع کارفرما، مبانی قانونی این ادعاها را پیدا کن:\n{query}"},
+        ],
+        max_output_tokens=2_500,
+        credits_charged=0,
+        response_format="json_object",
+        search_domain_filter=list(OFFICIAL_LEGAL_DOMAINS),
+        metadata_json={"prompt_mode": "official_live_defense_research"},
+    )
+    try:
+        payload = json.loads(generated.content)
+        research = str(payload.get("research", "")).strip()
+    except (json.JSONDecodeError, AttributeError, TypeError) as exc:
+        raise LegalDefenseError("پژوهش زنده حقوقی پاسخ معتبر تولید نکرد") from exc
+    citations = official_citations(generated.citations)
+    references = {int(value) for value in _CITATION_PATTERN.findall(research)}
+    allowed = {item.reference_number for item in citations}
+    if not research or not citations or not references or not references.issubset(allowed):
+        raise LegalDefenseError("منبع رسمی مستقیم و قابل تطبیق برای دفاع پیدا نشد")
+    claim_type = "، ".join(dict.fromkeys(claim.claim_type for claim in claims))[:500]
+    laws = [
+        LegalDefenseRelevantLaw(
+            claim_type=claim_type,
+            article_number=None,
+            category="official_live_search",
+            content=(citation.snippet or research)[:1_000],
+            similarity=1.0,
+            reference_number=citation.reference_number,
+            source_title=citation.title,
+            source_url=citation.url,
+        )
+        for citation in citations
+        if citation.reference_number in references
+    ]
+    return laws, research
 
 
 async def enforce_legal_defense_rate_limit(
@@ -350,26 +418,43 @@ async def generate_legal_defense(
                     match_threshold=0.4,
                 ),
             )
-            relevant_laws.extend(
-                LegalDefenseRelevantLaw(
+            official_results = [
+                item for item in results
+                if is_official_legal_url(item.source_url, direct=True)
+            ]
+            for item in official_results:
+                relevant_laws.append(LegalDefenseRelevantLaw(
                     claim_type=claim.claim_type,
                     article_number=item.article_number,
                     category=item.category,
                     content=item.content[:1_000],
                     similarity=item.similarity,
-                )
-                for item in results
+                    reference_number=len(relevant_laws) + 1,
+                    source_title=item.title,
+                    source_url=item.source_url,
+                ))
+
+        if not relevant_laws or max(law.similarity for law in relevant_laws) < 0.45:
+            relevant_laws, live_research = await _live_official_laws(
+                claims=claims,
+                principal=principal,
             )
+        else:
+            live_research = ""
+        relevant_laws = relevant_laws[:5]
 
         claims_text = "\n".join(
             f"{index}. {claim.claim_type}: {claim.description}"
             for index, claim in enumerate(claims, start=1)
         )
         laws_text = "\n\n".join(
-            f"- ماده {law.article_number or 'نامشخص'} ({law.category}): "
-            f"{law.content[:500]}"
+            f"[{law.reference_number}] {law.source_title or law.category}\n"
+            f"{('ماده ' + law.article_number) if law.article_number else ''}\n"
+            f"نشانی رسمی: {law.source_url}\n{law.content[:800]}"
             for law in relevant_laws
-        ) or "ماده مرتبطی در پایگاه قوانین یافت نشد."
+        )
+        if live_research:
+            laws_text = f"{laws_text}\n\nپژوهش مستند:\n{live_research}"
         gap_result = await _generate_phase(
             session,
             prompt_key=GAP_PROMPT_KEY,
@@ -401,6 +486,7 @@ async def generate_legal_defense(
             user_prompt=VERDICT_USER_PROMPT,
             variables={
                 "claims": claims_text,
+                "relevant_laws": laws_text,
                 "evidence_analysis": json.dumps(
                     [item.model_dump() for item in evidence_analysis],
                     ensure_ascii=False,
@@ -414,13 +500,30 @@ async def generate_legal_defense(
             max_output_tokens=4_000,
         )
         verdict_output = _parse_json(verdict_result, _VerdictOutput)
+        verdict_text = "\n".join(
+            value
+            for value in (
+                verdict_output.reasoning,
+                verdict_output.defense_bill,
+                verdict_output.settlement_advice,
+            )
+            if value
+        )
+        verdict_references = {
+            int(value) for value in _CITATION_PATTERN.findall(verdict_text)
+        }
+        available_references = {
+            law.reference_number for law in relevant_laws if law.reference_number is not None
+        }
+        if not verdict_references or not verdict_references.issubset(available_references):
+            raise LegalDefenseError("تحلیل دفاع بدون ارجاع معتبر به منبع رسمی تولید شد")
         verdict = LegalDefenseVerdict.model_validate(verdict_output.model_dump())
     except (AiGatewayError, PromptRegistryError) as exc:
         raise LegalDefenseError("سرویس تحلیل دفاع کارفرما در دسترس نیست") from exc
 
     return LegalDefenseResponse(
         claims=claims,
-        relevant_laws=relevant_laws[:5],
+        relevant_laws=relevant_laws,
         gap_analysis=LegalDefenseGapAnalysis(
             evidence_analysis=evidence_analysis,
             follow_up_questions=follow_up_questions,

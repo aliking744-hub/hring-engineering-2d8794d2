@@ -12,7 +12,8 @@ import {
   Scale,
   Info,
   FileCheck,
-  XCircle
+  XCircle,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,6 +75,13 @@ interface AnalysisResult {
   recommendation: string;
   complaintText?: string;
   relevantArticles: string[];
+  sources: Array<{
+    referenceNumber: number;
+    title: string;
+    url: string;
+    publishedAt?: string;
+  }>;
+  probabilityDisclaimer?: string;
 }
 
 const LaborComplaintAssistant = () => {
@@ -710,6 +718,35 @@ const LaborComplaintAssistant = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {analysisResult.sources?.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">منابع رسمی</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {analysisResult.sources.map((source) => (
+                    <a
+                      key={`${source.referenceNumber}-${source.url}`}
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      <ExternalLink className="h-4 w-4 shrink-0" />
+                      [{source.referenceNumber}] {source.title}
+                    </a>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {analysisResult.probabilityDisclaimer && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>{analysisResult.probabilityDisclaimer}</AlertDescription>
+              </Alert>
+            )}
 
             {/* Recommendation */}
             <Card>

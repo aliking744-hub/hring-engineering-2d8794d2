@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Shield, Upload, FileText, AlertTriangle, CheckCircle2, 
   XCircle, Loader2, ChevronRight, Scale, Target, 
-  FileQuestion, Sparkles, Download, RefreshCw, Plus
+  FileQuestion, Sparkles, Download, RefreshCw, Plus, ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,9 @@ interface RelevantLaw {
   category: string;
   content: string;
   similarity: number;
+  referenceNumber?: number;
+  sourceTitle?: string;
+  sourceUrl?: string;
 }
 
 interface EvidenceAnalysis {
@@ -71,7 +74,6 @@ type AnalysisPhase = 'upload' | 'analyzing' | 'gap_analysis' | 'verdict';
 
 const DefenseBuilder = () => {
   const { getCost } = useCredits();
-  const asyncUpgradePending = true;
   const [phase, setPhase] = useState<AnalysisPhase>('upload');
   const [complaint, setComplaint] = useState<{ file: File; content: string } | null>(null);
   const [evidence, setEvidence] = useState<{ file: File; name: string; type: string; content?: string }[]>([]);
@@ -81,27 +83,6 @@ const DefenseBuilder = () => {
   
   const complaintInputRef = useRef<HTMLInputElement>(null);
   const evidenceInputRef = useRef<HTMLInputElement>(null);
-
-  if (asyncUpgradePending) {
-    return (
-      <Card className="border-amber-500/40 bg-amber-500/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-            <Shield className="h-5 w-5" />
-            لایحه دفاعیه هوشمند — به‌زودی
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
-          <p>
-            تحلیل پرونده‌های حقوقی ممکن است چند دقیقه طول بکشد. برای جلوگیری از ناقص‌ماندن
-            تحلیل یا کسر اعتبار نامشخص، این قابلیت تا آماده‌شدن اجرای غیرهمزمان و پیگیری‌پذیر
-            موقتاً فعال نیست.
-          </p>
-          <p>در این نسخه هیچ فایل یا اعتباری دریافت نمی‌شود.</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const handleComplaintUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -506,12 +487,10 @@ const DefenseBuilder = () => {
               size="lg" 
               className="w-full gap-2"
               onClick={startAnalysis}
-              disabled={!complaint || asyncUpgradePending}
+              disabled={!complaint}
             >
               <Sparkles className="w-5 h-5" />
-              {asyncUpgradePending
-                ? 'در حال بهسازی اجرای طولانی‌مدت'
-                : `شروع تحلیل پرونده (${getCost('LEGAL_DEFENSE')} جم)`}
+              {`شروع تحلیل پرونده (${getCost('LEGAL_DEFENSE')} جم)`}
             </Button>
           </motion.div>
         )}
@@ -592,6 +571,17 @@ const DefenseBuilder = () => {
                           <p className="text-sm text-muted-foreground line-clamp-3">
                             {law.content}
                           </p>
+                          {law.sourceUrl && (
+                            <a
+                              href={law.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              [{law.referenceNumber}] {law.sourceTitle || "مشاهده منبع رسمی"}
+                            </a>
+                          )}
                         </div>
                       ))}
                     </div>
