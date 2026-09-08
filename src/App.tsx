@@ -28,9 +28,7 @@ const ToolsGrid = lazy(() => import("./pages/ToolsGrid"));
 const HRDashboard = lazy(() => import("./pages/HRDashboard"));
 const Modules = lazy(() => import("./pages/Modules"));
 const CostCalculator = lazy(() => import("./pages/CostCalculator"));
-const SmartHeadhunting = lazy(() => import("./pages/SmartHeadhunting"));
-const CampaignDetail = lazy(() => import("./pages/CampaignDetail"));
-const CandidateDetail = lazy(() => import("./pages/CandidateDetail"));
+const HeadhuntingComingSoon = lazy(() => import("./pages/HeadhuntingComingSoon"));
 const King744 = lazy(() => import("./pages/King744"));
 const LegalSearchPage = lazy(() => import("./pages/LegalSearchPage"));
 const LegalAdvisor = lazy(() => import("./pages/LegalAdvisor"));
@@ -166,7 +164,7 @@ const App = () => (
                 path="/smart-headhunting" 
                 element={
                   <ProtectedRoute>
-                    <SmartHeadhunting />
+                    <HeadhuntingComingSoon />
                   </ProtectedRoute>
                 } 
               />
@@ -174,7 +172,7 @@ const App = () => (
                 path="/campaign/:id" 
                 element={
                   <ProtectedRoute>
-                    <CampaignDetail />
+                    <HeadhuntingComingSoon />
                   </ProtectedRoute>
                 } 
               />
@@ -182,7 +180,7 @@ const App = () => (
                 path="/campaign/:campaignId/candidate/:candidateId" 
                 element={
                   <ProtectedRoute>
-                    <CandidateDetail />
+                    <HeadhuntingComingSoon />
                   </ProtectedRoute>
                 } 
               />
