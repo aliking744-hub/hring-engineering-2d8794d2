@@ -30,6 +30,8 @@ test('standalone compose owns core runtime dependencies', async () => {
   assert.match(compose, /alembic upgrade head/);
   assert.equal(compose.includes('supabase'), false);
   assert.equal(compose.includes('lovable'), false);
+  assert.match(compose, /PUBLIC_BASE_URL: \$\{PUBLIC_SITE_URL:-https:\/\/hring\.ir\}/);
+  assert.equal(compose.includes('PUBLIC_BASE_URL: ${PUBLIC_APP_URL'), false);
 });
 
 test('container build context excludes local credentials', async () => {
@@ -48,4 +50,6 @@ test('nginx gateway carries core browser security controls', async () => {
   assert.match(nginx, /Referrer-Policy/);
   assert.match(nginx, /Permissions-Policy/);
   assert.match(nginx, /proxy_pass http:\/\/api:8000/);
+  assert.match(nginx, /return 308 https:\/\/hring\.ir\$request_uri/);
+  assert.equal(nginx.includes('^(?:www\\.|staging\\.)hring\\.ir$'), true);
 });
