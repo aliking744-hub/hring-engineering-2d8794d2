@@ -51,7 +51,5 @@ test('nginx gateway carries core browser security controls', async () => {
   assert.match(nginx, /Permissions-Policy/);
   assert.match(nginx, /proxy_pass http:\/\/api:8000/);
   assert.match(nginx, /return 308 https:\/\/hring\.ir\$request_uri/);
-  assert.equal(nginx.includes('^(?:www\\\\.|staging\\\\.)hring\\\\.ir
-});
-), true);
+  assert.equal(nginx.includes('^(?:www\\.|staging\\.)hring\\.ir$'), true);
 });
