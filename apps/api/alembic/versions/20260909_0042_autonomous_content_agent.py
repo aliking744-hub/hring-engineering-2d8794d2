@@ -6,8 +6,9 @@ Revises: 20260908_0041
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import sqlalchemy as sa
 from alembic import op
@@ -20,9 +21,31 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 SETTINGS_ID = UUID("d40bc9db-4726-54f2-8ad6-1f9d4322604c")
+PROMPT_NAMESPACE = UUID("74ce056e-7b07-51d4-9d11-38850a3eb180")
+CONTENT_PROMPTS = (
+    (
+        "content.hr_trend_research",
+        "پژوهش روندهای منابع انسانی",
+        "perplexity",
+        "sonar",
+        "Research recent HR developments using only trusted source domains and direct citations.",
+    ),
+    (
+        "content.hr_article_writer",
+        "نویسنده تحریریه HRing",
+        "gemini",
+        "gemini-2.5-pro",
+        "Create an original Persian multi-source HR article with inline citations and no fabricated facts.",
+    ),
+)
+
+
+def _prompt_id(kind: str, prompt_key: str) -> str:
+    return str(uuid5(PROMPT_NAMESPACE, f"{kind}:{prompt_key}"))
 
 
 def upgrade() -> None:
+    connection = op.get_bind()
     op.create_table(
         "content_agent_settings",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -115,6 +138,45 @@ def upgrade() -> None:
         """),
         {"id": str(SETTINGS_ID)},
     )
+    for prompt_key, display_name, provider, model, system_template in CONTENT_PROMPTS:
+        connection.execute(
+            sa.text("""
+            INSERT INTO ai_prompts (
+                id, prompt_key, feature_key, display_name, description, is_active
+            ) VALUES (
+                CAST(:id AS uuid), :prompt_key, :prompt_key, :display_name,
+                'تنظیم مسیر و دستور ایجنت تحریریه منابع انسانی.', TRUE
+            ) ON CONFLICT (prompt_key) DO NOTHING
+            """),
+            {"id": _prompt_id("prompt", prompt_key), "prompt_key": prompt_key, "display_name": display_name},
+        )
+        connection.execute(
+            sa.text("""
+            INSERT INTO ai_prompt_versions (
+                id, prompt_id, version, status, provider_alias, model,
+                system_template, user_template, input_variables_json,
+                response_format, output_schema_json, temperature,
+                max_output_tokens, test_status
+            )
+            SELECT CAST(:id AS uuid), prompt.id, 1, 'draft', :provider, :model,
+                   :system_template, '{request}', CAST(:variables AS jsonb),
+                   'text', NULL, NULL, 4200, 'untested'
+            FROM ai_prompts AS prompt
+            WHERE prompt.prompt_key = :prompt_key
+              AND NOT EXISTS (
+                  SELECT 1 FROM ai_prompt_versions AS version
+                  WHERE version.prompt_id = prompt.id
+              )
+            """),
+            {
+                "id": _prompt_id("version-1", prompt_key),
+                "prompt_key": prompt_key,
+                "provider": provider,
+                "model": model,
+                "system_template": system_template,
+                "variables": json.dumps(["request"]),
+            },
+        )
     # Preserve legacy articles when the old Supabase-compatible posts table was
     # previously copied into this PostgreSQL database. On clean installs this is
     # deliberately a no-op.
@@ -162,6 +224,35 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    connection = op.get_bind()
+    for prompt_key, *_ in reversed(CONTENT_PROMPTS):
+        connection.execute(
+            sa.text("""
+            DELETE FROM ai_prompt_versions AS version
+            USING ai_prompts AS prompt
+            WHERE version.prompt_id = prompt.id
+              AND prompt.prompt_key = :prompt_key
+              AND version.version = 1
+              AND version.status = 'draft'
+              AND version.test_status = 'untested'
+              AND version.created_by IS NULL
+              AND version.published_by IS NULL
+            """),
+            {"prompt_key": prompt_key},
+        )
+        connection.execute(
+            sa.text("""
+            DELETE FROM ai_prompts AS prompt
+            WHERE prompt.prompt_key = :prompt_key
+              AND prompt.created_by IS NULL
+              AND prompt.updated_by IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM ai_prompt_versions AS version
+                  WHERE version.prompt_id = prompt.id
+              )
+            """),
+            {"prompt_key": prompt_key},
+        )
     op.drop_index("ix_content_agent_runs_status", table_name="content_agent_runs")
     op.drop_index("ix_content_agent_runs_slot_key", table_name="content_agent_runs")
     op.drop_table("content_agent_runs")

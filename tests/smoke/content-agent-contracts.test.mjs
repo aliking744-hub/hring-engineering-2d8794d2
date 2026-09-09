@@ -19,5 +19,7 @@ assert.match(worker, /minute="\*\/15"/);
 assert.match(migration, /content_agent_settings/);
 assert.match(migration, /content_articles/);
 assert.match(migration, /content_agent_runs/);
+assert.match(migration, /content\.hr_trend_research/);
+assert.match(migration, /content\.hr_article_writer/);
 
 console.log('content-agent-contracts: ok');
