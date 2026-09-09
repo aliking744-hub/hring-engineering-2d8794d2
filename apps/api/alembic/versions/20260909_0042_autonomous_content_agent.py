@@ -98,7 +98,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_content_agent_runs_slot_key", "content_agent_runs", ["slot_key"])
     op.create_index("ix_content_agent_runs_status", "content_agent_runs", ["status"])
-    op.execute(
+    op.get_bind().execute(
         sa.text("""
         INSERT INTO content_agent_settings (
             id, enabled, auto_publish, daily_article_count, publishing_times_json,
