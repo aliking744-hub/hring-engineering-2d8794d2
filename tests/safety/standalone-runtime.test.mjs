@@ -28,6 +28,8 @@ test('standalone compose owns core runtime dependencies', async () => {
     assert.match(compose, new RegExp(`\\n  ${service}`));
   }
   assert.match(compose, /alembic upgrade head/);
+  assert.match(compose, /API_WEB_CONCURRENCY: \$\{API_WEB_CONCURRENCY:-2\}/);
+  assert.match(compose, /--workers "\$\$\{API_WEB_CONCURRENCY\}"/);
   assert.equal(compose.includes('supabase'), false);
   assert.equal(compose.includes('lovable'), false);
   assert.match(compose, /PUBLIC_BASE_URL: \$\{PUBLIC_SITE_URL:-https:\/\/hring\.ir\}/);

@@ -114,6 +114,7 @@ services:
     environment:
       ENVIRONMENT: production
       API_V1_PREFIX: /api/v1
+      API_WEB_CONCURRENCY: ${API_WEB_CONCURRENCY:-2}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://hring.ir}
       DATABASE_URL: postgresql+asyncpg://hring:${POSTGRES_PASSWORD}@postgres:5432/hring
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -153,7 +154,7 @@ services:
       - -ec
       - |
         alembic upgrade head
-        exec uvicorn hring_api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
+        exec uvicorn hring_api.main:app --host 0.0.0.0 --port 8000 --workers "$${API_WEB_CONCURRENCY}" --proxy-headers --forwarded-allow-ips="*"
     healthcheck:
       test:
         [
