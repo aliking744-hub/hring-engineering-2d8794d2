@@ -12,6 +12,8 @@ from hring_api.domains.billing.credit_routes import router as credit_router
 from hring_api.domains.companies.routes import router as companies_router
 from hring_api.domains.costing.routes import router as costing_router
 from hring_api.domains.company_ai.routes import router as company_ai_router
+from hring_api.domains.content.routes import admin_router as content_admin_router
+from hring_api.domains.content.routes import router as content_router
 from hring_api.domains.companies.settings_routes import router as company_settings_router
 from hring_api.domains.compat.routes import router as compat_router
 from hring_api.domains.development.routes import router as development_router
@@ -37,6 +39,8 @@ api_router.include_router(identity_recovery_router)
 api_router.include_router(account_security_router)
 api_router.include_router(companies_router)
 api_router.include_router(company_ai_router)
+api_router.include_router(content_router)
+api_router.include_router(content_admin_router)
 api_router.include_router(company_settings_router)
 api_router.include_router(access_router)
 api_router.include_router(admin_router)

@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Building2, ChevronLeft, CircleDollarSign, FileCode2, Package, PlugZap, ShieldCheck, UsersRound } from 'lucide-react';
+import { Bot, Building2, ChevronLeft, CircleDollarSign, FileCode2, Package, PlugZap, ShieldCheck, UsersRound } from 'lucide-react';
 import AuroraBackground from '@/components/AuroraBackground';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,7 @@ const Admin = () => {
     canOpenIntegrations && { title: 'اتصال سرویس‌ها و APIها', description: 'ثبت امن API Key و تست سلامت سرویس‌های AI، مدل لوکال، پرداخت، پیامک، ایمیل و وب‌هوک.', icon: PlugZap, href: '/admin/integrations', badge: 'Secrets & APIs' },
     canOpenPrompts && { title: 'مدیریت هوش قابلیت‌ها', description: 'مشاهده و تغییر هوش و مدل هر بخش HRing، همراه با نسخه‌بندی، تست و بازگشت متن دستورها.', icon: FileCode2, href: '/admin/prompts', badge: 'AI Routing' },
     canOpenProduct && { title: 'CMS و تنظیمات سایت', description: 'نام برند، لوگوها، رنگ‌ها، فونت‌ها، متن‌ها، نمایش بخش‌ها و SEO؛ بدون تغییر کد.', icon: Package, href: '/admin/product', badge: 'CMS' },
+    canOpenProduct && { title: 'ایجنت تحریریه HR', description: 'کشف روندهای معتبر، تلفیق چندمنبعی، کنترل کیفیت و انتشار خودکار مقاله.', icon: Bot, href: '/admin/content-agent', badge: 'Editorial AI' },
     canOpenCompany && { title: 'Company Admin', description: 'کاربران، نقش‌ها، دعوت‌نامه‌ها، سطح دسترسی و تنظیمات همان شرکت.', icon: UsersRound, href: '/company-members', badge: 'Tenant' },
   ].filter(Boolean) as Array<{ title: string; description: string; icon: typeof ShieldCheck; href: string; badge: string }>;
 

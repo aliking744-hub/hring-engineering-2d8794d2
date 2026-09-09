@@ -1,136 +1,38 @@
-import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { BookOpen, Calendar, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
-import AuroraBackground from "@/components/AuroraBackground";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/landing/Footer";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowRight, BookOpen, Calendar, PenLine } from 'lucide-react';
+import AuroraBackground from '@/components/AuroraBackground';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/landing/Footer';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { apiRequest } from '@/lib/api';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+
+interface Article {
+  id: string; title: string; slug: string; excerpt: string; image_url: string | null;
+  author_name: string; published_at: string | null; created_at: string;
+}
 
 const Blog = () => {
   const { siteName, getSetting } = useSiteSettings();
   const canonicalBase = getSetting('seo_canonical_base_url', 'https://hring.ir').replace(/\/+$/, '');
-  const blogUrl = canonicalBase + '/blog';
-  const { data: posts = [], isLoading } = useQuery({
-    queryKey: ['blog-posts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('published', true)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    },
+  const { data: posts = [], isLoading, isError } = useQuery({
+    queryKey: ['content-posts'],
+    queryFn: () => apiRequest<Article[]>('/content/posts?limit=60', {}, { auth: false, retryAuth: false }),
   });
+  const date = (value: string) => new Intl.DateTimeFormat('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(value));
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('fa-IR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(date);
-  };
-
-  return (
-    <>
-      <Helmet>
-        <title>بلاگ - {siteName}</title>
-        <meta name="description" content="آخرین مقالات و مطالب تخصصی منابع انسانی، استخدام، آنبوردینگ، رهبری سازمان و قانون کار ایران در بلاگ HRing." />
-        <link rel="canonical" href={blogUrl} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={blogUrl} />
-        <meta property="og:title" content="بلاگ HRing — مقالات تخصصی منابع انسانی" />
-        <meta property="og:description" content="آخرین مقالات تخصصی منابع انسانی، استخدام و رهبری سازمان در HRing." />
-      </Helmet>
-      <div className="relative min-h-screen" dir="rtl">
-        <AuroraBackground />
-        <Navbar />
-        
-        <main className="relative z-10 container mx-auto px-4 py-24">
-          <div className="flex items-center gap-4 mb-12">
-            <Link to="/">
-              <Button variant="outline" size="icon" className="border-border bg-secondary/50">
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground">بلاگ و مقالات</h1>
-              <p className="text-muted-foreground mt-2">آخرین مطالب تخصصی منابع انسانی</p>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="glass-card p-0 overflow-hidden">
-                  <Skeleton className="h-48 w-full" />
-                  <div className="p-6">
-                    <Skeleton className="h-6 w-3/4 mb-3" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-20">
-              <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-foreground mb-2">هنوز مقاله‌ای منتشر نشده</h2>
-              <p className="text-muted-foreground">به زودی مطالب جدید منتشر خواهد شد</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {posts.map((post, index) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Link to={`/blog/${post.slug}`}>
-                    <div className="glass-card p-0 overflow-hidden group cursor-pointer h-full">
-                      {post.image_url ? (
-                        <div className="h-48 overflow-hidden">
-                          <img 
-                            src={post.image_url} 
-                            alt={post.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-48 bg-primary/10 flex items-center justify-center">
-                          <BookOpen className="w-16 h-16 text-primary/50" />
-                        </div>
-                      )}
-                      
-                      <div className="p-6">
-                        <h2 className="text-lg font-semibold text-foreground mb-3 line-clamp-2 group-hover:text-primary transition-colors">
-                          {post.title}
-                        </h2>
-                        
-                        <div className="flex items-center gap-1 text-muted-foreground text-sm">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(post.created_at)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </main>
-        
-        <Footer />
-      </div>
-    </>
-  );
+  return <><Helmet><title>بلاگ منابع انسانی | {siteName}</title><meta name="description" content="تحلیل تازه‌ترین پژوهش‌ها و روندهای معتبر منابع انسانی، آینده کار، استخدام و تجربه کارکنان در تحریریه HRing." /><link rel="canonical" href={`${canonicalBase}/blog`} /><meta property="og:type" content="website" /><meta property="og:url" content={`${canonicalBase}/blog`} /></Helmet>
+    <div className="relative min-h-screen" dir="rtl"><AuroraBackground /><Navbar /><main className="container relative z-10 mx-auto px-4 py-24">
+      <div className="mb-12 flex items-center gap-4"><Button asChild variant="outline" size="icon"><Link to="/"><ArrowRight className="h-5 w-5" /></Link></Button><div><h1 className="text-3xl font-bold md:text-4xl">بلاگ و مقالات</h1><p className="mt-2 text-muted-foreground">تحلیل چندمنبعی روندهای روز منابع انسانی</p></div></div>
+      {isLoading ? <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{[1,2,3,4,5,6].map(i => <div key={i} className="glass-card overflow-hidden"><Skeleton className="h-48" /><div className="p-6"><Skeleton className="mb-3 h-6" /><Skeleton className="h-4" /></div></div>)}</div>
+      : isError ? <div className="glass-card p-8 text-center"><p>دریافت مقالات موقتاً ممکن نیست.</p></div>
+      : posts.length === 0 ? <div className="glass-card p-12 text-center"><BookOpen className="mx-auto mb-4 h-14 w-14 text-muted-foreground" /><h2 className="text-xl font-bold">اولین مقالات تحریریه در راه‌اند</h2></div>
+      : <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{posts.map(post => <article key={post.id} className="glass-card flex overflow-hidden p-0"><Link to={`/blog/${post.slug}`} className="flex w-full flex-col">{post.image_url && <img src={post.image_url} alt="" className="h-48 w-full object-cover" loading="lazy" />}<div className="flex flex-1 flex-col p-6"><h2 className="mb-3 text-xl font-bold leading-8">{post.title}</h2><p className="mb-5 line-clamp-3 text-sm leading-7 text-muted-foreground">{post.excerpt}</p><div className="mt-auto flex flex-wrap items-center gap-4 border-t pt-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><PenLine className="h-3.5 w-3.5" />{post.author_name}</span><span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{date(post.published_at || post.created_at)}</span></div></div></Link></article>)}</div>}
+    </main><Footer /></div></>;
 };
 
 export default Blog;
+
