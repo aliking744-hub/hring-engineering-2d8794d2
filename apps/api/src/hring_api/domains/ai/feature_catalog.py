@@ -11,6 +11,8 @@ class AiFeatureDefinition:
 
 
 AI_FEATURES = (
+    AiFeatureDefinition("content.hr_trend_research", "پژوهش روندهای منابع انسانی", "محتوا", "کشف و اعتبارسنجی چندمنبعی تازه‌ترین روندهای معتبر منابع انسانی.", "enrichment"),
+    AiFeatureDefinition("content.hr_article_writer", "نویسنده تحریریه HRing", "محتوا", "تولید مقاله فارسی تلفیقی، مستند و بهینه برای SEO و پاسخ‌موتورها."),
     AiFeatureDefinition("smart_headhunting.candidate_analysis", "تحلیل و امتیازدهی کاندیداها", "استخدام هوشمند", "تحلیل پنج‌لایه، امتیاز تطابق و پیشنهاد اقدام برای کاندیداها."),
     AiFeatureDefinition("smart_headhunting.web_enrichment", "تکمیل اطلاعات عمومی کاندیدا", "استخدام هوشمند", "جست‌وجوی اطلاعات عمومی حرفه‌ای برای غنی‌سازی تحلیل کاندیدا.", "enrichment"),
     AiFeatureDefinition("job_ads.smart_ad_text", "متن آگهی هوشمند", "جذب و استخدام", "تولید متن آگهی متناسب با پلتفرم و لحن."),

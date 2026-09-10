@@ -48,6 +48,8 @@ celery_app.conf.update(
         "hring.worker.healthcheck": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
         "hring.legal.sync_sources": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
         "hring.billing.refresh_exchange_rate": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+        "hring.content.poll_schedule": {"queue": MAINTENANCE_QUEUE, "routing_key": MAINTENANCE_QUEUE},
+        "hring.content.generate_article": {"queue": AI_QUEUE, "routing_key": AI_QUEUE},
     },
     task_send_sent_event=True,
     task_serializer="json",
@@ -70,6 +72,10 @@ celery_app.conf.beat_schedule = {
     "daily-exchange-rate-refresh": {
         "task": "hring.billing.refresh_exchange_rate",
         "schedule": crontab(hour=5, minute=0),
+    },
+    "content-agent-schedule-poll": {
+        "task": "hring.content.poll_schedule",
+        "schedule": crontab(minute="*/15"),
     },
 }
 
