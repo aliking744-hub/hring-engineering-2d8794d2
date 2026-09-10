@@ -1,0 +1,66 @@
+name: web-deploy-assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/web-deploy-assets.yml"
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tailwind.config.ts"
+      - "postcss.config.js"
+      - "infra/nginx/default.conf"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-deploy-assets
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build production web
+        env:
+          PUBLIC_BASE_URL: https://hring.ir
+          VITE_API_BASE_URL: /api/v1
+        run: npm run build
+
+      - name: Publish immutable deploy assets branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_dir="$RUNNER_TEMP/hring-web-assets"
+          mkdir -p "$asset_dir/dist"
+          cp -a dist/. "$asset_dir/dist/"
+          cp infra/nginx/default.conf "$asset_dir/default.conf"
+          printf '%s\n' "$GITHUB_SHA" > "$asset_dir/BUILD_SHA"
+
+          git checkout --orphan deploy/web-assets
+          git rm -rf .
+          cp -a "$asset_dir/." .
+          git add dist default.conf BUILD_SHA
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Build web deploy assets for $GITHUB_SHA"
+          git push --force origin HEAD:deploy/web-assets
