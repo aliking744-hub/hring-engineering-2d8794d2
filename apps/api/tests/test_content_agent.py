@@ -8,6 +8,7 @@ from hring_api.domains.content.service import (
     ContentAgentError,
     _credibility_score,
     _official_citations,
+    _publication_status,
     _quality_score,
     due_slot_keys,
 )
@@ -70,3 +71,15 @@ def test_quality_gate_rewards_original_structured_cited_article() -> None:
     )
     assert score >= 80
 
+
+
+def test_publication_status_distinguishes_draft_from_quality_rejection() -> None:
+    assert _publication_status(
+        auto_publish=False, quality_score=94, minimum_quality_score=80
+    ) == ("draft", "drafted")
+    assert _publication_status(
+        auto_publish=True, quality_score=94, minimum_quality_score=80
+    ) == ("published", "published")
+    assert _publication_status(
+        auto_publish=True, quality_score=79, minimum_quality_score=80
+    ) == ("rejected", "rejected")

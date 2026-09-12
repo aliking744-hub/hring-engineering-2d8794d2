@@ -161,6 +161,16 @@ def _quality_score(article: dict[str, object], content: str, sources: list[dict[
     return min(100, score)
 
 
+
+def _publication_status(
+    *, auto_publish: bool, quality_score: int, minimum_quality_score: int
+) -> tuple[str, str]:
+    if quality_score < minimum_quality_score:
+        return "rejected", "rejected"
+    if auto_publish:
+        return "published", "published"
+    return "draft", "drafted"
+
 def _duplicate(article_title: str, sources: list[dict[str, object]], recent: list[ContentArticle]) -> bool:
     new_urls = {str(item["url"]) for item in sources}
     for old in recent:
@@ -282,7 +292,11 @@ async def run_content_agent(
             f"- [{i}] [{item.get('title') or urlsplit(str(item['url'])).hostname}]({item['url']})"
             for i, item in enumerate(sources, 1)
         )
-        status = "published" if settings_row.auto_publish and quality >= settings_row.minimum_quality_score else "rejected"
+        status, run_status = _publication_status(
+            auto_publish=settings_row.auto_publish,
+            quality_score=quality,
+            minimum_quality_score=settings_row.minimum_quality_score,
+        )
         article = ContentArticle(
             title=title, slug=_slug(generated.get("slug"), title), excerpt=excerpt,
             content_markdown=content + source_section,
@@ -301,7 +315,7 @@ async def run_content_agent(
         session.add(article)
         await session.flush()
         run.article_id = article.id
-        run.status = "published" if status == "published" else "rejected"
+        run.status = run_status
         run.provider, run.model = writer_provider, writer_model
         run.sources_checked = len(sources)
         run.credibility_score, run.quality_score = credibility, quality
