@@ -1,9 +1,12 @@
+import asyncio
+
 import pytest
 from pydantic import ValidationError
 
+import hring_api.worker.tasks as worker_tasks
 from hring_api.worker.app import MAINTENANCE_QUEUE, WORKER_QUEUES, celery_app
 from hring_api.worker.config import WorkerSettings
-from hring_api.worker.tasks import worker_healthcheck
+from hring_api.worker.tasks import _run_async, worker_healthcheck
 
 
 def test_worker_uses_durable_isolated_json_queues() -> None:
@@ -22,6 +25,23 @@ def test_worker_uses_durable_isolated_json_queues() -> None:
     assert celery_app.conf.beat_schedule["daily-legal-source-sync"]["task"] == (
         "hring.legal.sync_sources"
     )
+
+
+def test_worker_reuses_one_event_loop_across_sequential_tasks() -> None:
+    async def loop_id() -> int:
+        return id(asyncio.get_running_loop())
+
+    worker_tasks._worker_event_loop = None
+    worker_tasks._worker_event_loop_pid = None
+    try:
+        first = _run_async(loop_id())
+        second = _run_async(loop_id())
+        assert first == second
+    finally:
+        if worker_tasks._worker_event_loop is not None:
+            worker_tasks._worker_event_loop.close()
+        worker_tasks._worker_event_loop = None
+        worker_tasks._worker_event_loop_pid = None
 
 
 def test_worker_health_task_runs_without_external_side_effects() -> None:
