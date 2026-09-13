@@ -164,7 +164,7 @@ export default function LearningPath() {
       }
       console.error("Learning-path generation failed:", e);
       const msg = e instanceof ApiError && e.status === 402
-        ? "اعتبار کافی برای تولید مسیر یادگیری ندارید"
+        ? "الماس کافی برای تولید مسیر یادگیری ندارید"
         : e instanceof ApiError && e.status === 502
           ? "سرویس هوش مصنوعی هنوز متصل یا در دسترس نیست"
           : e instanceof Error
@@ -449,7 +449,7 @@ export default function LearningPath() {
 
                       <Button onClick={handleSubmit} disabled={loading || !isFormValid || credits < getCost('LEARNING_PATH')} className="w-full mt-2" size="lg">
                         {loading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید نقشه راه...</> :
-                          <><GraduationCap className="w-4 h-4 ml-2" />تولید نقشه راه آموزشی ({getCost('LEARNING_PATH')} جم)</>}
+                          <><GraduationCap className="w-4 h-4 ml-2" />تولید نقشه راه آموزشی ({getCost('LEARNING_PATH')} الماس)</>}
                       </Button>
                     </CardContent>
                   </Card>
