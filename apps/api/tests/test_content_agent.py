@@ -1,4 +1,3 @@
-import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
@@ -9,6 +8,7 @@ import hring_api.domains.content.service as content_service
 from hring_api.domains.ai.gateway_client import AiCitation
 from hring_api.domains.content.service import (
     ContentAgentError,
+    _article_object,
     _credibility_score,
     _official_citations,
     _publication_status,
@@ -91,13 +91,43 @@ def test_publication_status_distinguishes_draft_from_quality_rejection() -> None
 
 
 
+
+def test_tagged_article_preserves_multiline_markdown_without_json_escaping() -> None:
+    article = _article_object("""<<<TITLE>>>عنوان مقاله منابع انسانی<<<END_TITLE>>>
+<<<SLUG>>>human-resources-article<<<END_SLUG>>>
+<<<EXCERPT>>>خلاصه مقاله برای مدیران منابع انسانی<<<END_EXCERPT>>>
+<<<CONTENT_MARKDOWN>>>## بخش اول
+متن چندخطی با «نقل‌قول» و [1].
+
+## بخش دوم
+- اقدام اول
+- اقدام دوم<<<END_CONTENT_MARKDOWN>>>
+<<<SEO_TITLE>>>عنوان سئوی مقاله منابع انسانی<<<END_SEO_TITLE>>>
+<<<META_DESCRIPTION>>>توضیح متای مقاله منابع انسانی برای نمایش در نتایج جست‌وجو<<<END_META_DESCRIPTION>>>
+<<<FOCUS_KEYWORD>>>منابع انسانی<<<END_FOCUS_KEYWORD>>>
+<<<RELATED_KEYWORDS>>>آینده کار، تحلیل افراد
+تجربه کارکنان<<<END_RELATED_KEYWORDS>>>""")
+
+    assert "## بخش دوم" in str(article["content_markdown"])
+    assert article["related_keywords"] == ["آینده کار", "تحلیل افراد", "تجربه کارکنان"]
+
+
 @pytest.mark.asyncio
-async def test_writer_retries_one_malformed_json_response(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_writer_retries_with_tagged_output_after_malformed_response(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict[str, object]] = []
     responses = [
         SimpleNamespace(content='{"title": "broken"', provider="avalai.primary", model="writer"),
         SimpleNamespace(
-            content=json.dumps({"title": "valid article", "content_markdown": "body"}),
+            content="""<<<TITLE>>>valid article<<<END_TITLE>>>
+<<<SLUG>>>valid-article<<<END_SLUG>>>
+<<<EXCERPT>>>short summary<<<END_EXCERPT>>>
+<<<CONTENT_MARKDOWN>>>## heading
+Persian body with "quotes" and
+multiple lines.<<<END_CONTENT_MARKDOWN>>>
+<<<SEO_TITLE>>>valid seo title<<<END_SEO_TITLE>>>
+<<<META_DESCRIPTION>>>valid meta description<<<END_META_DESCRIPTION>>>
+<<<FOCUS_KEYWORD>>>HR trends<<<END_FOCUS_KEYWORD>>>
+<<<RELATED_KEYWORDS>>>work, people analytics<<<END_RELATED_KEYWORDS>>>""",
             provider="avalai.primary",
             model="writer",
         ),
