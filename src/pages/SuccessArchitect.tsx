@@ -13,8 +13,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useCredits } from "@/hooks/useCredits";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
-import jsPDF from "jspdf";
-import { waitForPrintableAssets } from "@/lib/printDocument";
+import { exportElementToPdf } from "@/lib/exportPdf";
 
 const seniorityLevels = [
   { value: "junior", label: "جونیور (۰-۲ سال)" },
@@ -148,12 +147,8 @@ const SuccessArchitect = () => {
 
   const handleDownload = async () => {
     if (!resultRef.current) return;
-    await waitForPrintableAssets(resultRef.current);
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(resultRef.current, {
-      callback: (document) => document.save(`HRing-onboarding-${employeeName || 'report'}.pdf`),
-      margin: [10, 10, 10, 10], autoPaging: 'text',
-      html2canvas: { scale: 0.75, useCORS: true }, width: 190, windowWidth: 900,
+    await exportElementToPdf(resultRef.current, {
+      filename: `HRing-onboarding-${employeeName || "report"}.pdf`,
     });
   };
 
