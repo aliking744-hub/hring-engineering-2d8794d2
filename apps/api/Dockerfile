@@ -6,7 +6,7 @@ ARG PIP_RETRIES=8
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple/
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 
 WORKDIR /app
 
