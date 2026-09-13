@@ -11,23 +11,17 @@ const ZARINPAL_API_URL = "https://payment.zarinpal.com/pg/v4/payment";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Plan prices in Tomans (updated pricing)
+// Transitional fallback only. The independent billing API is authoritative.
+// Corporate plans are deliberately excluded and require contacting support.
 const PLAN_PRICES: Record<string, number> = {
-  individual_pro: 490000,        // ~490k Toman
-  individual_plus: 990000,       // ~990k Toman
-  corporate_expert: 1490000,     // ~1.49M Toman
-  corporate_decision_support: 2990000, // ~2.99M Toman
-  corporate_decision_making: 5990000,  // ~5.99M Toman
+  individual_pro: 1476000,
+  individual_plus: 3998000,
 };
 
-// Plan credit allocations
 const PLAN_CREDITS: Record<string, number> = {
-  individual_free: 50,
-  individual_pro: 600,
-  individual_plus: 2500,
-  corporate_expert: 1000,
-  corporate_decision_support: 3000,
-  corporate_decision_making: 10000,
+  individual_free: 0,
+  individual_pro: 2000,
+  individual_plus: 6000,
 };
 
 interface PaymentRequest {
