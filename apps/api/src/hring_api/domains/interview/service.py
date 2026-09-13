@@ -34,7 +34,7 @@ from hring_api.domains.interview.schemas import (
 
 
 INTERVIEW_FEATURE_KEY = "interview.kit"
-INTERVIEW_DEFAULT_CREDIT_COST = 10
+INTERVIEW_DEFAULT_CREDIT_COST = 100
 
 SENIORITY_LABELS = {
     "junior": "کارشناس (Junior)",
