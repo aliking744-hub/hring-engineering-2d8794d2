@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     smart_ad_text_ai_provider: str = "avalai.primary"
     smart_ad_text_ai_model: str = "gemini-2.5-flash"
     smart_ad_image_ai_provider: str = "avalai.primary"
-    smart_ad_image_ai_model: str = "gpt-image-2.5-flare"
+    smart_ad_image_ai_model: str = "gemini-3-pro-image-preview"
     legal_advisor_ai_provider: str = "avalai.primary"
     legal_advisor_ai_model: str = "gemini-2.5-flash"
     legal_defense_ai_provider: str = "avalai.primary"
@@ -131,11 +131,6 @@ class Settings(BaseSettings):
             raise ValueError("Development SMS provider is forbidden in production")
         if self.email_provider.lower() == "development":
             raise ValueError("Development email provider is forbidden in production")
-        if self.email_provider.lower() == "disabled":
-            raise ValueError(
-                "Production email cannot be disabled while learning-path delivery is exposed; "
-                "set EMAIL_PROVIDER=resend"
-            )
         if self.email_provider.lower() == "resend" and self.email_resend_api_key is None:
             raise ValueError("EMAIL_RESEND_API_KEY is required when EMAIL_PROVIDER=resend")
         if self.payment_provider.lower() == "zarinpal" and self.zarinpal_merchant_id is None:
