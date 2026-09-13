@@ -46,6 +46,28 @@ def upgrade() -> None:
             f"{credit_cost}, updated_at = now() WHERE feature_key = '{feature_key}'"
         )
 
+    # Free users may inspect the product and use only the dashboard demo.
+    op.execute(
+        """
+        UPDATE feature_permissions
+        SET allowed_tiers = array_remove(allowed_tiers, 'individual_free'),
+            updated_at = now()
+        WHERE feature_key <> 'hr_data.dashboard_demo'
+        """
+    )
+    op.execute(
+        """
+        UPDATE feature_permissions
+        SET allowed_tiers = CASE
+                WHEN 'individual_free' = ANY(allowed_tiers) THEN allowed_tiers
+                ELSE array_append(allowed_tiers, 'individual_free')
+            END,
+            credit_cost = 0,
+            updated_at = now()
+        WHERE feature_key = 'hr_data.dashboard_demo'
+        """
+    )
+
     op.execute(
         """
         UPDATE billing_plans
