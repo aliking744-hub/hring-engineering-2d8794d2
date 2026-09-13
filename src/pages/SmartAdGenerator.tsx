@@ -217,8 +217,8 @@ const SmartAdGenerator = () => {
   const ensureCredits = (requiredCredits: number) => {
     if (credits >= requiredCredits) return true;
     toast({
-      title: "اعتبار ناکافی",
-      description: `برای این عملیات ${requiredCredits} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+      title: "الماس ناکافی",
+      description: `برای این عملیات ${requiredCredits} الماس نیاز دارید. الماس فعلی: ${credits}`,
       variant: "destructive",
     });
     return false;
@@ -258,7 +258,7 @@ const SmartAdGenerator = () => {
       });
     } else if (status === 402) {
       toast({
-        title: "اعتبار ناکافی",
+        title: "الماس ناکافی",
         description: "اعتبار هوش مصنوعی کافی نیست. لطفاً حساب را شارژ کنید.",
         variant: "destructive",
       });
@@ -644,7 +644,7 @@ const SmartAdGenerator = () => {
                   <>
                     <Megaphone className="w-5 h-5" />
                     تولید متن
-                    <span className="text-xs opacity-80">({getCost('SMART_AD_TEXT')} جم)</span>
+                    <span className="text-xs opacity-80">({getCost('SMART_AD_TEXT')} الماس)</span>
                   </>
                 )}
               </Button>
@@ -663,7 +663,7 @@ const SmartAdGenerator = () => {
                   <>
                     <ImageIcon className="w-5 h-5" />
                     تولید تصویر
-                    <span className="text-xs opacity-80">({getCost('SMART_AD_IMAGE')} جم)</span>
+                    <span className="text-xs opacity-80">({getCost('SMART_AD_IMAGE')} الماس)</span>
                   </>
                 )}
               </Button>
