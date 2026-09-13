@@ -393,7 +393,10 @@ def test_onboarding_reopen_clears_final_score_but_preserves_tasks(monkeypatch) -
         )
 
 def test_native_development_records_are_owner_scoped_and_idempotent(monkeypatch) -> None:
-    monkeypatch.setattr("hring_api.domains.development.routes.feature_credit_cost", lambda *_args, **_kwargs: 0)
+    async def zero_credit_cost(*_args: object, **_kwargs: object) -> int:
+        return 0
+
+    monkeypatch.setattr("hring_api.domains.development.service.feature_credit_cost", zero_credit_cost)
     async def fake_learning(**_kwargs: object) -> LearningPathResult:
         return _learning_result()
 
