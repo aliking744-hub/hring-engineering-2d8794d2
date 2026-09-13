@@ -26,7 +26,8 @@ def _auth(account: dict[str, Any]) -> dict[str, str]:
     return {"Authorization": f"Bearer {account['tokens']['access_token']}"}
 
 
-def test_hr_uploads_are_private_and_the_history_omits_records() -> None:
+def test_hr_uploads_are_private_and_the_history_omits_records(monkeypatch) -> None:
+    monkeypatch.setattr("hring_api.domains.hr_data.routes.feature_credit_cost", lambda *_args, **_kwargs: 0)
     with TestClient(app) as client:
         owner = _register(client, "hr-upload-owner")
         other = _register(client, "hr-upload-other")
