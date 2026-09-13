@@ -20,7 +20,7 @@ import { ApiError, apiRequest } from "@/lib/api";
 import AuroraBackground from "@/components/AuroraBackground";
 import { useSiteName } from "@/hooks/useSiteSettings";
 import { useCredits } from "@/hooks/useCredits";
-import jsPDF from "jspdf";
+import { exportElementToPdf } from "@/lib/exportPdf";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { waitForPrintableAssets } from "@/lib/printDocument";
 
@@ -228,15 +228,8 @@ export default function LearningPath() {
   };
   const handleDownload = async () => {
     if (!printRef.current) return;
-    await waitForPrintableAssets(printRef.current);
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(printRef.current, {
-      callback: (document) => document.save('HRing-learning-path.pdf'),
-      margin: [10, 10, 10, 10],
-      autoPaging: 'text',
-      html2canvas: { scale: 0.75, useCORS: true },
-      width: 190,
-      windowWidth: 900,
+    await exportElementToPdf(printRef.current, {
+      filename: "HRing-learning-path.pdf",
     });
   };
 
