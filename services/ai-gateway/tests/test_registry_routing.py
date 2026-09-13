@@ -259,7 +259,7 @@ def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> 
     assert "valid JSON object" in str(payload["system"])
     assert "response_format" not in payload
     assert result.content == '{"ok":true}'
-    assert result.usage == {"input_tokens": 11, "output_tokens": 4}
+    assert result.usage == {"input_tokens": 11, "output_tokens": 4, "total_tokens": 15}
     assert result.provider_request_id == "anthropic-request"
 
 
