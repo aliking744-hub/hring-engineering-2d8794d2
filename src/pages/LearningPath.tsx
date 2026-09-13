@@ -197,7 +197,12 @@ export default function LearningPath() {
       });
       toast({ title: "ایمیل ارسال شد ✓", description: `نقشه راه به ${targetEmail} ارسال شد` });
     } catch (e: unknown) {
-      toast({ title: "خطا در ارسال ایمیل", description: (e instanceof Error ? e.message : "خطای ناشناخته"), variant: "destructive" });
+      const description = e instanceof ApiError && e.status === 503
+        ? "سرویس ایمیل روی سرور تنظیم نشده است. مدیر سامانه باید Resend و فرستندهٔ تأییدشده را فعال کند."
+        : e instanceof Error
+          ? e.message
+          : "خطای ناشناخته";
+      toast({ title: "خطا در ارسال ایمیل", description, variant: "destructive" });
     } finally {
       setSendingEmail(false);
     }
