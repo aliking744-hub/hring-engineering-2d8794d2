@@ -169,7 +169,7 @@ const AiEconomicsPanel = () => {
         apiRequest<CompanyUsageSummary>('/admin/platform/ai/company-summary?days=30'),
         apiRequest<RateCard[]>('/admin/platform/ai/rates'),
         apiRequest<PlatformCompany[]>('/admin/platform/companies?limit=500'),
-        apiRequest<UsageEvent[]>('/admin/platform/ai/usage-events?days=30&limit=500'),
+        apiRequest<UsageEvent[]>('/admin/platform/ai/usage-events?days=30&limit=1000'),
       ]);
       setSummary(summaryData);
       setCompanySummary(companyData);
