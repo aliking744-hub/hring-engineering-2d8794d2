@@ -23,8 +23,6 @@ def _production_settings(**overrides: object) -> Settings:
         "sms_otp_pepper": "sms-pepper-that-is-not-a-default",
         "auth_security_token_pepper": "security-pepper-that-is-not-a-default",
         "auth_mfa_encryption_key": "mfa-encryption-key-that-is-not-a-default",
-        "email_provider": "resend",
-        "email_resend_api_key": "resend-test-key-that-is-not-a-default",
     }
     values.update(overrides)
     return Settings(**values)
@@ -54,6 +52,7 @@ def test_valid_production_security_configuration_is_accepted() -> None:
     settings = _production_settings()
     assert settings.environment == "production"
     assert settings.public_app_url == "https://hring.ir"
+    assert settings.email_provider == "disabled"
 
 
 def test_production_refresh_cookie_is_secure_http_only_and_scoped() -> None:
