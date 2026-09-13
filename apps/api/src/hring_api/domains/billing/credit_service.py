@@ -1112,32 +1112,32 @@ async def run_with_credit_reservation(
 
 
 _COMPAT_CREDIT_COSTS = {
-    "generate-job-profile": 8,
-    "generate-interview-kit": 10,
-    "generate-onboarding-plan": 12,
-    "generate-learning-path": 12,
-    "hring-support": 1,
-    "labor-complaint-assistant": 25,
+    "generate-job-profile": 50,
+    "generate-interview-kit": 100,
+    "generate-onboarding-plan": 50,
+    "generate-learning-path": 30,
+    "hring-support": 10,
+    "labor-complaint-assistant": 250,
 }
 
 # Stable browser operation names mapped to the authoritative database feature keys.
 # The defaults only apply when an administrator has not configured an active row.
 PUBLIC_RATE_CARD: dict[str, tuple[str, int]] = {
-    "JOB_PROFILE": ("job_engineering.job_profile", 8),
-    "INTERVIEW_GUIDE": ("interview.kit", 10),
-    "INTERVIEW_KIT": ("interview.kit", 10),
-    "SMART_AD_TEXT": ("job_ads.smart_ad_text", 5),
-    "SMART_AD_IMAGE": ("job_ads.smart_ad_image", 50),
-    "ONBOARDING_PLAN": ("development.onboarding_plan", 12),
-    "LEARNING_PATH": ("development.learning_path", 12),
-    "LEGAL_ADVISOR": ("legal.advisor", 5),
-    "LABOR_COMPLAINT": ("compat.labor-complaint-assistant", 25),
-    "LEGAL_DEFENSE": ("legal.defense", 35),
-    "HR_SUPPORT": ("compat.hring-support", 1),
-    "COST_CALCULATOR": ("costing.employee_cost_calculator", 2),
-    "HR_DASHBOARD": ("hr_data.dashboard_demo", 5),
-    "HR_DASHBOARD_UPLOAD": ("hr_data.dashboard_upload", 15),
-    "HEADHUNTING": ("recruiting.headhunting", 60),
+    "JOB_PROFILE": ("job_engineering.job_profile", 50),
+    "INTERVIEW_GUIDE": ("interview.kit", 100),
+    "INTERVIEW_KIT": ("interview.kit", 100),
+    "SMART_AD_TEXT": ("job_ads.smart_ad_text", 10),
+    "SMART_AD_IMAGE": ("job_ads.smart_ad_image", 1500),
+    "ONBOARDING_PLAN": ("development.onboarding_plan", 50),
+    "LEARNING_PATH": ("development.learning_path", 30),
+    "LEGAL_ADVISOR": ("legal.advisor", 20),
+    "LABOR_COMPLAINT": ("compat.labor-complaint-assistant", 250),
+    "LEGAL_DEFENSE": ("legal.defense", 200),
+    "HR_SUPPORT": ("compat.hring-support", 10),
+    "COST_CALCULATOR": ("costing.employee_cost_calculator", 20),
+    "HR_DASHBOARD": ("hr_data.dashboard_demo", 0),
+    "HR_DASHBOARD_UPLOAD": ("hr_data.dashboard_upload", 100),
+    "HEADHUNTING": ("recruiting.headhunting", 600),
 }
 
 
@@ -1175,7 +1175,7 @@ async def compatibility_credit_cost(
 ) -> int:
     feature_key = f"compat.{function_name}"
     if function_name == "generate-job-ad":
-        default_cost = 25 if isinstance(body, dict) and body.get("generateImage") is True else 5
+        default_cost = 1510 if isinstance(body, dict) and body.get("generateImage") is True else 10
     else:
         default_cost = _COMPAT_CREDIT_COSTS.get(function_name, 5)
     return await feature_credit_cost(
