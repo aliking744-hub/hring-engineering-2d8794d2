@@ -65,7 +65,7 @@ const ShopTeaser = () => {
 
                     <div className="flex items-center gap-1 text-muted-foreground text-sm">
                       <Download className="w-4 h-4" />
-                      <span>{product.download_count.toLocaleString('fa-IR')} دانلود</span>
+                      <span>{(product.download_count ?? 0).toLocaleString('fa-IR')} دانلود</span>
                     </div>
                   </motion.div>
                 </Link>
