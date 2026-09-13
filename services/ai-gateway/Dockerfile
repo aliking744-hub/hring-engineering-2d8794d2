@@ -3,7 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple/ \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ \
     PIP_DEFAULT_TIMEOUT=120 \
     PIP_RETRIES=10
 
