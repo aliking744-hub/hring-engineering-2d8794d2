@@ -90,7 +90,7 @@ def test_job_profile_prompt_preserves_lovable_contract(monkeypatch) -> None:
     )
 
     assert result.content.startswith("# سند پروفایل شغلی")
-    assert "**سابقه کار مورد نیاز:** حداقل ۵ سال سابقه کار مرتبط" in result.content
+    assert "**سابقه کار مورد نیاز:** حداقل ۳ تا ۵ سال سابقه کار مرتبط" in result.content
     prompt = "\n".join(item["content"] for item in captured)
     for heading in (
         "## بخش اول: هویت شغلی",
