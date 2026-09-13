@@ -33,8 +33,24 @@ test("public diamond rate card stays aligned across frontend and API", async () 
     assert.match(backend, new RegExp(`"${operation}": \\("[^"]+", ${diamonds}\\)`));
   }
 
-  for (const diamonds of [50, 100, 10, 1500, 30, 20, 250, 200, 100, 600]) {
-    assert.ok(migration.includes(`credit_cost": ${diamonds}`));
+  const migratedRates = {
+    "job_engineering.job_profile": 50,
+    "interview.kit": 100,
+    "job_ads.smart_ad_text": 10,
+    "job_ads.smart_ad_image": 1500,
+    "development.onboarding_plan": 50,
+    "development.learning_path": 30,
+    "legal.advisor": 20,
+    "compat.labor-complaint-assistant": 250,
+    "legal.defense": 200,
+    "compat.hring-support": 10,
+    "costing.employee_cost_calculator": 20,
+    "hr_data.dashboard_demo": 0,
+    "hr_data.dashboard_upload": 100,
+    "recruiting.headhunting": 600,
+  };
+  for (const [featureKey, diamonds] of Object.entries(migratedRates)) {
+    assert.ok(migration.includes(`"${featureKey}": ${diamonds}`));
   }
 });
 
@@ -50,9 +66,9 @@ test("individual plans use fixed 720-hour validity and corporate self-service is
   assert.match(pricing, /۷۲۰ ساعت/);
   assert.match(pricing, /۰۹۳۲۱۱۱۱۱۲۰/);
   assert.doesNotMatch(pricing, /یک.?ساله|سالانه/);
-  assert.match(migration, /"individual_free"[\s\S]*?"monthly_credits": 0/);
-  assert.match(migration, /"individual_pro"[\s\S]*?"monthly_credits": 2_000/);
-  assert.match(migration, /"individual_plus"[\s\S]*?"monthly_credits": 6_000/);
+  assert.match(migration, /WHEN 'individual_free' THEN 0/);
+  assert.match(migration, /WHEN 'individual_pro' THEN 2000/);
+  assert.match(migration, /WHEN 'individual_plus' THEN 6000/);
 });
 
 test("admin AI quality receives only real user messages", async () => {
