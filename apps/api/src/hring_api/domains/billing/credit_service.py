@@ -1072,7 +1072,9 @@ async def run_with_credit_reservation(
     operation: Callable[[], Awaitable[T]],
 ) -> T:
     if amount <= 0:
-        return await operation()
+        result = await operation()
+        await session.commit()
+        return result
     reserved = await reserve_credits(
         session,
         principal=principal,
