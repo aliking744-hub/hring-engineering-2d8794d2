@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 SUPPORTED_USAGE_METRICS = {
     "input_tokens",
     "output_tokens",
+    "total_tokens",
     "cached_input_tokens",
     "reasoning_tokens",
     "citation_tokens",
@@ -49,6 +50,7 @@ class AiUsageSummaryRow(BaseModel):
     failures: int
     input_tokens: int
     output_tokens: int
+    total_tokens: int
     cached_input_tokens: int
     reasoning_tokens: int
     credits_charged: int
@@ -72,6 +74,7 @@ class AiCompanyUsageSummaryRow(BaseModel):
     failures: int
     input_tokens: int
     output_tokens: int
+    total_tokens: int
     cached_input_tokens: int
     reasoning_tokens: int
     credits_charged: int
