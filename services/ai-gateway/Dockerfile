@@ -14,7 +14,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+RUN pip install --no-cache-dir "setuptools>=70" wheel \
     && pip install --no-cache-dir --no-build-isolation .
 
 RUN addgroup --system hring \
