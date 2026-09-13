@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
@@ -11,6 +12,31 @@ from hring_api.worker.config import get_worker_settings
 
 
 T = TypeVar("T")
+
+_worker_event_loop: asyncio.AbstractEventLoop | None = None
+_worker_event_loop_pid: int | None = None
+
+
+def _run_async(awaitable: Awaitable[T]) -> T:
+    """Run every task in a child process on one stable asyncio event loop.
+
+    Celery prefork processes execute tasks sequentially, while SQLAlchemy's
+    shared async engine keeps pooled asyncpg connections bound to their event
+    loop. Creating a fresh loop for every retry can therefore attach a pooled
+    Future to the previous, already-closed loop.
+    """
+
+    global _worker_event_loop, _worker_event_loop_pid
+    pid = os.getpid()
+    if (
+        _worker_event_loop is None
+        or _worker_event_loop.is_closed()
+        or _worker_event_loop_pid != pid
+    ):
+        _worker_event_loop = asyncio.new_event_loop()
+        _worker_event_loop_pid = pid
+        asyncio.set_event_loop(_worker_event_loop)
+    return _worker_event_loop.run_until_complete(awaitable)
 
 
 @celery_app.task(name="hring.worker.healthcheck", ignore_result=False)  # type: ignore[untyped-decorator]
@@ -52,7 +78,7 @@ async def _sync_legal_sources() -> dict[str, object]:
     retry_kwargs={"max_retries": 3},
 )
 def sync_legal_sources_task() -> dict[str, object]:
-    return asyncio.run(_sync_legal_sources())
+    return _run_async(_sync_legal_sources())
 
 
 async def _refresh_exchange_rate() -> dict[str, object]:
@@ -77,7 +103,7 @@ async def _refresh_exchange_rate() -> dict[str, object]:
     retry_kwargs={"max_retries": 3},
 )
 def refresh_exchange_rate_task() -> dict[str, object]:
-    return asyncio.run(_refresh_exchange_rate())
+    return _run_async(_refresh_exchange_rate())
 
 
 async def _generate_content_article(
@@ -117,7 +143,7 @@ async def _generate_content_article(
 def generate_content_article_task(
     slot_key: str, trigger: str = "schedule", actor_user_id: str | None = None, force: bool = False,
 ) -> dict[str, object]:
-    result = asyncio.run(_generate_content_article(
+    result = _run_async(_generate_content_article(
         slot_key=slot_key, trigger=trigger, actor_user_id=actor_user_id, force=force,
     ))
     if result["status"] == "failed":
@@ -145,4 +171,4 @@ async def _poll_content_schedule() -> dict[str, object]:
 
 @celery_app.task(name="hring.content.poll_schedule", ignore_result=False)  # type: ignore[untyped-decorator]
 def poll_content_schedule_task() -> dict[str, object]:
-    return asyncio.run(_poll_content_schedule())
+    return _run_async(_poll_content_schedule())
