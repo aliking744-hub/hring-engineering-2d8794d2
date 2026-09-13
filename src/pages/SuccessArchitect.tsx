@@ -107,8 +107,8 @@ const SuccessArchitect = () => {
       }
       if (err instanceof ApiError && err.status === 402) {
         toast({
-          title: "اعتبار ناکافی",
-          description: "برای تولید این برنامه اعتبار کافی ندارید",
+          title: "الماس ناکافی",
+          description: "برای تولید این برنامه الماس کافی ندارید",
           variant: "destructive",
         });
       } else if (err instanceof ApiError && err.status === 502) {
@@ -267,7 +267,7 @@ const SuccessArchitect = () => {
               ) : (
                 <>
                   <Route className="w-5 h-5" />
-                  تولید نقشه راه ۹۰ روزه و ایمیل خوش‌آمدگویی ({getCost('ONBOARDING_PLAN')} جم)
+                  تولید نقشه راه ۹۰ روزه و ایمیل خوش‌آمدگویی ({getCost('ONBOARDING_PLAN')} الماس)
                 </>
               )}
             </Button>
