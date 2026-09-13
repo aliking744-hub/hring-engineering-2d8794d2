@@ -215,7 +215,7 @@ const PricingAdmin = () => {
                   <div className="space-y-2"><Label>نام نمایشی</Label><Input value={plan.display_name} onChange={(e) => patchPlan(plan.plan_type, { display_name: e.target.value })} /></div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2"><Label>قیمت پایه (دلار)</Label><Input inputMode="decimal" value={usdDrafts[plan.plan_type] ?? ''} onChange={(e) => updateUsdDraft(plan.plan_type, e.target.value)} placeholder="مثلاً 1.5" aria-label={`قیمت دلاری ${plan.display_name}`} /></div>
-                    <div className="space-y-2"><Label>اعتبار/توکن پلن</Label><Input inputMode="numeric" value={plan.monthly_credits} onChange={(e) => patchPlan(plan.plan_type, { monthly_credits: Number(e.target.value.replace(/\D/g, '')) })} /></div>
+                    <div className="space-y-2"><Label>الماس پلن</Label><Input inputMode="numeric" value={plan.monthly_credits} onChange={(e) => patchPlan(plan.plan_type, { monthly_credits: Number(e.target.value.replace(/\D/g, '')) })} /></div>
                   </div>
                   <div className="rounded-lg bg-muted p-3"><div className="text-xs text-muted-foreground">قیمت نهایی فعلی</div><div className="mt-1 text-lg font-bold">{toman(plan.price_toman)}</div></div>
                   <div className="flex items-center justify-between"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={plan.is_active} onChange={(e) => patchPlan(plan.plan_type, { is_active: e.target.checked })} className="h-4 w-4" />فعال برای فروش</label><Button onClick={() => savePlan(plan)} disabled={busy !== null}><Save className="ml-2 h-4 w-4" />ذخیره پلن</Button></div>

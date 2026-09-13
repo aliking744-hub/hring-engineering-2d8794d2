@@ -23,6 +23,8 @@ def _production_settings(**overrides: object) -> Settings:
         "sms_otp_pepper": "sms-pepper-that-is-not-a-default",
         "auth_security_token_pepper": "security-pepper-that-is-not-a-default",
         "auth_mfa_encryption_key": "mfa-encryption-key-that-is-not-a-default",
+        "email_provider": "resend",
+        "email_resend_api_key": "resend-test-key-that-is-not-a-default",
     }
     values.update(overrides)
     return Settings(**values)

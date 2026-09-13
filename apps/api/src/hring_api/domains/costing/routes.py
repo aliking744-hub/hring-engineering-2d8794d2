@@ -26,7 +26,7 @@ from hring_api.domains.identity.dependencies import Principal, get_current_princ
 
 router = APIRouter(prefix="/costing", tags=["costing"])
 COST_CALCULATOR_FEATURE_KEY = "costing.employee_cost_calculator"
-COST_CALCULATOR_DEFAULT_CREDIT_COST = 2
+COST_CALCULATOR_DEFAULT_CREDIT_COST = 20
 
 
 def _http_error(exc: CreditError) -> HTTPException:

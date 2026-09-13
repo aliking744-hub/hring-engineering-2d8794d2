@@ -54,7 +54,7 @@ def test_billing_plans_are_seeded_and_publicly_readable() -> None:
     plan_types = {item["plan_type"] for item in plans}
     assert "individual_pro" in plan_types
     assert "individual_expert" not in plan_types
-    assert "corporate_expert" in plan_types
+    assert not any(plan_type.startswith("corporate_") for plan_type in plan_types)
     for plan in plans:
         assert plan["price_toman"] >= 0
         assert plan["monthly_credits"] >= 0

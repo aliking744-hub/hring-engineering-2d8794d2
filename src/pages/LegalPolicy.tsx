@@ -14,7 +14,7 @@ interface LegalPolicyProps {
 
 const UPDATED_AT = '۱۴ شهریور ۱۴۰۵';
 const SUPPORT_EMAIL = 'ali_dehghani744@yahoo.com';
-const SUPPORT_PHONE = '09127760516';
+const SUPPORT_PHONE = '09321111120';
 
 const contact = (
   <>

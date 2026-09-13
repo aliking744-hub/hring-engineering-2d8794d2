@@ -490,7 +490,7 @@ const DefenseBuilder = () => {
               disabled={!complaint}
             >
               <Sparkles className="w-5 h-5" />
-              {`شروع تحلیل پرونده (${getCost('LEGAL_DEFENSE')} جم)`}
+              {`شروع تحلیل پرونده (${getCost('LEGAL_DEFENSE')} الماس)`}
             </Button>
           </motion.div>
         )}

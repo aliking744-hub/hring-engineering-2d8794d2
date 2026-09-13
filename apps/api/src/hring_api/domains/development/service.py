@@ -55,10 +55,10 @@ from hring_api.domains.development.schemas import (
 from hring_api.domains.identity.dependencies import Principal
 
 
-ONBOARDING_DEFAULT_CREDIT_COST = 12
+ONBOARDING_DEFAULT_CREDIT_COST = 50
 ONBOARDING_CERTIFICATE_FEATURE_KEY = "development.onboarding_certificate"
-ONBOARDING_CERTIFICATE_DEFAULT_CREDIT_COST = 2
-LEARNING_PATH_DEFAULT_CREDIT_COST = 12
+ONBOARDING_CERTIFICATE_DEFAULT_CREDIT_COST = 20
+LEARNING_PATH_DEFAULT_CREDIT_COST = 30
 
 
 class DevelopmentError(RuntimeError):

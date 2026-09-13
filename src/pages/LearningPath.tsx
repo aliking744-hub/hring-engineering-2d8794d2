@@ -20,7 +20,7 @@ import { ApiError, apiRequest } from "@/lib/api";
 import AuroraBackground from "@/components/AuroraBackground";
 import { useSiteName } from "@/hooks/useSiteSettings";
 import { useCredits } from "@/hooks/useCredits";
-import jsPDF from "jspdf";
+import { exportElementToPdf } from "@/lib/exportPdf";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { waitForPrintableAssets } from "@/lib/printDocument";
 
@@ -164,7 +164,7 @@ export default function LearningPath() {
       }
       console.error("Learning-path generation failed:", e);
       const msg = e instanceof ApiError && e.status === 402
-        ? "اعتبار کافی برای تولید مسیر یادگیری ندارید"
+        ? "الماس کافی برای تولید مسیر یادگیری ندارید"
         : e instanceof ApiError && e.status === 502
           ? "سرویس هوش مصنوعی هنوز متصل یا در دسترس نیست"
           : e instanceof Error
@@ -197,7 +197,12 @@ export default function LearningPath() {
       });
       toast({ title: "ایمیل ارسال شد ✓", description: `نقشه راه به ${targetEmail} ارسال شد` });
     } catch (e: unknown) {
-      toast({ title: "خطا در ارسال ایمیل", description: (e instanceof Error ? e.message : "خطای ناشناخته"), variant: "destructive" });
+      const description = e instanceof ApiError && e.status === 503
+        ? "سرویس ایمیل روی سرور تنظیم نشده است. مدیر سامانه باید Resend و فرستندهٔ تأییدشده را فعال کند."
+        : e instanceof Error
+          ? e.message
+          : "خطای ناشناخته";
+      toast({ title: "خطا در ارسال ایمیل", description, variant: "destructive" });
     } finally {
       setSendingEmail(false);
     }
@@ -228,15 +233,8 @@ export default function LearningPath() {
   };
   const handleDownload = async () => {
     if (!printRef.current) return;
-    await waitForPrintableAssets(printRef.current);
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(printRef.current, {
-      callback: (document) => document.save('HRing-learning-path.pdf'),
-      margin: [10, 10, 10, 10],
-      autoPaging: 'text',
-      html2canvas: { scale: 0.75, useCORS: true },
-      width: 190,
-      windowWidth: 900,
+    await exportElementToPdf(printRef.current, {
+      filename: "HRing-learning-path.pdf",
     });
   };
 
@@ -456,7 +454,7 @@ export default function LearningPath() {
 
                       <Button onClick={handleSubmit} disabled={loading || !isFormValid || credits < getCost('LEARNING_PATH')} className="w-full mt-2" size="lg">
                         {loading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید نقشه راه...</> :
-                          <><GraduationCap className="w-4 h-4 ml-2" />تولید نقشه راه آموزشی ({getCost('LEARNING_PATH')} جم)</>}
+                          <><GraduationCap className="w-4 h-4 ml-2" />تولید نقشه راه آموزشی ({getCost('LEARNING_PATH')} الماس)</>}
                       </Button>
                     </CardContent>
                   </Card>

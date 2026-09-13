@@ -113,12 +113,12 @@ async def persist_ai_usage_isolated(**kwargs: object) -> None:
 
 
 def _safe_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Keep customer-visible turns, never internal system instructions."""
+    """Keep only actual customer messages; never operational or assistant instructions."""
     safe: list[dict[str, str]] = []
     for item in messages[-30:]:
         role = item.get("role")
         content = item.get("content")
-        if role not in {"user", "assistant"} or not isinstance(content, str):
+        if role != "user" or not isinstance(content, str):
             continue
         normalized = content.strip()
         if normalized:

@@ -112,7 +112,7 @@ const LegalAdvisorWidget = () => {
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <><Send className="w-4 h-4" /><span className="text-xs">{getCost('LEGAL_ADVISOR')} جم</span></>
+              <><Send className="w-4 h-4" /><span className="text-xs">{getCost('LEGAL_ADVISOR')} الماس</span></>
             )}
           </Button>
         </form>
@@ -242,7 +242,7 @@ const LegalAdvisorWidget = () => {
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <><Send className="w-4 h-4" /><span className="text-xs">{getCost('LEGAL_ADVISOR')} جم</span></>
+                  <><Send className="w-4 h-4" /><span className="text-xs">{getCost('LEGAL_ADVISOR')} الماس</span></>
                 )}
               </Button>
             </form>

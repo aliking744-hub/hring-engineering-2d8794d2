@@ -39,6 +39,7 @@ interface UsageRow {
   failures: number;
   input_tokens: number;
   output_tokens: number;
+  total_tokens: number;
   cached_input_tokens: number;
   reasoning_tokens: number;
   credits_charged: number;
@@ -62,6 +63,7 @@ interface CompanyUsageRow {
   failures: number;
   input_tokens: number;
   output_tokens: number;
+  total_tokens: number;
   cached_input_tokens: number;
   reasoning_tokens: number;
   credits_charged: number;
@@ -77,6 +79,21 @@ interface CompanyUsageSummary {
   total_estimated_cost_microusd: number;
   total_provider_cost_microusd: number;
   total_credits_charged: number;
+}
+
+interface UsageEvent {
+  id: string;
+  request_id: string;
+  feature_key: string;
+  provider: string;
+  model: string;
+  metrics_json: Record<string, number>;
+  provider_cost_microusd: number | null;
+  estimated_cost_microusd: number;
+  credits_charged: number;
+  status: string;
+  error_code: string | null;
+  created_at: string;
 }
 
 interface PlatformCompany {
@@ -129,6 +146,7 @@ const AiEconomicsPanel = () => {
   const [companySummary, setCompanySummary] = useState<CompanyUsageSummary | null>(null);
   const [companies, setCompanies] = useState<PlatformCompany[]>([]);
   const [rates, setRates] = useState<RateCard[]>([]);
+  const [events, setEvents] = useState<UsageEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [rateOpen, setRateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -146,16 +164,18 @@ const AiEconomicsPanel = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryData, companyData, rateData, companyList] = await Promise.all([
+      const [summaryData, companyData, rateData, companyList, eventData] = await Promise.all([
         apiRequest<UsageSummary>('/admin/platform/ai/usage-summary?days=30'),
         apiRequest<CompanyUsageSummary>('/admin/platform/ai/company-summary?days=30'),
         apiRequest<RateCard[]>('/admin/platform/ai/rates'),
         apiRequest<PlatformCompany[]>('/admin/platform/companies?limit=500'),
+        apiRequest<UsageEvent[]>('/admin/platform/ai/usage-events?days=30&limit=1000'),
       ]);
       setSummary(summaryData);
       setCompanySummary(companyData);
       setRates(rateData);
       setCompanies(companyList);
+      setEvents(eventData);
     } catch (error) {
       console.error('AI economics load failed:', error);
       toast.error(error instanceof Error ? error.message : 'دریافت آمار مصرف هوش مصنوعی انجام نشد');
@@ -215,6 +235,23 @@ const AiEconomicsPanel = () => {
     : 0;
   const avgCostPerRequestUsd = summary?.total_requests ? totalCostUsd / summary.total_requests : 0;
   const avgCostPerCreditUsd = summary?.total_credits_charged ? totalCostUsd / summary.total_credits_charged : 0;
+  const summaryTokenTotal = (summary?.rows || []).reduce(
+    (total, row) => total + row.total_tokens,
+    0,
+  );
+  const eventTokenTotal = events.reduce(
+    (total, event) =>
+      total +
+      (event.metrics_json.total_tokens
+        || (event.metrics_json.input_tokens || 0) + (event.metrics_json.output_tokens || 0)),
+    0,
+  );
+  const tokenDelta = eventTokenTotal - summaryTokenTotal;
+  const componentTokenTotal = (summary?.rows || []).reduce(
+    (total, row) => total + row.input_tokens + row.output_tokens,
+    0,
+  );
+  const providerInternalTokens = Math.max(0, summaryTokenTotal - componentTokenTotal);
 
   const revenue = numberValue(contractRevenueToman);
   const fx = numberValue(usdTomanRate);
@@ -272,7 +309,7 @@ const AiEconomicsPanel = () => {
 
       <Card>
         <CardHeader><CardTitle>هزینه به تفکیک شرکت</CardTitle><CardDescription>برای Drill-down هر شرکت، `company_id` به گزارش feature-level ارسال می‌شود؛ این جدول نمای اقتصادی کل tenant است.</CardDescription></CardHeader>
-        <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>شرکت</TableHead><TableHead>Calls</TableHead><TableHead>Input</TableHead><TableHead>Output</TableHead><TableHead>Credits</TableHead><TableHead>Failure</TableHead><TableHead>AI Cost</TableHead></TableRow></TableHeader><TableBody>{(companySummary?.rows || []).map((row) => <TableRow key={row.company_id || 'individual'}><TableCell>{row.company_id ? companyNames.get(row.company_id) || row.company_id : 'کاربران فردی / بدون شرکت'}</TableCell><TableCell>{integer(row.requests)}</TableCell><TableCell>{integer(row.input_tokens)}</TableCell><TableCell>{integer(row.output_tokens)}</TableCell><TableCell>{integer(row.credits_charged)}</TableCell><TableCell>{integer(row.failures)}</TableCell><TableCell dir="ltr">{usd(row.provider_cost_microusd || row.estimated_cost_microusd)}</TableCell></TableRow>)}{!companySummary?.rows.length && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">هنوز مصرف شرکتی ثبت نشده است.</TableCell></TableRow>}</TableBody></Table></div></CardContent>
+        <CardContent><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>شرکت</TableHead><TableHead>Calls</TableHead><TableHead>Input</TableHead><TableHead>Output</TableHead><TableHead>Total</TableHead><TableHead>Credits</TableHead><TableHead>Failure</TableHead><TableHead>AI Cost</TableHead></TableRow></TableHeader><TableBody>{(companySummary?.rows || []).map((row) => <TableRow key={row.company_id || 'individual'}><TableCell>{row.company_id ? companyNames.get(row.company_id) || row.company_id : 'کاربران فردی / بدون شرکت'}</TableCell><TableCell>{integer(row.requests)}</TableCell><TableCell>{integer(row.input_tokens)}</TableCell><TableCell>{integer(row.output_tokens)}</TableCell><TableCell>{integer(row.credits_charged)}</TableCell><TableCell>{integer(row.failures)}</TableCell><TableCell dir="ltr">{usd(row.provider_cost_microusd || row.estimated_cost_microusd)}</TableCell></TableRow>)}{!companySummary?.rows.length && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">هنوز مصرف شرکتی ثبت نشده است.</TableCell></TableRow>}</TableBody></Table></div></CardContent>
       </Card>
 
       <Card>
@@ -289,11 +326,53 @@ const AiEconomicsPanel = () => {
                     <TableCell>{integer(row.requests)}{row.failures > 0 && <Badge className="mr-2" variant="destructive">{integer(row.failures)} خطا</Badge>}</TableCell>
                     <TableCell>{integer(row.input_tokens)}</TableCell>
                     <TableCell>{integer(row.output_tokens)}</TableCell>
+                    <TableCell>{integer(row.total_tokens)}</TableCell>
                     <TableCell>{integer(row.credits_charged)}</TableCell>
                     <TableCell dir="ltr">{usd(row.provider_cost_microusd || row.estimated_cost_microusd)}</TableCell>
                   </TableRow>
                 ))}
                 {!summary?.rows.length && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">هنوز featureای از Gateway مصرف ثبت نکرده است.</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>ردیابی و تطبیق هر درخواست</CardTitle>
+          <CardDescription>
+            هر فراخوانی با request_id، توکن خام مدل، الماس کسرشده و هزینه دلار ثبت می‌شود؛
+            اختلاف ردیف‌ها با خلاصه: <span dir="ltr">{integer(tokenDelta)}</span> توکن؛
+            اختلاف کل خام ارائه‌دهنده با Input + Output: <span dir="ltr">{integer(providerInternalTokens)}</span> توکن.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tokenDelta !== 0 && (
+            <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">
+              هشدار تطبیق: جمع ردیف‌های درخواست با خلاصه برابر نیست. تا رفع اختلاف، این داده برای قیمت‌گذاری قطعی معتبر نیست.
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>زمان / request_id</TableHead><TableHead>Feature</TableHead><TableHead>Model</TableHead><TableHead>Input</TableHead><TableHead>Output</TableHead><TableHead>Total</TableHead><TableHead>Cache</TableHead><TableHead>Reasoning</TableHead><TableHead>الماس</TableHead><TableHead>هزینه</TableHead><TableHead>وضعیت</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {events.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell><div>{new Date(event.created_at).toLocaleString('fa-IR')}</div><div className="max-w-40 truncate font-mono text-[10px]" dir="ltr" title={event.request_id}>{event.request_id}</div></TableCell>
+                    <TableCell className="font-mono text-xs">{event.feature_key}</TableCell>
+                    <TableCell><div>{event.provider}</div><div className="text-xs text-muted-foreground" dir="ltr">{event.model}</div></TableCell>
+                    <TableCell>{integer(event.metrics_json.input_tokens || 0)}</TableCell>
+                    <TableCell>{integer(event.metrics_json.output_tokens || 0)}</TableCell>
+                    <TableCell>{integer(event.metrics_json.total_tokens || (event.metrics_json.input_tokens || 0) + (event.metrics_json.output_tokens || 0))}</TableCell>
+                    <TableCell>{integer(event.metrics_json.cached_input_tokens || 0)}</TableCell>
+                    <TableCell>{integer(event.metrics_json.reasoning_tokens || 0)}</TableCell>
+                    <TableCell>{integer(event.credits_charged)}</TableCell>
+                    <TableCell dir="ltr">{usd(event.provider_cost_microusd ?? event.estimated_cost_microusd)}</TableCell>
+                    <TableCell>{event.status === 'success' ? 'موفق' : event.error_code || event.status}</TableCell>
+                  </TableRow>
+                ))}
+                {!events.length && <TableRow><TableCell colSpan={11} className="py-8 text-center text-muted-foreground">هنوز درخواست قابل تطبیقی ثبت نشده است.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>

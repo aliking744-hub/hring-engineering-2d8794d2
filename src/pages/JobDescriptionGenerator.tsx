@@ -9,12 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
 import DataPrivacyWarning from "@/components/DataPrivacyWarning";
-import jsPDF from "jspdf";
+import { exportElementToPdf } from "@/lib/exportPdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import { Textarea } from "@/components/ui/textarea";
 import logo from "@/assets/logo.png";
-import { waitForPrintableAssets } from "@/lib/printDocument";
 
 const seniorityLevels = [
   { value: "junior", label: "کارشناس (Junior)" },
@@ -82,15 +81,8 @@ const JobDescriptionGenerator = () => {
 
   const downloadPDF = async () => {
     if (!previewRef.current) return;
-    await waitForPrintableAssets(previewRef.current);
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    await pdf.html(previewRef.current, {
-      callback: (document) => document.save(`HRing-job-profile-${jobTitle || 'report'}.pdf`),
-      margin: [12, 12, 12, 12],
-      autoPaging: 'text',
-      html2canvas: { scale: 0.8, useCORS: true },
-      width: 186,
-      windowWidth: 900,
+    await exportElementToPdf(previewRef.current, {
+      filename: `HRing-job-profile-${jobTitle || "report"}.pdf`,
     });
   };
 
@@ -106,8 +98,8 @@ const JobDescriptionGenerator = () => {
 
     if (!hasEnoughCredits('JOB_PROFILE')) {
       toast({
-        title: "اعتبار ناکافی",
-        description: `برای این عملیات ${getCost('JOB_PROFILE')} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        title: "الماس ناکافی",
+        description: `برای این عملیات ${getCost('JOB_PROFILE')} الماس نیاز دارید. الماس فعلی: ${credits}`,
         variant: "destructive",
       });
       return;
@@ -174,7 +166,7 @@ const JobDescriptionGenerator = () => {
               <Input placeholder="مثال: شرکت فناوری" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="bg-secondary/50 border-border" />
             </div>
             <Button className="w-full glow-button text-foreground" onClick={handleGenerate} disabled={isLoading || !hasEnoughCredits('JOB_PROFILE')}>
-              {isLoading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید...</> : <><Sparkles className="w-4 h-4 ml-2" />تولید پروفایل شغلی ({getCost('JOB_PROFILE')} جم)</>}
+              {isLoading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید...</> : <><Sparkles className="w-4 h-4 ml-2" />تولید پروفایل شغلی ({getCost('JOB_PROFILE')} الماس)</>}
             </Button>
           </motion.div>
 

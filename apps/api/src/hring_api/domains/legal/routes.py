@@ -159,7 +159,7 @@ async def legal_advisor_chat(
     db: AsyncSession = Depends(get_db_session),
 ) -> LegalAdvisorResponse:
     feature_key = "legal.advisor"
-    cost = await feature_credit_cost(db, feature_key=feature_key, default_cost=5)
+    cost = await feature_credit_cost(db, feature_key=feature_key, default_cost=20)
     key_hash = sha256(idempotency_key.strip().encode()).hexdigest()
 
     async def operation() -> LegalAdvisorResponse:

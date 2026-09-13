@@ -32,8 +32,8 @@ from hring_api.domains.identity.dependencies import Principal, get_current_princ
 router = APIRouter(prefix="/hr-data", tags=["hr-data"])
 HR_DASHBOARD_DEMO_FEATURE_KEY = "hr_data.dashboard_demo"
 HR_DASHBOARD_UPLOAD_FEATURE_KEY = "hr_data.dashboard_upload"
-HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 5
-HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 15
+HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 0
+HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 100
 
 
 def dashboard_upload_credit_cost(base_cost: int, row_count: int) -> int:

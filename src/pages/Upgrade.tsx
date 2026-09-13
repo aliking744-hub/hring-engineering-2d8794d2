@@ -50,41 +50,41 @@ interface PaymentVerifyResponse {
 
 const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
   individual_free: {
-    period: 'یکبار',
-    description: 'برای شروع و آشنایی با پلتفرم',
+    period: 'بدون انقضا',
+    description: 'فقط برای مشاهده قابلیت‌ها و تست دموی داشبورد',
     features: [
-      'دسترسی به ماژول‌ها',
-      'محاسبه هزینه استخدام',
-      'بدون ذخیره‌سازی ابری',
+      'مشاهده همه قابلیت‌ها',
+      'تست دموی داشبورد منابع انسانی',
+      'بدون الماس قابل مصرف',
     ],
     icon: <Zap className="h-6 w-6" />,
   },
   individual_pro: {
-    period: 'ماهانه',
-    description: 'برای متخصصان HR',
+    period: '۳۰ روز (۷۲۰ ساعت)',
+    description: 'برای استفاده محدود و واقعی یک کارشناس',
     features: [
-      'تمام ماژول‌ها',
-      'هدهانتینگ هوشمند',
-      'داشبورد HR',
-      'بدون ذخیره‌سازی ابری',
+      '۲٬۰۰۰ الماس',
+      'دسترسی به قابلیت‌های فعال تولیدی',
+      'انقضای دقیق پس از ۷۲۰ ساعت',
+      'بدون تمدید خودکار',
     ],
     icon: <Sparkles className="h-6 w-6" />,
     popular: true,
   },
   individual_plus: {
-    period: 'ماهانه',
-    description: 'برای کاربران پیشرفته',
+    period: '۳۰ روز (۷۲۰ ساعت)',
+    description: 'برای کارشناس با حجم استفاده بیشتر',
     features: [
-      'تمام ویژگی‌های Pro',
-      'دموی قطب‌نمای استراتژیک',
-      'دموی آنبوردینگ',
-      'ذخیره‌سازی ابری کامل',
-      'پشتیبانی اولویت‌دار',
+      '۶٬۰۰۰ الماس',
+      'دسترسی به قابلیت‌های فعال تولیدی',
+      'ذخیره‌سازی خروجی‌ها',
+      'انقضای دقیق پس از ۷۲۰ ساعت',
+      'بدون تمدید خودکار',
     ],
     icon: <Crown className="h-6 w-6" />,
   },
   corporate_expert: {
-    period: 'ماهانه',
+    period: 'تماس با پشتیبانی',
     description: 'تا ۵ کاربر',
     features: [
       'تا ۵ عضو تیم',
@@ -95,7 +95,7 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
     icon: <Building2 className="h-6 w-6" />,
   },
   corporate_decision_support: {
-    period: 'ماهانه',
+    period: 'تماس با پشتیبانی',
     description: 'تا ۱۰ کاربر',
     features: [
       'تا ۱۰ عضو تیم',
@@ -108,7 +108,7 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
     popular: true,
   },
   corporate_decision_making: {
-    period: 'ماهانه',
+    period: 'تماس با پشتیبانی',
     description: 'تا ۵۰ کاربر',
     features: [
       'تا ۵۰ عضو تیم',
@@ -460,7 +460,7 @@ export default function Upgrade() {
                           <div className="text-2xl font-bold">
                             {formatPrice(plan.price)}
                             <span className="text-sm text-muted-foreground mr-1">
-                              تومان / ماه
+                              تومان / ۳۰ روز
                             </span>
                           </div>
                         </CardHeader>
@@ -470,7 +470,7 @@ export default function Upgrade() {
                             className="w-full"
                             onClick={() => navigate('/auth?type=company')}
                           >
-                            ثبت‌نام شرکتی
+                            تماس با پشتیبانی: ۰۹۳۲۱۱۱۱۱۲۰
                           </Button>
                         </CardContent>
                       </Card>

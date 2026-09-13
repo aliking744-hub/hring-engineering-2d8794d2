@@ -49,7 +49,7 @@ export function UploadPage({ onDataLoaded, historySlot }: UploadPageProps) {
         feature_key: 'hr_dashboard.excel_import',
       });
       if (billingError || charged !== true) {
-        throw new Error(`برای تحلیل این فایل اکسل ${uploadCost} جم لازم است`);
+        throw new Error(`برای تحلیل این فایل اکسل ${uploadCost} الماس لازم است`);
       }
       window.dispatchEvent(new Event('hring:credits-changed'));
 

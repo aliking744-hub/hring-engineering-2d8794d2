@@ -160,6 +160,10 @@ def test_legal_defense_requires_complaint_or_history() -> None:
 
 
 def test_legal_defense_route_requires_auth_and_preserves_ui_aliases(monkeypatch) -> None:
+    async def zero_credit_cost(*_args: object, **_kwargs: object) -> int:
+        return 0
+
+    monkeypatch.setattr("hring_api.domains.legal.routes.feature_credit_cost", zero_credit_cost)
     async def fake_limit(**_kwargs: object) -> None:
         return None
 

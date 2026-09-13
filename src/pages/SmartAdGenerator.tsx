@@ -217,8 +217,8 @@ const SmartAdGenerator = () => {
   const ensureCredits = (requiredCredits: number) => {
     if (credits >= requiredCredits) return true;
     toast({
-      title: "اعتبار ناکافی",
-      description: `برای این عملیات ${requiredCredits} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+      title: "الماس ناکافی",
+      description: `برای این عملیات ${requiredCredits} الماس نیاز دارید. الماس فعلی: ${credits}`,
       variant: "destructive",
     });
     return false;
@@ -258,7 +258,7 @@ const SmartAdGenerator = () => {
       });
     } else if (status === 402) {
       toast({
-        title: "اعتبار ناکافی",
+        title: "الماس ناکافی",
         description: "اعتبار هوش مصنوعی کافی نیست. لطفاً حساب را شارژ کنید.",
         variant: "destructive",
       });
@@ -393,23 +393,94 @@ const SmartAdGenerator = () => {
       // Preserve the provider image if a cross-origin host blocks client-side composition.
       return backgroundUrl;
     }
+    await document.fonts?.load(`700 ${Math.round(height * 0.08)}px Vazirmatn`);
     context.drawImage(background, 0, 0, width, height);
-    const gradient = context.createLinearGradient(0, 0, width, 0);
-    gradient.addColorStop(0, 'rgba(7,12,28,.18)');
-    gradient.addColorStop(1, 'rgba(7,12,28,.82)');
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, width, height);
-    context.direction = 'rtl';
-    context.textAlign = 'right';
-    context.fillStyle = '#ffffff';
-    context.font = `700 ${Math.round(height * .075)}px Tahoma, sans-serif`;
-    context.fillText('استخدام می‌کنیم', width * .9, height * .28);
-    context.font = `700 ${Math.round(height * .1)}px Tahoma, sans-serif`;
-    context.fillText(jobTitle, width * .9, height * .44, width * .78);
-    context.font = `600 ${Math.round(height * .055)}px Tahoma, sans-serif`;
-    context.fillText(companyName, width * .9, height * .57, width * .72);
-    context.font = `400 ${Math.round(height * .035)}px Tahoma, sans-serif`;
-    context.fillText(contactMethod, width * .9, height * .69, width * .72);
+
+    // Preserve the premium background while guaranteeing readable Persian copy.
+    const panelX = width * 0.43;
+    const panelY = height * 0.09;
+    const panelWidth = width * 0.51;
+    const panelHeight = height * 0.82;
+    const panelGradient = context.createLinearGradient(panelX, panelY, width, panelY);
+    panelGradient.addColorStop(0, "rgba(7, 18, 38, 0.72)");
+    panelGradient.addColorStop(1, "rgba(7, 18, 38, 0.94)");
+    context.fillStyle = panelGradient;
+    context.beginPath();
+    context.roundRect(panelX, panelY, panelWidth, panelHeight, Math.max(24, height * 0.03));
+    context.fill();
+
+    const right = width * 0.89;
+    const maxTextWidth = width * 0.40;
+    context.direction = "rtl";
+    context.textAlign = "right";
+    context.textBaseline = "alphabetic";
+
+    const drawWrappedText = (
+      value: string,
+      y: number,
+      maxWidth: number,
+      lineHeight: number,
+      maxLines = 2,
+    ) => {
+      const words = value.trim().split(/\s+/);
+      const lines: string[] = [];
+      let line = "";
+      for (const word of words) {
+        const next = line ? `${line} ${word}` : word;
+        if (context.measureText(next).width <= maxWidth || !line) {
+          line = next;
+        } else {
+          lines.push(line);
+          line = word;
+        }
+      }
+      if (line) lines.push(line);
+      const visible = lines.slice(0, maxLines);
+      visible.forEach((item, index) => context.fillText(item, right, y + index * lineHeight));
+      return y + visible.length * lineHeight;
+    };
+
+    context.fillStyle = "#60a5fa";
+    context.font = `600 ${Math.round(height * 0.029)}px Vazirmatn, IRANSans, Tahoma, sans-serif`;
+    context.fillText("فرصت همکاری", right, height * 0.20);
+
+    context.fillStyle = "#ffffff";
+    context.font = `800 ${Math.round(height * 0.075)}px Vazirmatn, IRANSans, Tahoma, sans-serif`;
+    const titleBottom = drawWrappedText(
+      jobTitle,
+      height * 0.34,
+      maxTextWidth,
+      height * 0.105,
+      2,
+    );
+
+    context.fillStyle = "#bfdbfe";
+    context.font = `600 ${Math.round(height * 0.037)}px Vazirmatn, IRANSans, Tahoma, sans-serif`;
+    const companyBottom = drawWrappedText(
+      companyName,
+      titleBottom + height * 0.035,
+      maxTextWidth,
+      height * 0.055,
+      2,
+    );
+
+    context.strokeStyle = "rgba(147, 197, 253, 0.7)";
+    context.lineWidth = Math.max(2, height * 0.003);
+    context.beginPath();
+    context.moveTo(right - maxTextWidth, companyBottom + height * 0.03);
+    context.lineTo(right, companyBottom + height * 0.03);
+    context.stroke();
+
+    context.fillStyle = "#e5e7eb";
+    context.font = `400 ${Math.round(height * 0.027)}px Vazirmatn, IRANSans, Tahoma, sans-serif`;
+    drawWrappedText(
+      contactMethod,
+      companyBottom + height * 0.095,
+      maxTextWidth,
+      height * 0.045,
+      2,
+    );
+
     if (companyLogo) {
       try {
         const uploadedLogo = await loadImage(companyLogo);
@@ -644,7 +715,7 @@ const SmartAdGenerator = () => {
                   <>
                     <Megaphone className="w-5 h-5" />
                     تولید متن
-                    <span className="text-xs opacity-80">({getCost('SMART_AD_TEXT')} جم)</span>
+                    <span className="text-xs opacity-80">({getCost('SMART_AD_TEXT')} الماس)</span>
                   </>
                 )}
               </Button>
@@ -663,7 +734,7 @@ const SmartAdGenerator = () => {
                   <>
                     <ImageIcon className="w-5 h-5" />
                     تولید تصویر
-                    <span className="text-xs opacity-80">({getCost('SMART_AD_IMAGE')} جم)</span>
+                    <span className="text-xs opacity-80">({getCost('SMART_AD_IMAGE')} الماس)</span>
                   </>
                 )}
               </Button>

@@ -170,7 +170,7 @@ def test_gateway_falls_back_and_uses_each_provider_default_model(monkeypatch) ->
     assert result.provider == "ollama.qwen"
     assert result.model == "qwen-fallback-model"
     assert result.content == "fallback ok"
-    assert result.usage == {"input_tokens": 10, "output_tokens": 3}
+    assert result.usage == {"input_tokens": 10, "output_tokens": 3, "total_tokens": 13}
     assert len(result.citations) == 1
     assert result.citations[0].url == "https://example.com/report"
     assert result.citations[0].title == "Official report"
@@ -259,7 +259,7 @@ def test_gateway_translates_native_anthropic_messages_and_usage(monkeypatch) -> 
     assert "valid JSON object" in str(payload["system"])
     assert "response_format" not in payload
     assert result.content == '{"ok":true}'
-    assert result.usage == {"input_tokens": 11, "output_tokens": 4}
+    assert result.usage == {"input_tokens": 11, "output_tokens": 4, "total_tokens": 15}
     assert result.provider_request_id == "anthropic-request"
 
 

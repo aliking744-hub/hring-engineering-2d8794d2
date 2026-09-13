@@ -18,7 +18,7 @@ test('cost calculator is server-authoritative, current-year and explicitly meter
   assert.equal(/حق مسکن مصوب[\\s\\S]*disabled/.test(page), false);
   assert.equal(page.includes('useMemo'), false);
   assert.match(routes, /run_with_credit_reservation/);
-  assert.match(routes, /COST_CALCULATOR_DEFAULT_CREDIT_COST = 2/);
+  assert.match(routes, /COST_CALCULATOR_DEFAULT_CREDIT_COST = 20/);
   assert.match(service, /year=1405/);
   assert.match(service, /housing_allowance_rial=30_000_000/);
   assert.match(service, /grocery_allowance_rial=22_000_000/);
@@ -29,8 +29,8 @@ test('HR dashboard charges demo and spreadsheet differently before reveal', asyn
   const upload = await read('src/components/hr-dashboard/UploadPage.tsx');
   const routes = await read('apps/api/src/hring_api/domains/hr_data/routes.py');
 
-  assert.match(routes, /HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 5/);
-  assert.match(routes, /HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 15/);
+  assert.match(routes, /HR_DASHBOARD_DEMO_DEFAULT_CREDIT_COST = 0/);
+  assert.match(routes, /HR_DASHBOARD_UPLOAD_DEFAULT_CREDIT_COST = 100/);
   assert.match(routes, /dashboard_upload_credit_cost/);
   assert.match(routes, /run_with_credit_reservation/);
   assert.match(routes, /X-Idempotency-Key/);

@@ -29,6 +29,24 @@ def _payload(record: CompatRecord) -> dict[str, Any]:
     return value
 
 
+def _user_only_payload(record: CompatRecord) -> dict[str, Any] | None:
+    value = _payload(record)
+    raw_messages = value.get("messages")
+    if not isinstance(raw_messages, list):
+        return None
+    user_messages = [
+        {"role": "user", "content": str(message.get("content", "")).strip()}
+        for message in raw_messages
+        if isinstance(message, dict)
+        and message.get("role") == "user"
+        and str(message.get("content", "")).strip()
+    ]
+    if not user_messages:
+        return None
+    value["messages"] = user_messages
+    return value
+
+
 @router.get("/interactions")
 async def list_ai_interactions(
     feature_key: str | None = Query(default=None, max_length=120),
@@ -45,7 +63,11 @@ async def list_ai_interactions(
         .order_by(CompatRecord.created_at.desc())
         .limit(1000)
     )
-    rows = [_payload(item) for item in result.scalars().all()]
+    rows = [
+        payload
+        for item in result.scalars().all()
+        if (payload := _user_only_payload(item)) is not None
+    ]
     if feature_key:
         rows = [row for row in rows if row.get("feature_key") == feature_key]
     if request_status:
