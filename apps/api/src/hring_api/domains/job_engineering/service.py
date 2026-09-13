@@ -30,7 +30,7 @@ from hring_api.domains.job_engineering.schemas import (
 
 
 JOB_PROFILE_FEATURE_KEY = "job_engineering.job_profile"
-JOB_PROFILE_DEFAULT_CREDIT_COST = 8
+JOB_PROFILE_DEFAULT_CREDIT_COST = 50
 
 SYSTEM_PROMPT = """You are a Senior HR Consultant specializing in Organizational Development and Job Engineering. Based on the user's input, create a comprehensive 'Job Identity & Specification Document'. You MUST follow this exact Markdown structure and use Tables where specified.
 
@@ -63,7 +63,9 @@ CRITICAL TABLE STRUCTURE FOR THIS SECTION:
 ## بخش چهارم: شرایط احراز شغل
 
 ### الف) تحصیلات و تجربه
-(Detail minimum education requirements and years of experience needed)
+(State education requirements and include this exact, explicit bullet:
+- **سابقه کار مورد نیاز:** a realistic numeric minimum/range of relevant work experience based on seniority.
+Never replace it with vague wording such as «تجربه مرتبط».)
 
 ### ب) مهارت‌های فنی و دانش تخصصی
 (List technical skills, software proficiency, certifications, and domain knowledge required)
@@ -93,6 +95,29 @@ QUALITY REQUIREMENTS:
 
 class JobEngineeringError(RuntimeError):
     pass
+
+
+_EXPERIENCE_REQUIREMENTS = {
+    "junior": "حداقل ۱ سال سابقه کار مرتبط (یا کارآموزی حرفه‌ای قابل ارزیابی)",
+    "senior": "حداقل ۳ تا ۵ سال سابقه کار مرتبط",
+    "lead": "حداقل ۵ سال سابقه کار مرتبط، شامل تجربه هدایت پروژه یا تیم",
+    "manager": "حداقل ۷ سال سابقه کار مرتبط، شامل حداقل ۲ سال تجربه مدیریتی",
+}
+
+
+def _ensure_required_experience(content: str, seniority_level: str) -> str:
+    """Guarantee a concrete experience requirement even when the model omits it."""
+    if "سابقه کار مورد نیاز" in content:
+        return content
+    requirement = _EXPERIENCE_REQUIREMENTS.get(
+        seniority_level.lower(),
+        "حداقل ۲ سال سابقه کار مرتبط",
+    )
+    line = f"- **سابقه کار مورد نیاز:** {requirement}"
+    heading = "### الف) تحصیلات و تجربه"
+    if heading in content:
+        return content.replace(heading, f"{heading}\n\n{line}", 1)
+    return f"{content}\n\n## شرایط احراز شغل\n\n{line}"
 
 
 def _company_id(principal: Principal) -> UUID | None:
@@ -165,7 +190,7 @@ async def _generate_content(
     except (AiGatewayError, PromptRegistryError) as exc:
         raise JobEngineeringError("سرویس تولید پروفایل شغلی در دسترس نیست") from exc
 
-    content = result.content.strip()
+    content = _ensure_required_experience(result.content.strip(), payload.seniority_level)
     if not content:
         raise JobEngineeringError("سرویس هوش مصنوعی محتوایی تولید نکرد")
     if len(content) > 60_000:
