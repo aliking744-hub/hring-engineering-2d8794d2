@@ -1,12 +1,12 @@
 FROM python:3.12-slim
 
-ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_DEFAULT_TIMEOUT=120
 ARG PIP_RETRIES=8
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple/
 
 WORKDIR /app
 
@@ -25,8 +25,7 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
 
-RUN export PIP_INDEX_URL="${PIP_INDEX_URL}" \
-        PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT}" \
+RUN export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT}" \
         PIP_RETRIES="${PIP_RETRIES}" \
     && pip install --no-cache-dir "setuptools>=70" wheel \
     && pip install --no-cache-dir --no-build-isolation .
