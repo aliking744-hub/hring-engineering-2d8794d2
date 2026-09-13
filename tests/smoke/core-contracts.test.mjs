@@ -414,7 +414,7 @@ test('approved legal policies are public and linked from the landing footer', as
   }
   assert.match(policies, /علی دهقانی/);
   assert.match(policies, /ali_dehghani744@yahoo\.com/);
-  assert.match(policies, /09127760516/);
+  assert.match(policies, /09321111120/);
   assert.match(policies, /خیابان جردن، خیابان تابان غربی/);
   assert.match(policies, /دو روز کاری/);
   assert.equal(/مهلت هفت[‌-]روزه/.test(policies), false);
