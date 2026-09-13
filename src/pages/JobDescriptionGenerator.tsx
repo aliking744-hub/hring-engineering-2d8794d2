@@ -98,8 +98,8 @@ const JobDescriptionGenerator = () => {
 
     if (!hasEnoughCredits('JOB_PROFILE')) {
       toast({
-        title: "اعتبار ناکافی",
-        description: `برای این عملیات ${getCost('JOB_PROFILE')} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        title: "الماس ناکافی",
+        description: `برای این عملیات ${getCost('JOB_PROFILE')} الماس نیاز دارید. الماس فعلی: ${credits}`,
         variant: "destructive",
       });
       return;
@@ -166,7 +166,7 @@ const JobDescriptionGenerator = () => {
               <Input placeholder="مثال: شرکت فناوری" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="bg-secondary/50 border-border" />
             </div>
             <Button className="w-full glow-button text-foreground" onClick={handleGenerate} disabled={isLoading || !hasEnoughCredits('JOB_PROFILE')}>
-              {isLoading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید...</> : <><Sparkles className="w-4 h-4 ml-2" />تولید پروفایل شغلی ({getCost('JOB_PROFILE')} جم)</>}
+              {isLoading ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />در حال تولید...</> : <><Sparkles className="w-4 h-4 ml-2" />تولید پروفایل شغلی ({getCost('JOB_PROFILE')} الماس)</>}
             </Button>
           </motion.div>
 
