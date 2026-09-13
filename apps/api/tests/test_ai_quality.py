@@ -1,7 +1,7 @@
 from hring_api.domains.ai.service import _safe_messages
 
 
-def test_safe_messages_excludes_internal_system_prompts() -> None:
+def test_safe_messages_keeps_only_actual_user_prompts() -> None:
     messages = [
         {"role": "system", "content": "private routing instructions"},
         {"role": "user", "content": "  سؤال کاربر  "},
@@ -10,7 +10,6 @@ def test_safe_messages_excludes_internal_system_prompts() -> None:
 
     assert _safe_messages(messages) == [
         {"role": "user", "content": "سؤال کاربر"},
-        {"role": "assistant", "content": "پاسخ قبلی"},
     ]
 
 
