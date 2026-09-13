@@ -172,6 +172,9 @@ class CreditAccount(Base):
     )
     available_credits: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     reserved_credits: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    valid_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
