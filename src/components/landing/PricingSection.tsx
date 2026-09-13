@@ -41,31 +41,30 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
   individual_free: {
     icon: Diamond,
     features: [
-      "ماژول‌های پایه",
-      "ماشین‌حساب هزینه",
-      "بدون ذخیره‌سازی ابری",
+      "مشاهده همه قابلیت‌ها",
+      "تست دموی داشبورد منابع انسانی",
+      "بدون الماس قابل مصرف",
     ],
-    hidden: ["هدهانتینگ هوشمند", "آنبوردینگ", "قطب‌نمای استراتژیک"],
+    hidden: ["تولید متن و تصویر", "ذخیره‌سازی خروجی", "قابلیت‌های هوش مصنوعی"],
     popular: false,
   },
   individual_pro: {
     icon: Zap,
     features: [
-      "تمام ماژول‌ها",
-      "هدهانتینگ هوشمند",
-      "بدون ذخیره‌سازی ابری",
+      "۲٬۰۰۰ الماس برای استفاده فردی",
+      "دسترسی به قابلیت‌های فعال تولیدی",
+      "اعتبار دقیقاً ۳۰ روز (۷۲۰ ساعت)",
     ],
-    hidden: ["آنبوردینگ", "قطب‌نمای استراتژیک"],
+    hidden: ["قابلیت‌های شرکتی", "تمدید خودکار"],
     popular: false,
   },
   individual_plus: {
     icon: Crown,
     features: [
-      "تمام ماژول‌ها",
-      "هدهانتینگ هوشمند",
-      "دمو قطب‌نمای استراتژیک",
-      "دمو آنبوردینگ",
-      "ذخیره‌سازی ابری کامل",
+      "۶٬۰۰۰ الماس برای استفاده فردی بیشتر",
+      "دسترسی به قابلیت‌های فعال تولیدی",
+      "ذخیره‌سازی خروجی‌ها",
+      "اعتبار دقیقاً ۳۰ روز (۷۲۰ ساعت)",
     ],
     hidden: [],
     popular: true,
@@ -116,9 +115,9 @@ const toDisplayPlan = (plan: BillingPlan): DisplayPlan | null => {
     name: plan.display_name,
     price: plan.price_toman === 0 ? "رایگان" : formatPrice(plan.price_toman),
     priceValue: plan.price_toman,
-    period: plan.price_toman === 0 ? "" : " تومان / ماهانه",
+    period: plan.price_toman === 0 ? "" : " تومان / ۳۰ روز",
     credits: plan.monthly_credits,
-    creditsNote: plan.price_toman === 0 ? "یکبار مصرف" : "ماهانه",
+    creditsNote: plan.price_toman === 0 ? "قابل مصرف" : "برای ۳۰ روز",
     tier: plan.plan_type,
   };
 };
@@ -268,7 +267,7 @@ const PricingSection = () => {
                     )}
                     <Link to={planTarget} className="block pt-2">
                       <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
-                        {plan.priceValue === 0 ? "شروع رایگان" : "انتخاب پلن"}
+                        {plan.priceValue === 0 ? "مشاهده دموی رایگان" : "انتخاب پلن"}
                       </Button>
                     </Link>
                   </CardContent>
@@ -330,7 +329,7 @@ const PricingSection = () => {
                     </ul>
                     <Link to={planTarget} className="block pt-2">
                       <Button className="w-full" variant="outline">
-                        درخواست مشاوره
+                        تماس با پشتیبانی: ۰۹۳۲۱۱۱۱۱۲۰
                       </Button>
                     </Link>
                   </CardContent>
@@ -364,16 +363,16 @@ const PricingSection = () => {
                   <div className="text-xs text-muted-foreground">تولید متن</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.ONBOARDING_PLAN.toLocaleString("fa-IR")}</div>
-                  <div className="text-xs text-muted-foreground">برنامه آنبوردینگ</div>
+                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.INTERVIEW_KIT.toLocaleString("fa-IR")}</div>
+                  <div className="text-xs text-muted-foreground">کیت مصاحبه</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-background/50">
                   <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.SMART_AD_IMAGE.toLocaleString("fa-IR")}</div>
                   <div className="text-xs text-muted-foreground">تولید تصویر</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-background/50">
-                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.HEADHUNTING.toLocaleString("fa-IR")}</div>
-                  <div className="text-xs text-muted-foreground">هدهانتینگ هوشمند</div>
+                  <div className="text-2xl font-bold text-primary">{DIAMOND_COSTS.LEARNING_PATH.toLocaleString("fa-IR")}</div>
+                  <div className="text-xs text-muted-foreground">مسیر یادگیری</div>
                 </div>
               </div>
             </CardContent>
