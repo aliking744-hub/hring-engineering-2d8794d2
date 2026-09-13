@@ -62,7 +62,7 @@ test("individual plans use fixed 720-hour validity and corporate self-service is
   ]);
 
   assert.match(billing, /timedelta\(hours=720\)/);
-  assert.match(billing, /plan\.plan_type\.startswith\("corporate_"\)/);
+  assert.match(billing, /plan\.scope\s*==\s*"corporate"/);
   assert.match(pricing, /۷۲۰ ساعت/);
   assert.match(pricing, /۰۹۳۲۱۱۱۱۱۲۰/);
   assert.doesNotMatch(pricing, /یک.?ساله|سالانه/);
@@ -76,7 +76,7 @@ test("admin AI quality receives only real user messages", async () => {
     read("apps/api/src/hring_api/domains/ai/service.py"),
     read("apps/api/src/hring_api/domains/ai/insight_routes.py"),
   ]);
-  assert.match(service, /role\)\s*!=\s*"user"/);
+  assert.match(service, /role\s*!=\s*"user"/);
   assert.match(routes, /_user_only_payload/);
   assert.doesNotMatch(service, /role\)\s*in\s*\{"user",\s*"assistant"\}/);
 });
