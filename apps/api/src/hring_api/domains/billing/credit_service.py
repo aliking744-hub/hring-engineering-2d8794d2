@@ -322,6 +322,40 @@ async def _expire_due_reservations_locked(
     return len(expired)
 
 
+async def _expire_due_plan_balance_locked(
+    session: AsyncSession,
+    *,
+    account: CreditAccount,
+    owner: OwnerModel,
+    request_id: str | None,
+) -> bool:
+    now = datetime.now(UTC)
+    if (
+        account.valid_until is None
+        or account.valid_until > now
+        or account.available_credits <= 0
+    ):
+        return False
+    amount = int(account.available_credits)
+    await _append_entry(
+        session,
+        account=account,
+        event_type="expire",
+        amount=amount,
+        available_delta=-amount,
+        reserved_delta=0,
+        idempotency_key=(
+            f"plan:{account.id}:{account.valid_until.isoformat()}:expire"
+        ),
+        reason="Exact 720-hour plan validity expired",
+        request_id=request_id,
+        metadata_json={"valid_until": account.valid_until.isoformat()},
+    )
+    account.available_credits = 0
+    await _sync_legacy_projection(account, owner)
+    return True
+
+
 async def _effective_owner(
     session: AsyncSession,
     principal: Principal,
@@ -365,6 +399,12 @@ async def get_credit_balance(
         owner=owner,
         request_id=request_id,
     )
+    await _expire_due_plan_balance_locked(
+        session,
+        account=account,
+        owner=owner,
+        request_id=request_id,
+    )
     ledger_available, ledger_reserved = await _ledger_totals(session, account.id)
     await session.commit()
     return CreditBalance(
@@ -397,6 +437,12 @@ async def reserve_credits(
         owner_id=owner_id,
     )
     await _expire_due_reservations_locked(
+        session,
+        account=account,
+        owner=owner,
+        request_id=request_id,
+    )
+    await _expire_due_plan_balance_locked(
         session,
         account=account,
         owner=owner,
@@ -611,6 +657,12 @@ async def _apply_available_event(
         owner_id=owner_id,
     )
     await _expire_due_reservations_locked(
+        session,
+        account=account,
+        owner=owner,
+        request_id=request_id,
+    )
+    await _expire_due_plan_balance_locked(
         session,
         account=account,
         owner=owner,
@@ -867,6 +919,7 @@ async def replace_available_credits_for_plan(
     request_id: str | None,
     grant_reason: str,
     source: str,
+    valid_until: datetime | None = None,
 ) -> CreditAccount:
     if target_credits < 0:
         raise CreditConflictError("Target credits must not be negative")
@@ -876,6 +929,12 @@ async def replace_available_credits_for_plan(
         owner_id=owner_id,
     )
     await _expire_due_reservations_locked(
+        session,
+        account=account,
+        owner=owner,
+        request_id=request_id,
+    )
+    await _expire_due_plan_balance_locked(
         session,
         account=account,
         owner=owner,
@@ -924,6 +983,7 @@ async def replace_available_credits_for_plan(
             metadata_json={"operation_key": operation_key, "source": source},
         )
     account.available_credits = target_credits
+    account.valid_until = valid_until
     await _sync_legacy_projection(account, owner)
     return account
 
