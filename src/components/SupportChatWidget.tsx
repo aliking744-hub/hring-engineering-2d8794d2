@@ -490,7 +490,7 @@ const SupportChatWidget = () => {
                   className="gap-1"
                 >
                   <Send className="w-4 h-4" />
-                  <span className="text-xs">{getCost('HR_SUPPORT')} جم</span>
+                  <span className="text-xs">{getCost('HR_SUPPORT')} الماس</span>
                 </Button>
               </div>
             </div>
