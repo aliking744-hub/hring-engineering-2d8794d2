@@ -72,9 +72,9 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
   corporate_expert: {
     icon: Building2,
     features: [
-      "دسترسی کامل ماژول‌ها",
-      "آنبوردینگ کامل",
-      "Credit Pool مشترک",
+      "قرارداد و سهمیه متناسب با سازمان",
+      "فضای کاری و الماس مشترک تیم",
+      "راه‌اندازی با پشتیبانی HRing",
     ],
     hidden: [],
     popular: false,
@@ -83,9 +83,9 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
   corporate_decision_support: {
     icon: Users,
     features: [
-      "تمام امکانات اکسپرت",
-      "قطب‌نمای استراتژیک (محدود)",
-      "داشبورد تحلیلی",
+      "تعداد کاربر و الماس توافقی",
+      "قابلیت‌های فعال متناسب با نیاز سازمان",
+      "گزارش مصرف و پشتیبانی سازمانی",
     ],
     hidden: [],
     popular: false,
@@ -94,10 +94,9 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
   corporate_decision_making: {
     icon: Briefcase,
     features: [
-      "تمام امکانات",
-      "قطب‌نمای استراتژیک کامل",
-      "داشبورد مدیریتی پیشرفته",
-      "پشتیبانی اختصاصی",
+      "قرارداد اختصاصی سازمان",
+      "سطح دسترسی و سقف مصرف توافقی",
+      "پشتیبانی و استقرار اختصاصی",
     ],
     hidden: [],
     popular: false,
