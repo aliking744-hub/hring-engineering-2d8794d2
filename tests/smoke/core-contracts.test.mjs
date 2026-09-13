@@ -149,7 +149,7 @@ test('public landing hides unverified metrics and provider endorsements by defau
   assert.equal(/getSetting\('footer_ai', 'Gemini'\)/.test(footer), false);
   assert.match(footer, /footerAi &&/);
   assert.match(shop, /useDigitalProducts/);
-  assert.match(shop, /download_count \\?\\? 0/);
+  assert.match(shop, /download_count \?\? 0/);
   assert.equal(/۲\.۴k|۱\.۸k|۳\.۱k|۲\.۹k/.test(shop), false);
 });
 
