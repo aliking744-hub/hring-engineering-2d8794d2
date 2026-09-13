@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     smart_ad_text_ai_provider: str = "avalai.primary"
     smart_ad_text_ai_model: str = "gemini-2.5-flash"
     smart_ad_image_ai_provider: str = "avalai.primary"
-    smart_ad_image_ai_model: str = "gemini-3-pro-image-preview"
+    smart_ad_image_ai_model: str = "gpt-image-2.5-flare"
     legal_advisor_ai_provider: str = "avalai.primary"
     legal_advisor_ai_model: str = "gemini-2.5-flash"
     legal_defense_ai_provider: str = "avalai.primary"
