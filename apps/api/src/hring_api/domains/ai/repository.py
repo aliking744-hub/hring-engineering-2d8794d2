@@ -174,6 +174,16 @@ async def usage_summary_rows(
           COUNT(*) FILTER (WHERE status = 'failure')::bigint AS failures,
           COALESCE(SUM((metrics_json->>'input_tokens')::bigint), 0)::bigint AS input_tokens,
           COALESCE(SUM((metrics_json->>'output_tokens')::bigint), 0)::bigint AS output_tokens,
+          COALESCE(
+            SUM(
+              COALESCE(
+                (metrics_json->>'total_tokens')::bigint,
+                COALESCE((metrics_json->>'input_tokens')::bigint, 0)
+                  + COALESCE((metrics_json->>'output_tokens')::bigint, 0)
+              )
+            ),
+            0
+          )::bigint AS total_tokens,
           COALESCE(SUM((metrics_json->>'cached_input_tokens')::bigint), 0)::bigint AS cached_input_tokens,
           COALESCE(SUM((metrics_json->>'reasoning_tokens')::bigint), 0)::bigint AS reasoning_tokens,
           COALESCE(SUM(credits_charged), 0)::bigint AS credits_charged,
@@ -209,6 +219,16 @@ async def company_usage_summary_rows(
           COUNT(*) FILTER (WHERE status = 'failure')::bigint AS failures,
           COALESCE(SUM((metrics_json->>'input_tokens')::bigint), 0)::bigint AS input_tokens,
           COALESCE(SUM((metrics_json->>'output_tokens')::bigint), 0)::bigint AS output_tokens,
+          COALESCE(
+            SUM(
+              COALESCE(
+                (metrics_json->>'total_tokens')::bigint,
+                COALESCE((metrics_json->>'input_tokens')::bigint, 0)
+                  + COALESCE((metrics_json->>'output_tokens')::bigint, 0)
+              )
+            ),
+            0
+          )::bigint AS total_tokens,
           COALESCE(SUM((metrics_json->>'cached_input_tokens')::bigint), 0)::bigint AS cached_input_tokens,
           COALESCE(SUM((metrics_json->>'reasoning_tokens')::bigint), 0)::bigint AS reasoning_tokens,
           COALESCE(SUM(credits_charged), 0)::bigint AS credits_charged,
