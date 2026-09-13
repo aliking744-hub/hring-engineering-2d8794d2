@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hmac import compare_digest
 from uuid import UUID
 
@@ -110,6 +110,8 @@ async def initialize_payment(
     plan = await db.get(BillingPlan, plan_type)
     if plan is None or not plan.is_active or plan.price_toman <= 0:
         raise BillingNotFoundError("Selected billing plan is not available")
+    if plan.scope == "corporate":
+        raise BillingForbiddenError("Corporate plans require contacting support")
     try:
         await assert_pricing_is_safe(db, plan)
     except ExchangeRateError as exc:
@@ -200,6 +202,7 @@ async def _finalize_verified_payment(
             request_id=request_id,
             grant_reason="Verified plan credit grant",
             source="verified_payment",
+            valid_until=now + timedelta(hours=720),
         )
     except CreditError as exc:
         await db.rollback()
@@ -236,6 +239,8 @@ async def _finalize_verified_payment(
         metadata_json={
             "plan_type": plan.plan_type,
             "monthly_credits": plan.monthly_credits,
+            "valid_for_hours": 720,
+            "valid_until": (now + timedelta(hours=720)).isoformat(),
             "authority": locked.authority or "",
             "ref_id": verified.ref_id or "",
             "request_id": request_id or "",
