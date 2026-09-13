@@ -151,8 +151,8 @@ const InterviewAssistant = () => {
     // Check credits
     if (!hasEnoughCredits('INTERVIEW_KIT')) {
       toast({
-        title: "اعتبار ناکافی",
-        description: `برای این عملیات ${getCost('INTERVIEW_KIT')} جم نیاز دارید. اعتبار فعلی: ${credits}`,
+        title: "الماس ناکافی",
+        description: `برای این عملیات ${getCost('INTERVIEW_KIT')} الماس نیاز دارید. الماس فعلی: ${credits}`,
         variant: "destructive",
       });
       return;
@@ -297,7 +297,7 @@ const InterviewAssistant = () => {
                   در حال تولید سوالات...
                 </>
               ) : (
-                `تولید راهنمای مصاحبه (${getCost('INTERVIEW_KIT')} جم)`
+                `تولید راهنمای مصاحبه (${getCost('INTERVIEW_KIT')} الماس)`
               )}
             </Button>
           </CardContent>
