@@ -114,26 +114,35 @@ def normalize_usage(body: dict[str, Any]) -> dict[str, int]:
     usage = body.get("usage")
     if not isinstance(usage, dict):
         return {}
+    input_tokens = max(
+        _nested_int(usage, "prompt_tokens"),
+        _nested_int(usage, "input_tokens"),
+    )
+    output_tokens = max(
+        _nested_int(usage, "completion_tokens"),
+        _nested_int(usage, "output_tokens"),
+    )
     reasoning_tokens = max(
         _nested_int(usage, "completion_tokens_details", "reasoning_tokens"),
         _nested_int(usage, "reasoning_tokens"),
     )
+    # Keep the provider's own total. Reasoning/cache values are often subsets
+    # of input/output, so adding them would double-count usage. The explicit
+    # total lets operations reconcile provider dashboards request by request.
+    total_tokens = max(
+        _nested_int(usage, "total_tokens"),
+        input_tokens + output_tokens,
+    )
     normalized = {
-        "input_tokens": max(
-            _nested_int(usage, "prompt_tokens"),
-            _nested_int(usage, "input_tokens"),
-        ),
-        "output_tokens": max(
-            _nested_int(usage, "completion_tokens"),
-            _nested_int(usage, "output_tokens"),
-        ),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
         "cached_input_tokens": _nested_int(usage, "prompt_tokens_details", "cached_tokens"),
         "reasoning_tokens": reasoning_tokens,
         "citation_tokens": _nested_int(usage, "citation_tokens"),
         "search_queries": _nested_int(usage, "num_search_queries"),
     }
     return {key: value for key, value in normalized.items() if value > 0}
-
 
 def _optional_citation_text(value: object, *, limit: int) -> str | None:
     if not isinstance(value, str):
