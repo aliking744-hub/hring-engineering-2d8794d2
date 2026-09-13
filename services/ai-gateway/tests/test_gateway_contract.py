@@ -96,6 +96,7 @@ def test_openai_compatible_usage_is_normalized() -> None:
             "usage": {
                 "prompt_tokens": 120,
                 "completion_tokens": 30,
+                "total_tokens": 970,
                 "prompt_tokens_details": {"cached_tokens": 40},
                 "completion_tokens_details": {"reasoning_tokens": 5},
             }
@@ -103,6 +104,7 @@ def test_openai_compatible_usage_is_normalized() -> None:
     ) == {
         "input_tokens": 120,
         "output_tokens": 30,
+        "total_tokens": 970,
         "cached_input_tokens": 40,
         "reasoning_tokens": 5,
     }
@@ -132,6 +134,7 @@ def test_perplexity_usage_keeps_search_cost_drivers() -> None:
     ) == {
         "input_tokens": 200,
         "output_tokens": 50,
+        "total_tokens": 250,
         "reasoning_tokens": 7,
         "citation_tokens": 12,
         "search_queries": 3,
