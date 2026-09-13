@@ -28,8 +28,8 @@ COPY src ./src
 RUN export PIP_INDEX_URL="${PIP_INDEX_URL}" \
         PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT}" \
         PIP_RETRIES="${PIP_RETRIES}" \
-    && pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir "setuptools>=70" wheel \
+    && pip install --no-cache-dir --no-build-isolation .
 
 RUN addgroup --system hring \
     && adduser --system --ingroup hring --home /app hring \
