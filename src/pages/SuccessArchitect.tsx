@@ -29,9 +29,21 @@ const expectations = [
   { value: "innovation", label: "نوآوری و خلاقیت" },
 ];
 
+interface OnboardingTask {
+  id: string;
+  parent_task_id: string | null;
+  title: string;
+  details: string | null;
+  assignee_label: string | null;
+  due_on: string | null;
+  status: string;
+  sort_order: number;
+}
+
 interface OnboardingPlanResponse {
   plan: string;
   welcomeEmail: string;
+  tasks: OnboardingTask[];
 }
 
 const SuccessArchitect = () => {
@@ -45,6 +57,7 @@ const SuccessArchitect = () => {
   const [mentorRole, setMentorRole] = useState("");
   const [generatedPlan, setGeneratedPlan] = useState("");
   const [welcomeEmail, setWelcomeEmail] = useState("");
+  const [onboardingTasks, setOnboardingTasks] = useState<OnboardingTask[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
@@ -64,6 +77,7 @@ const SuccessArchitect = () => {
     setIsLoading(true);
     setGeneratedPlan("");
     setWelcomeEmail("");
+    setOnboardingTasks([]);
 
     try {
       const requestKey = idempotencyKeyRef.current || crypto.randomUUID();
@@ -89,6 +103,7 @@ const SuccessArchitect = () => {
 
       setGeneratedPlan(data.plan);
       setWelcomeEmail(data.welcomeEmail);
+      setOnboardingTasks(data.tasks || []);
       idempotencyKeyRef.current = null;
       window.dispatchEvent(new Event("hring:credits-changed"));
 
@@ -144,6 +159,22 @@ const SuccessArchitect = () => {
       });
     }
   };
+
+  const printablePlan = onboardingTasks
+    .filter((task) => !task.parent_task_id)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((stage) => {
+      const children = onboardingTasks
+        .filter((task) => task.parent_task_id === stage.id)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      return [
+        stage.title,
+        `مسئول: ${stage.assignee_label || "مدیر مستقیم"}`,
+        `موعد: ${stage.due_on ? new Date(stage.due_on).toLocaleDateString("fa-IR") : "تعیین نشده"}`,
+        ...children.map((task, index) => `${index + 1}. ${task.title}`),
+      ].join("\n");
+    })
+    .join("\n\n");
 
   const handleDownload = async () => {
     if (!resultRef.current) return;
@@ -293,7 +324,7 @@ const SuccessArchitect = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleCopy(generatedPlan, "نقشه راه")}
+                    onClick={() => handleCopy(printablePlan || generatedPlan, "نقشه راه")}
                     className="gap-2"
                   >
                     <Copy className="w-4 h-4" />
@@ -302,12 +333,47 @@ const SuccessArchitect = () => {
                 </CardTitle>
                 <CardDescription>تسک‌های قابل پیگیری برنامه در «نقشه راه ۹۰ روزه» در دسترس‌اند.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none dark:prose-invert text-right">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {generatedPlan}
-                  </ReactMarkdown>
-                </div>
+              <CardContent className="space-y-5">
+                {onboardingTasks
+                  .filter((task) => !task.parent_task_id)
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .map((stage) => {
+                    const children = onboardingTasks
+                      .filter((task) => task.parent_task_id === stage.id)
+                      .sort((a, b) => a.sort_order - b.sort_order);
+                    return (
+                      <section key={stage.id} className="rounded-xl border bg-background p-5">
+                        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b pb-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-primary">{stage.title}</h3>
+                            {stage.details && <p className="mt-1 text-sm text-muted-foreground">{stage.details}</p>}
+                          </div>
+                          <div className="text-sm leading-7 text-muted-foreground">
+                            <div><strong className="text-foreground">مسئول:</strong> {stage.assignee_label || "مدیر مستقیم"}</div>
+                            <div><strong className="text-foreground">موعد:</strong> {stage.due_on ? new Date(stage.due_on).toLocaleDateString("fa-IR") : "تعیین نشده"}</div>
+                          </div>
+                        </div>
+                        <ol className="space-y-3">
+                          {children.map((task, index) => (
+                            <li key={task.id} className="grid grid-cols-[2rem_1fr] items-start gap-3 rounded-lg bg-muted/40 p-3">
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">{index + 1}</span>
+                              <div>
+                                <p className="font-medium">{task.title}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  خروجی مورد انتظار: انجام و ثبت نتیجه این فعالیت برای تأیید مدیر
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
+                    );
+                  })}
+                {!onboardingTasks.length && (
+                  <div className="prose prose-sm max-w-none text-right">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{generatedPlan}</ReactMarkdown>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
