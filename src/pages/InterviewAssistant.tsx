@@ -8,11 +8,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { useCredits } from "@/hooks/useCredits";
 import { Loader2, Download, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle, MessageSquare, Brain, Users, Briefcase, Coins, History, Trash2 } from "lucide-react";
-import jsPDF from "jspdf";
+import { exportElementToPdf } from "@/lib/exportPdf";
 import { ApiError, apiRequest } from "@/lib/api";
 import WorkspaceHeader from "@/components/WorkspaceHeader";
 import logo from "@/assets/logo.png";
-import { waitForPrintableAssets } from "@/lib/printDocument";
 
 interface InterviewQuestion {
   id: string;
@@ -112,15 +111,8 @@ const InterviewAssistant = () => {
     });
 
     try {
-      await waitForPrintableAssets(root);
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      await pdf.html(root, {
-        callback: (document) => document.save(`HRing-interview-kit-${jobTitle || 'report'}.pdf`),
-        margin: [10, 10, 10, 10],
-        autoPaging: 'text',
-        html2canvas: { scale: 0.75, useCORS: true },
-        width: 190,
-        windowWidth: 900,
+      await exportElementToPdf(root, {
+        filename: `HRing-interview-kit-${jobTitle || "report"}.pdf`,
       });
     } finally {
       controls.forEach((element, index) => { element.style.display = controlDisplays[index]; });
