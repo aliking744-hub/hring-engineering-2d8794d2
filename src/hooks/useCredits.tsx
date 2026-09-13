@@ -5,33 +5,29 @@ import { apiRequest } from '@/lib/api';
 
 // Diamond costs for different AI operations
 export const DIAMOND_COSTS = {
-  // Simple Text Generation - 5 Diamonds
-  JOB_PROFILE: 8,
-  INTERVIEW_GUIDE: 10,
-  INTERVIEW_KIT: 10,
-  SMART_AD_TEXT: 5,
+  // Customer-facing diamond prices (minimum 10x measured provider cost).
+  JOB_PROFILE: 50,
+  INTERVIEW_GUIDE: 100,
+  INTERVIEW_KIT: 100,
+  SMART_AD_TEXT: 10,
 
-  // Medium Text Generation - 15 Diamonds
-  ONBOARDING_PLAN: 12,
-  ONBOARDING_CERTIFICATE: 2,
-  LEARNING_PATH: 12,
-  LEGAL_ADVISOR: 5,
-  LABOR_COMPLAINT: 25,
-  LEGAL_DEFENSE: 20,
-  HR_SUPPORT: 1,
+  ONBOARDING_PLAN: 50,
+  ONBOARDING_CERTIFICATE: 20,
+  LEARNING_PATH: 30,
+  LEGAL_ADVISOR: 20,
+  LABOR_COMPLAINT: 250,
+  LEGAL_DEFENSE: 200,
+  HR_SUPPORT: 10,
 
-  // Complex Analysis - 20 Diamonds
-  STRATEGIC_ANALYSIS: 20,
+  // Retired/undefined modules stay unavailable until product scope is approved.
+  STRATEGIC_ANALYSIS: 0,
 
-  // Image Generation - 25 Diamonds
-  SMART_AD_IMAGE: 50,
+  SMART_AD_IMAGE: 1500,
   HR_DASHBOARD: 0,
-  HR_DASHBOARD_UPLOAD: 10,
-  COST_CALCULATOR: 2,
-  ANALYTICS_HUB: 25,
-
-  // Premium Deep Search (Perplexity + Gemini Pro) - 60 Diamonds
-  HEADHUNTING: 60,
+  HR_DASHBOARD_UPLOAD: 100,
+  COST_CALCULATOR: 20,
+  ANALYTICS_HUB: 0,
+  HEADHUNTING: 600,
 } as const;
 
 // Labels for display (Persian)
@@ -47,19 +43,20 @@ export const DIAMOND_COST_LABELS: Record<keyof typeof DIAMOND_COSTS, string> = {
   LABOR_COMPLAINT: 'تنظیم شکایت کار',
   LEGAL_DEFENSE: 'دفاعیه حقوقی',
   HR_SUPPORT: 'پشتیبانی هوشمند',
-  STRATEGIC_ANALYSIS: 'تحلیل قطب‌نمای استراتژیک',
+  STRATEGIC_ANALYSIS: 'قابلیت راهبردی (غیرفعال)',
   SMART_AD_IMAGE: 'تصویر آگهی هوشمند',
   HR_DASHBOARD: 'داشبورد منابع انسانی (دمو)',
   HR_DASHBOARD_UPLOAD: 'داشبورد منابع انسانی (اکسل)',
   COST_CALCULATOR: 'ماشین‌حساب هزینه نیروی انسانی',
-  ANALYTICS_HUB: 'هاب تحلیلی',
+  ANALYTICS_HUB: 'قابلیت تحلیلی (غیرفعال)',
   HEADHUNTING: 'هدهانتینگ هوشمند',
 };
 
 // Tooltips for premium features
 export const DIAMOND_COST_TOOLTIPS: Partial<Record<keyof typeof DIAMOND_COSTS, string>> = {
   HEADHUNTING: 'از جستجوی پیشرفته بلادرنگ و تحلیل عمیق AI استفاده می‌کند',
-  STRATEGIC_ANALYSIS: 'تحلیل چندلایه با مدل‌های پیشرفته',
+  STRATEGIC_ANALYSIS: 'این قابلیت تا تعیین دامنه محصول غیرفعال است',
+  ANALYTICS_HUB: 'این قابلیت تا تعیین دامنه محصول غیرفعال است',
 };
 
 // Backward compatibility
