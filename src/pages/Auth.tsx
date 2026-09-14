@@ -12,7 +12,6 @@ import {
   Loader2,
   Lock,
   Mail,
-  MessageSquareText,
   Phone,
   ShieldCheck,
   User,
@@ -82,7 +81,7 @@ const Auth = () => {
   } = useAuth();
 
   const [isLogin, setIsLogin] = useState(true);
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
+  const loginMethod: LoginMethod = 'email';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -583,26 +582,8 @@ const Auth = () => {
             <InviteBanner />
 
             {showMfaPanel ? renderMfaPanel() : <>
-              <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-muted/60 p-1">
-              <Button
-                type="button"
-                variant={loginMethod === 'email' ? 'default' : 'ghost'}
-                onClick={() => setLoginMethod('email')}
-                className="gap-2"
-              >
-                <Mail className="h-4 w-4" /> ایمیل
-              </Button>
-              <Button
-                type="button"
-                variant={loginMethod === 'sms' ? 'default' : 'ghost'}
-                onClick={() => {
-                  setLoginMethod('sms');
-                  setIsLogin(true);
-                }}
-                className="gap-2"
-              >
-                <MessageSquareText className="h-4 w-4" /> پیامک
-              </Button>
+              <div className="mb-5 flex items-center justify-center gap-2 rounded-xl bg-muted/60 p-3 text-sm font-medium">
+                <Mail className="h-4 w-4" /> ورود با ایمیل
               </div>
 
             {loginMethod === 'email' ? (

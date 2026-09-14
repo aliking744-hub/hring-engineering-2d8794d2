@@ -13,7 +13,7 @@ test('employee development pages use typed native APIs only', async () => {
   assert.equal(/integrations\/supabase|supabase\.|generate-onboarding-plan/.test(onboarding), false);
 
   assert.match(learning, /\/development\/learning-paths\/generate/);
-  assert.match(learning, /\/development\/learning-paths\/\$\{targetRecordId\}\/email/);
+  assert.doesNotMatch(learning, /handleSendEmail|ارسال به ایمیل|title="ارسال ایمیل"/);
   assert.match(learning, /X-Idempotency-Key/);
   assert.equal(
     /integrations\/supabase|supabase\.|learning_path_records|generate-learning-path|send-learning-path-email/.test(learning),
@@ -66,4 +66,15 @@ test('learning path refuses an incomplete AI contract before presenting a broken
   assert.match(learning, /Array\.isArray\(data\.result\.roadmap\)/);
   assert.match(learning, /Array\.isArray\(data\.result\.hardSkills\)/);
   assert.match(learning, /Array\.isArray\(data\.result\.softSkills\)/);
+});
+
+test('unverified delivery channels are not exposed as working UI actions', async () => {
+  const [auth, learning] = await Promise.all([
+    read('src/pages/Auth.tsx'),
+    read('src/pages/LearningPath.tsx'),
+  ]);
+
+  assert.match(auth, /ورود با ایمیل/);
+  assert.doesNotMatch(auth, /MessageSquareText/);
+  assert.doesNotMatch(learning, /handleSendEmail|ارسال به ایمیل|title="ارسال ایمیل"/);
 });

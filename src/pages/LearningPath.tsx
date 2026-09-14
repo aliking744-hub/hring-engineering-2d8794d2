@@ -87,7 +87,6 @@ export default function LearningPath() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
   const [result, setResult] = useState<LearningPathResult | null>(null);
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [history, setHistory] = useState<SavedRecord[]>([]);
@@ -173,38 +172,6 @@ export default function LearningPath() {
       toast({ title: "خطا", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
-    }
-  };
-
-  /* ── Send Email ────────────────────────────────────────── */
-  const handleSendEmail = async (record?: SavedRecord) => {
-    const savedRecord = record || history.find((item) => item.id === savedRecordId);
-    const targetEmail = savedRecord?.employee_email;
-    const targetRecordId = record ? record.id : savedRecordId;
-
-    if (!targetEmail) {
-      toast({ title: "ایمیل کارمند وارد نشده", description: "لطفاً ایمیل کارمند را وارد کنید", variant: "destructive" });
-      return;
-    }
-    if (!targetRecordId) {
-      toast({ title: "ابتدا نقشه راه را تولید و ذخیره کنید", variant: "destructive" });
-      return;
-    }
-    setSendingEmail(true);
-    try {
-      await apiRequest(`/development/learning-paths/${targetRecordId}/email`, {
-        method: "POST",
-      });
-      toast({ title: "ایمیل ارسال شد ✓", description: `نقشه راه به ${targetEmail} ارسال شد` });
-    } catch (e: unknown) {
-      const description = e instanceof ApiError && e.status === 503
-        ? "سرویس ایمیل روی سرور تنظیم نشده است. مدیر سامانه باید Resend و فرستندهٔ تأییدشده را فعال کند."
-        : e instanceof Error
-          ? e.message
-          : "خطای ناشناخته";
-      toast({ title: "خطا در ارسال ایمیل", description, variant: "destructive" });
-    } finally {
-      setSendingEmail(false);
     }
   };
 
@@ -322,12 +289,6 @@ export default function LearningPath() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {form.employeeEmail && (
-                            <Button variant="outline" size="sm" onClick={() => handleSendEmail()} disabled={sendingEmail} className="gap-2">
-                              {sendingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                              ارسال به ایمیل
-                            </Button>
-                          )}
                           <Button variant="outline" size="sm" onClick={() => void handleDownload()} className="gap-2">
                             <Download className="w-4 h-4" /> دانلود PDF
                           </Button>
@@ -497,12 +458,6 @@ export default function LearningPath() {
                           <span className="text-xs text-muted-foreground hidden sm:block">
                             {new Date(rec.created_at).toLocaleDateString("fa-IR")}
                           </span>
-                          {rec.employee_email && (
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
-                              onClick={() => handleSendEmail(rec)} title="ارسال ایمیل">
-                              <Mail className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
                             onClick={() => setExpandedRecord(expandedRecord === rec.id ? null : rec.id)}>
                             {expandedRecord === rec.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
