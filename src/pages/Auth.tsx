@@ -12,7 +12,6 @@ import {
   Loader2,
   Lock,
   Mail,
-  MessageSquareText,
   Phone,
   ShieldCheck,
   User,
@@ -82,7 +81,7 @@ const Auth = () => {
   } = useAuth();
 
   const [isLogin, setIsLogin] = useState(true);
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
+  const loginMethod: LoginMethod = 'email';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
