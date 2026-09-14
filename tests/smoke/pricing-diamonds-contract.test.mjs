@@ -81,19 +81,23 @@ test("admin AI quality receives only real user messages", async () => {
   assert.doesNotMatch(service, /role\)\s*in\s*\{"user",\s*"assistant"\}/);
 });
 
-test("all printable AI results use the RTL-safe PDF exporter", async () => {
+test("all printable AI and legal results use semantic RTL-safe PDF pagination", async () => {
   const [exporter, ...pages] = await Promise.all([
     read("src/lib/exportPdf.ts"),
     read("src/pages/SuccessArchitect.tsx"),
     read("src/pages/LearningPath.tsx"),
     read("src/pages/InterviewAssistant.tsx"),
     read("src/pages/JobDescriptionGenerator.tsx"),
+    read("src/components/legal/DefenseBuilder.tsx"),
+    read("src/components/legal/LaborComplaintAssistant.tsx"),
   ]);
   assert.match(exporter, /html2canvas/);
   assert.match(exporter, /direction: rtl/);
-  assert.match(exporter, /totalPages/);
+  assert.match(exporter, /calculatePageSlices/);
+  assert.match(exporter, /semanticBoundaries/);
+  assert.doesNotMatch(exporter, /sourceY\s*=\s*page\s*\*\s*pageHeightPx/);
   for (const page of pages) {
-    assert.match(page, /exportElementToPdf/);
-    assert.doesNotMatch(page, /pdf\.html\(/);
+    assert.match(page, /export(?:Element|Text)ToPdf/);
+    assert.doesNotMatch(page, /pdf\.html\(|new jsPDF/);
   }
 });

@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
+import { exportTextToPdf } from "@/lib/exportPdf";
 import { useCredits } from "@/hooks/useCredits";
 
 // Claim types
@@ -224,85 +224,19 @@ const LaborComplaintAssistant = () => {
   };
 
   // Export complaint to PDF
-  const exportToPDF = () => {
+  // Export complaint through the shared browser-shaped Persian PDF engine.
+  const exportToPDF = async () => {
     if (!analysisResult?.complaintText) return;
 
     try {
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
+      await exportTextToPdf({
+        title: "دادخواست کار",
+        content: analysisResult.complaintText,
+        filename: `دادخواست_${new Date().toISOString().split("T")[0]}.pdf`,
       });
-
-      doc.addFont('/fonts/BNAZANIN.TTF', 'BNazanin', 'normal');
-      doc.setFont('BNazanin');
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 20;
-      const contentWidth = pageWidth - (margin * 2);
-
-      // Header
-      doc.setFontSize(18);
-      doc.setTextColor(33, 37, 41);
-      const title = "دادخواست کار";
-      const titleWidth = doc.getTextWidth(title);
-      doc.text(title, pageWidth - margin - titleWidth, 25);
-
-      // Date
-      doc.setFontSize(10);
-      doc.setTextColor(108, 117, 125);
-      const dateText = `تاریخ: ${new Date().toLocaleDateString('fa-IR')}`;
-      const dateWidth = doc.getTextWidth(dateText);
-      doc.text(dateText, pageWidth - margin - dateWidth, 35);
-
-      // Separator
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, 40, pageWidth - margin, 40);
-
-      // Content
-      doc.setFontSize(12);
-      doc.setTextColor(33, 37, 41);
-
-      const lines = analysisResult.complaintText.split('\n');
-      let yPosition = 50;
-      const lineHeight = 7;
-
-      for (const line of lines) {
-        if (yPosition > pageHeight - margin) {
-          doc.addPage();
-          yPosition = margin;
-        }
-
-        const wrappedLines = doc.splitTextToSize(line, contentWidth);
-        for (const wrappedLine of wrappedLines) {
-          if (yPosition > pageHeight - margin) {
-            doc.addPage();
-            yPosition = margin;
-          }
-          const lineWidth = doc.getTextWidth(wrappedLine);
-          doc.text(wrappedLine, pageWidth - margin - lineWidth, yPosition);
-          yPosition += lineHeight;
-        }
-      }
-
-      // Footer
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        const footerText = `صفحه ${i} از ${pageCount}`;
-        const footerWidth = doc.getTextWidth(footerText);
-        doc.text(footerText, (pageWidth - footerWidth) / 2, pageHeight - 10);
-      }
-
-      const fileName = `دادخواست_${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-
       toast.success("فایل PDF با موفقیت دانلود شد");
     } catch (error) {
-      console.error('PDF export error:', error);
+      console.error("PDF export error:", error);
       toast.error("خطا در ایجاد فایل PDF");
     }
   };
