@@ -113,7 +113,7 @@ export function calculatePageSlices(
     const candidates = boundaries.filter(
       (value) => value >= minimumUsefulBreak && value <= target,
     );
-    const breakAt = candidates.at(-1) ?? target;
+    const breakAt = candidates.length ? candidates[candidates.length - 1] : target;
     const safeBreak = breakAt > sourceY ? breakAt : target;
     slices.push({ sourceY, height: safeBreak - sourceY });
     sourceY = safeBreak;
