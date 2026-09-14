@@ -64,11 +64,22 @@ test("individual plans use fixed 720-hour validity and corporate self-service is
   assert.match(billing, /timedelta\(hours=720\)/);
   assert.match(billing, /plan\.scope\s*==\s*"corporate"/);
   assert.match(pricing, /۷۲۰ ساعت/);
+  assert.match(pricing, /مانده قبلی حفظ و به بسته جدید اضافه می‌شود/);
   assert.match(pricing, /۰۹۳۲۱۱۱۱۱۲۰/);
   assert.doesNotMatch(pricing, /یک.?ساله|سالانه/);
   assert.match(migration, /WHEN 'individual_free' THEN 0/);
   assert.match(migration, /WHEN 'individual_pro' THEN 2000/);
   assert.match(migration, /WHEN 'individual_plus' THEN 6000/);
+});
+
+test("free registrations start with zero diamonds", async () => {
+  const [models, migration] = await Promise.all([
+    read("apps/api/src/hring_api/domains/identity/models.py"),
+    read("apps/api/alembic/versions/20260914_0049_free_plan_zero_credits.py"),
+  ]);
+  assert.match(models, /monthly_credits: Mapped\[int\] = mapped_column\(Integer, nullable=False, default=0\)/);
+  assert.match(migration, /server_default="0"/);
+  assert.match(migration, /Legacy free-plan credit removal/);
 });
 
 test("admin AI quality receives only real user messages", async () => {
