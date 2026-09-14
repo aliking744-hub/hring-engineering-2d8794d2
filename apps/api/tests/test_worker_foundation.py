@@ -6,7 +6,7 @@ from pydantic import ValidationError
 import hring_api.worker.tasks as worker_tasks
 from hring_api.worker.app import MAINTENANCE_QUEUE, WORKER_QUEUES, celery_app
 from hring_api.worker.config import WorkerSettings
-from hring_api.worker.tasks import _run_async, worker_healthcheck
+from hring_api.worker.tasks import _run_async, generate_content_article_task, worker_healthcheck
 
 
 def test_worker_uses_durable_isolated_json_queues() -> None:
@@ -49,6 +49,22 @@ def test_worker_health_task_runs_without_external_side_effects() -> None:
 
     assert result.successful()
     assert result.result == {"status": "ok", "service": "hring-worker"}
+
+
+def test_failed_content_result_is_returned_without_celery_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(awaitable):  # type: ignore[no-untyped-def]
+        awaitable.close()
+        return {"status": "failed", "run_id": "run-1", "article_id": None}
+
+    monkeypatch.setattr(worker_tasks, "_run_async", fake_run)
+    result = generate_content_article_task.apply(
+        kwargs={"slot_key": "manual:test", "trigger": "manual", "force": True}
+    )
+
+    assert result.successful()
+    assert result.result["status"] == "failed"
 
 
 def test_production_worker_requires_authenticated_isolated_redis_databases() -> None:
