@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -15,6 +15,7 @@ from hring_api.domains.content.service import (
     _quality_score,
     _write_article,
     due_slot_keys,
+    recover_stale_content_runs,
     run_content_agent,
 )
 
@@ -113,47 +114,67 @@ def test_tagged_article_preserves_multiline_markdown_without_json_escaping() -> 
 
 
 @pytest.mark.asyncio
-async def test_writer_retries_with_tagged_output_after_malformed_response(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_writer_does_not_repeat_expensive_generation_after_malformed_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[dict[str, object]] = []
-    responses = [
-        SimpleNamespace(content='{"title": "broken"', provider="avalai.primary", model="writer"),
-        SimpleNamespace(
-            content="""<<<TITLE>>>valid article<<<END_TITLE>>>
-<<<SLUG>>>valid-article<<<END_SLUG>>>
-<<<EXCERPT>>>short summary<<<END_EXCERPT>>>
-<<<CONTENT_MARKDOWN>>>## heading
-Persian body with "quotes" and
-multiple lines.<<<END_CONTENT_MARKDOWN>>>
-<<<SEO_TITLE>>>valid seo title<<<END_SEO_TITLE>>>
-<<<META_DESCRIPTION>>>valid meta description<<<END_META_DESCRIPTION>>>
-<<<FOCUS_KEYWORD>>>HR trends<<<END_FOCUS_KEYWORD>>>
-<<<RELATED_KEYWORDS>>>work, people analytics<<<END_RELATED_KEYWORDS>>>""",
-            provider="avalai.primary",
-            model="writer",
-        ),
-    ]
 
     async def fake_route(**_: object) -> SimpleNamespace:
         return SimpleNamespace(provider="avalai.primary", model="writer")
 
     async def fake_generate(**kwargs: object) -> SimpleNamespace:
         calls.append(kwargs)
-        return responses[len(calls) - 1]
+        return SimpleNamespace(
+            content='{"title": "broken"',
+            provider="avalai.primary",
+            model="writer",
+        )
 
     monkeypatch.setattr(content_service, "resolve_runtime_feature_route", fake_route)
     monkeypatch.setattr(content_service, "generate_with_ai_gateway", fake_generate)
 
-    article, provider, model = await _write_article(
-        "brief",
-        [{"url": "https://example.com/report", "title": "Report"}],
-        SimpleNamespace(recruiting_ai_provider="fallback", recruiting_ai_model="fallback"),
+    with pytest.raises(ContentAgentError, match="omitted tagged field"):
+        await _write_article(
+            "brief",
+            [{"url": "https://example.com/report", "title": "Report"}],
+            SimpleNamespace(recruiting_ai_provider="fallback", recruiting_ai_model="fallback"),
+        )
+
+    assert len(calls) == 1
+    assert calls[0]["temperature"] == 0.35
+
+
+@pytest.mark.asyncio
+async def test_stale_runs_are_failed_and_requeued_only_once() -> None:
+    now = datetime(2026, 9, 14, 8, 0, tzinfo=UTC)
+    run = SimpleNamespace(
+        status="running",
+        slot_key="2026-09-14:09:00:Asia/Tehran",
+        started_at=now - timedelta(minutes=31),
+        finished_at=None,
+        error_message=None,
+        metadata_json={},
     )
 
-    assert article["title"] == "valid article"
-    assert provider == "avalai.primary"
-    assert model == "writer"
-    assert len(calls) == 2
-    assert calls[1]["temperature"] == 0.1
+    class Rows:
+        def all(self) -> list[SimpleNamespace]:
+            return [run]
+
+    class FakeSession:
+        async def scalars(self, _statement: object) -> Rows:
+            return Rows()
+
+    first = await recover_stale_content_runs(FakeSession(), now)  # type: ignore[arg-type]
+    assert first == [run.slot_key]
+    assert run.status == "failed"
+    assert run.metadata_json["stale_recovery_count"] == 1
+
+    run.status = "running"
+    run.started_at = now - timedelta(minutes=31)
+    second = await recover_stale_content_runs(FakeSession(), now)  # type: ignore[arg-type]
+    assert second == []
+    assert run.status == "failed"
+    assert run.metadata_json["stale_recovery_count"] == 2
 
 
 @pytest.mark.asyncio
