@@ -64,6 +64,7 @@ test("individual plans use fixed 720-hour validity and corporate self-service is
   assert.match(billing, /timedelta\(hours=720\)/);
   assert.match(billing, /plan\.scope\s*==\s*"corporate"/);
   assert.match(pricing, /۷۲۰ ساعت/);
+  assert.match(pricing, /مانده قبلی حفظ و به بسته جدید اضافه می‌شود/);
   assert.match(pricing, /۰۹۳۲۱۱۱۱۱۲۰/);
   assert.doesNotMatch(pricing, /یک.?ساله|سالانه/);
   assert.match(migration, /WHEN 'individual_free' THEN 0/);
