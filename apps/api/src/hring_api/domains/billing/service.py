@@ -10,7 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
 from hring_api.domains.admin.repository import add_audit_log
-from hring_api.domains.billing.credit_service import CreditError, add_available_credits_for_plan
+from hring_api.domains.billing.credit_service import (
+    CreditError,
+    add_available_credits_for_plan,
+)
 from hring_api.domains.billing.models import BillingPlan, PaymentTransaction
 from hring_api.domains.billing.pricing import ExchangeRateError, assert_pricing_is_safe
 from hring_api.domains.identity.dependencies import Principal
