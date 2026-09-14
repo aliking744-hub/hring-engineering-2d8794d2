@@ -23,6 +23,8 @@ from hring_api.domains.content.schemas import DEFAULT_SOURCE_DOMAINS, DEFAULT_TO
 
 FEATURE_RESEARCH = "content.hr_trend_research"
 FEATURE_WRITING = "content.hr_article_writer"
+CONTENT_RUN_TIMEOUT = timedelta(minutes=30)
+MAX_STALE_RECOVERIES = 1
 DEFAULT_DISCLOSURE = "این مقاله توسط تحریریه HRing و با کمک هوش مصنوعی، بر پایه منابع معتبر و با کنترل خودکار کیفیت تهیه شده است."
 
 
@@ -283,30 +285,18 @@ Return only the tagged document below. Do not use JSON or code fences. Every ope
 <<<FOCUS_KEYWORD>>>...<<<END_FOCUS_KEYWORD>>>
 <<<RELATED_KEYWORDS>>>keyword one, keyword two<<<END_RELATED_KEYWORDS>>>"""
     user = f"""SOURCE CATALOG:\n{source_catalog}\n\nUNTRUSTED RESEARCH BRIEF:\n<research>{brief[:14000]}</research>\n\nWrite 900–1400 Persian words for senior HR professionals. The Latin slug must be meaningful and hyphenated. Do not add a sources section; the platform appends verified links."""
-    last_error: ContentAgentError | None = None
-    for attempt in range(2):
-        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        if attempt:
-            messages.append({
-                "role": "user",
-                "content": "The previous response did not follow the required tagged format. Regenerate the complete article using every opening and closing tag exactly once. Do not use JSON or code fences.",
-            })
-        result = await generate_with_ai_gateway(
-            feature_key=FEATURE_WRITING, user_id=None, company_id=None,
-            provider=route.provider, model=route.model,
-            messages=messages,
-            temperature=0.35 if attempt == 0 else 0.1,
-            max_output_tokens=4200,
-            metadata_json={
-                "agent": "hr_editorial", "stage": "writing",
-                "source_count": len(sources), "attempt": attempt + 1,
-            },
-        )
-        try:
-            return _article_object(result.content), result.provider, result.model
-        except ContentAgentError as exc:
-            last_error = exc
-    raise last_error or ContentAgentError("AI response did not contain a valid article")
+    result = await generate_with_ai_gateway(
+        feature_key=FEATURE_WRITING, user_id=None, company_id=None,
+        provider=route.provider, model=route.model,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        temperature=0.35,
+        max_output_tokens=4200,
+        metadata_json={
+            "agent": "hr_editorial", "stage": "writing",
+            "source_count": len(sources), "attempt": 1,
+        },
+    )
+    return _article_object(result.content), result.provider, result.model
 
 
 async def run_content_agent(
@@ -321,7 +311,10 @@ async def run_content_agent(
         if run.status != "failed":
             raise ContentAgentError("This publishing slot has already run")
         run.status = "running"
+        run.trigger = trigger
+        run.actor_user_id = actor_user_id
         run.error_message = None
+        run.started_at = datetime.now(UTC)
         run.finished_at = None
     else:
         run = ContentAgentRun(slot_key=slot_key, trigger=trigger, actor_user_id=actor_user_id)
@@ -404,6 +397,35 @@ async def run_content_agent(
             await session.commit()
             return persisted
         raise
+
+
+async def recover_stale_content_runs(
+    session: AsyncSession, now: datetime | None = None,
+) -> list[str]:
+    current = now or datetime.now(UTC)
+    cutoff = current - CONTENT_RUN_TIMEOUT
+    stale_runs = list((await session.scalars(
+        select(ContentAgentRun).where(
+            ContentAgentRun.status == "running",
+            ContentAgentRun.started_at <= cutoff,
+        )
+    )).all())
+    retry_slots: list[str] = []
+    for run in stale_runs:
+        metadata = dict(run.metadata_json or {})
+        raw_count = metadata.get("stale_recovery_count", 0)
+        recovery_count = raw_count if isinstance(raw_count, int) else 0
+        run.status = "failed"
+        run.error_message = (
+            f"Content generation exceeded {int(CONTENT_RUN_TIMEOUT.total_seconds() // 60)} minutes"
+        )
+        run.finished_at = current
+        metadata["stale_recovery_count"] = recovery_count + 1
+        metadata["last_stale_recovery_at"] = current.isoformat()
+        run.metadata_json = metadata
+        if recovery_count < MAX_STALE_RECOVERIES:
+            retry_slots.append(run.slot_key)
+    return retry_slots
 
 
 def due_slot_keys(settings_row: ContentAgentSetting, now: datetime | None = None) -> list[str]:
