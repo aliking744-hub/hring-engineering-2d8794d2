@@ -19,6 +19,7 @@ from hring_api.domains.billing.credit_service import (
     consume_reservation,
     expire_available_credits,
     get_credit_balance,
+    grant_credits,
     refund_credits,
     release_reservation,
     reserve_credits,
@@ -720,6 +721,15 @@ def test_verified_payment_reconciles_ledger_once_and_updates_legacy_projection(
         async with SessionFactory() as session:
             plan = await session.get(BillingPlan, "individual_pro")
             assert plan is not None
+            await grant_credits(
+                session,
+                owner_type="user",
+                owner_id=user_id,
+                amount=137,
+                idempotency_key=f"pre-payment-{uuid4()}",
+                reason="Unused balance before renewal",
+                actor_user_id=user_id,
+            )
             transaction = PaymentTransaction(
                 user_id=user_id,
                 provider="fake",
@@ -756,10 +766,15 @@ def test_verified_payment_reconciles_ledger_once_and_updates_legacy_projection(
                 select(CreditAccount).where(CreditAccount.user_id == user_id)
             )
             assert plan is not None and profile is not None and account is not None
-            assert account.available_credits == plan.monthly_credits
+            transaction = await session.get(PaymentTransaction, transaction_id)
+            expected_balance = plan.monthly_credits + 137
+            assert transaction is not None and transaction.verified_at is not None
+            assert account.available_credits == expected_balance
             assert account.reserved_credits == 0
-            assert profile.monthly_credits == plan.monthly_credits
+            assert profile.monthly_credits == expected_balance
             assert profile.used_credits == 0
+            assert account.valid_until is not None
+            assert account.valid_until - transaction.verified_at == timedelta(hours=720)
             grants = int(
                 await session.scalar(
                     select(func.count(CreditLedgerEntry.id)).where(
