@@ -97,7 +97,7 @@ class Profile(Base):
     subscription_tier: Mapped[str | None] = mapped_column(
         String(64), nullable=True, default=SubscriptionTier.INDIVIDUAL_FREE.value
     )
-    monthly_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=50)
+    monthly_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     used_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_credit_reset: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

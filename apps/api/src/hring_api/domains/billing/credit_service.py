@@ -908,6 +908,49 @@ async def transfer_company_credits_to_user(
     return user_entry
 
 
+async def add_available_credits_for_plan(
+    session: AsyncSession,
+    *,
+    owner_type: str,
+    owner_id: UUID,
+    credits: int,
+    operation_key: str,
+    actor_user_id: UUID,
+    request_id: str | None,
+    grant_reason: str,
+    source: str,
+    valid_until: datetime,
+) -> CreditAccount:
+    """Add a paid plan grant without discarding the customer's usable balance.
+
+    A renewal starts a new exact validity window for the combined balance. The
+    unique payment operation key makes both the grant and expiry extension
+    idempotent.
+    """
+    if credits <= 0:
+        raise CreditConflictError("Plan credit grant must be positive")
+    account, _, replay = await _apply_available_event(
+        session,
+        owner_type=owner_type,
+        owner_id=owner_id,
+        event_type="grant",
+        amount_delta=credits,
+        idempotency_key=f"{operation_key}:grant",
+        actor_user_id=actor_user_id,
+        reason=grant_reason,
+        request_id=request_id,
+        metadata_json={
+            "operation_key": operation_key,
+            "source": source,
+            "grant_mode": "additive_rollover",
+            "valid_until": valid_until.isoformat(),
+        },
+    )
+    if not replay:
+        account.valid_until = valid_until
+    return account
+
+
 async def replace_available_credits_for_plan(
     session: AsyncSession,
     *,

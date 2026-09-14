@@ -10,7 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from hring_api.config import Settings
 from hring_api.domains.admin.repository import add_audit_log
-from hring_api.domains.billing.credit_service import CreditError, replace_available_credits_for_plan
+from hring_api.domains.billing.credit_service import (
+    CreditError,
+    add_available_credits_for_plan,
+)
 from hring_api.domains.billing.models import BillingPlan, PaymentTransaction
 from hring_api.domains.billing.pricing import ExchangeRateError, assert_pricing_is_safe
 from hring_api.domains.identity.dependencies import Principal
@@ -192,11 +195,11 @@ async def _finalize_verified_payment(
     owner_type = "company" if locked.company_id is not None else "user"
     owner_id = locked.company_id or locked.user_id
     try:
-        await replace_available_credits_for_plan(
+        credit_account = await add_available_credits_for_plan(
             db,
             owner_type=owner_type,
             owner_id=owner_id,
-            target_credits=plan.monthly_credits,
+            credits=plan.monthly_credits,
             operation_key=f"payment:{locked.id}",
             actor_user_id=actor_user_id,
             request_id=request_id,
@@ -213,16 +216,16 @@ async def _finalize_verified_payment(
         if company is None:
             raise BillingNotFoundError("Company no longer exists")
         company.subscription_tier = plan.plan_type
-        company.monthly_credits = plan.monthly_credits
+        company.monthly_credits = credit_account.available_credits
         company.used_credits = 0
-        company.credit_pool = plan.monthly_credits
+        company.credit_pool = credit_account.available_credits
         company.last_credit_reset = now
     else:
         profile = await db.get(Profile, locked.user_id)
         if profile is None:
             raise BillingNotFoundError("User profile no longer exists")
         profile.subscription_tier = plan.plan_type
-        profile.monthly_credits = plan.monthly_credits
+        profile.monthly_credits = credit_account.available_credits
         profile.used_credits = 0
         profile.last_credit_reset = now
 
@@ -239,6 +242,8 @@ async def _finalize_verified_payment(
         metadata_json={
             "plan_type": plan.plan_type,
             "monthly_credits": plan.monthly_credits,
+            "balance_after_grant": credit_account.available_credits,
+            "grant_mode": "additive_rollover",
             "valid_for_hours": 720,
             "valid_until": (now + timedelta(hours=720)).isoformat(),
             "authority": locked.authority or "",

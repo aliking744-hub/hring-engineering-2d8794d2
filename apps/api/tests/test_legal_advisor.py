@@ -1,13 +1,15 @@
 import asyncio
 from types import SimpleNamespace
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from hring_api.config import Settings
+from hring_api.db.session import SessionFactory
 from hring_api.domains.ai.gateway_client import AiGatewayResult
+from hring_api.domains.billing.credit_service import grant_credits
 from hring_api.domains.legal.advisor import (
     LegalAdvisorError,
     LegalAdvisorNoSourcesError,
@@ -36,7 +38,24 @@ def _register(client: TestClient) -> dict[str, Any]:
         },
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    account = response.json()
+
+    async def seed_route_credit() -> None:
+        user_id = UUID(account["user"]["id"])
+        async with SessionFactory() as session:
+            await grant_credits(
+                session,
+                owner_type="user",
+                owner_id=user_id,
+                amount=20,
+                idempotency_key=f"legal-advisor-test-{uuid4()}",
+                reason="Explicit legal advisor test fixture",
+                actor_user_id=user_id,
+            )
+            await session.commit()
+
+    asyncio.run(seed_route_credit())
+    return account
 
 
 def test_legal_advisor_uses_five_rag_results_and_returns_three_sources(monkeypatch) -> None:
