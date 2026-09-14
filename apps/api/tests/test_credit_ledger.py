@@ -43,7 +43,26 @@ from hring_api.main import app
 PASSWORD = "correct horse battery staple"
 
 
-def _register(client: TestClient, prefix: str) -> dict[str, Any]:
+async def _grant_test_credits(user_id: UUID, amount: int) -> None:
+    async with SessionFactory() as session:
+        await grant_credits(
+            session,
+            owner_type="user",
+            owner_id=user_id,
+            amount=amount,
+            idempotency_key=f"test-grant-{uuid4()}",
+            reason="Explicit test fixture credit",
+            actor_user_id=user_id,
+        )
+        await session.commit()
+
+
+def _register(
+    client: TestClient,
+    prefix: str,
+    *,
+    initial_credits: int = 50,
+) -> dict[str, Any]:
     response = client.post(
         "/api/v1/auth/register",
         json={
@@ -53,7 +72,10 @@ def _register(client: TestClient, prefix: str) -> dict[str, Any]:
         },
     )
     assert response.status_code == 201, response.text
-    return response.json()
+    account = response.json()
+    if initial_credits > 0:
+        asyncio.run(_grant_test_credits(UUID(account["user"]["id"]), initial_credits))
+    return account
 
 
 def _auth(account: dict[str, Any]) -> dict[str, str]:
@@ -712,7 +734,7 @@ def test_verified_payment_reconciles_ledger_once_and_updates_legacy_projection(
     )
 
     with TestClient(app) as client:
-        registered = _register(client, "credit-payment")
+        registered = _register(client, "credit-payment", initial_credits=0)
     user_id = UUID(registered["user"]["id"])
 
     async def scenario() -> None:
