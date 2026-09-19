@@ -29,3 +29,18 @@ test("native defense builder preserves the three-phase Lovable contract", () => 
   assert.doesNotMatch(ui, /asyncUpgradePending/);
   assert.match(ui, /law\.sourceUrl/);
 });
+
+
+test("worker complaint is metered with idempotency and employer evidence keeps valid files", () => {
+  const client = read("src/integrations/supabase/client.ts");
+  const defenseUi = read("src/components/legal/DefenseBuilder.tsx");
+  const complaintUi = read("src/components/legal/LaborComplaintAssistant.tsx");
+  const complaintService = read("apps/api/src/hring_api/domains/compat/labor_complaint.py");
+
+  assert.match(client, /'labor-complaint-assistant'/);
+  assert.match(client, /X-Idempotency-Key/);
+  assert.match(defenseUi, /const supported = files\.filter/);
+  assert.match(defenseUi, /await Promise\.all/);
+  assert.match(complaintUi, /labor-complaint-assistant/);
+  assert.match(complaintService, /official legal/i);
+});
