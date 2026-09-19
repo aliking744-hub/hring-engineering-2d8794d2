@@ -107,34 +107,40 @@ const DefenseBuilder = () => {
   };
 
   const handleEvidenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    const newEvidence: typeof evidence = [];
-    
-    for (const file of Array.from(files)) {
-      if (!file.type.includes('pdf') && !file.type.includes('image')) {
-        toast.error(`${file.name}: فقط PDF و تصویر پشتیبانی می‌شود`);
-        continue;
-      }
+    const supported = files.filter((file) => {
+      const valid = file.type.includes('pdf') || file.type.includes('image');
+      if (!valid) toast.error(`${file.name}: فقط PDF و تصویر پشتیبانی می‌شود`);
+      return valid;
+    });
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        newEvidence.push({
-          file,
-          name: file.name,
-          type: file.type.includes('pdf') ? 'pdf' : 'image',
-          content: event.target?.result as string
-        });
-        
-        if (newEvidence.length === files.length) {
-          setEvidence(prev => [...prev, ...newEvidence]);
-        }
-      };
-      reader.readAsDataURL(file);
+    try {
+      const loaded = await Promise.all(
+        supported.map(
+          (file) =>
+            new Promise<{ file: File; name: string; type: string; content: string }>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (event) =>
+                resolve({
+                  file,
+                  name: file.name,
+                  type: file.type.includes('pdf') ? 'pdf' : 'image',
+                  content: event.target?.result as string,
+                });
+              reader.onerror = () => reject(new Error(`خواندن فایل «${file.name}» ناموفق بود`));
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
+      if (loaded.length) setEvidence((previous) => [...previous, ...loaded]);
+    } catch (error) {
+      console.error('Evidence upload error:', error);
+      toast.error('خواندن یکی از مدارک ناموفق بود؛ دوباره تلاش کنید');
+    } finally {
+      if (evidenceInputRef.current) evidenceInputRef.current.value = "";
     }
-    
-    if (evidenceInputRef.current) evidenceInputRef.current.value = "";
   };
 
   const removeEvidence = (index: number) => {
