@@ -49,6 +49,7 @@ const METERED_COMPAT_FUNCTIONS = new Set([
   'generate-job-ad-image',
   'legal-advisor-chat',
   'defense-builder',
+  'labor-complaint-assistant',
   'hring-support',
 ]);
 
