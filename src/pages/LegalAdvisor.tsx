@@ -1,19 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
-import { Scale, Send, Paperclip, FileText, X, Loader2, Bot, User, ArrowRight, Sparkles, Plus, MessageSquare, Trash2, Clock, Lock, Shield, MessageCircle, Gavel, ExternalLink } from "lucide-react";
+import { Scale, Send, Paperclip, FileText, X, Loader2, Bot, User, ArrowRight, Sparkles, Plus, MessageSquare, Trash2, Clock, Lock, MessageCircle, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AuroraBackground from "@/components/AuroraBackground";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/landing/Footer";
-import DefenseBuilder from "@/components/legal/DefenseBuilder";
-import LaborComplaintAssistant from "@/components/legal/LaborComplaintAssistant";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -400,47 +397,7 @@ const LegalAdvisor = () => {
             </p>
           </motion.div>
 
-          {/* Mode Tabs */}
-          <Tabs defaultValue="chat" className="w-full">
-            <TabsList className="grid w-full max-w-xl mx-auto grid-cols-3 mb-6 h-auto">
-              <TabsTrigger value="chat" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
-                <MessageCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">مشاور حقوقی</span>
-                <span className="sm:hidden">مشاور</span>
-              </TabsTrigger>
-              <TabsTrigger value="defense" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
-                <Shield className="w-4 h-4" />
-                <span className="hidden sm:inline">دفاع کارفرما</span>
-                <span className="sm:hidden">دفاع</span>
-              </TabsTrigger>
-              <TabsTrigger value="complaint" className="gap-1 sm:gap-2 text-xs sm:text-sm py-2 px-1 sm:px-3 flex-col sm:flex-row">
-                <Gavel className="w-4 h-4" />
-                <span className="hidden sm:inline">شکایت کارگر</span>
-                <span className="sm:hidden">شکایت</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="complaint">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card p-6"
-              >
-                <LaborComplaintAssistant />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="defense">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card p-6"
-              >
-                <DefenseBuilder />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="chat">
+          <section aria-label="مشاوره حقوقی">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Sidebar - Conversation History */}
             {canSaveHistory() && (
@@ -726,8 +683,7 @@ const LegalAdvisor = () => {
               </div>
             </motion.div>
           </div>
-            </TabsContent>
-          </Tabs>
+          </section>
         </div>
       </main>
 
