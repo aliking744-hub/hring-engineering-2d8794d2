@@ -234,8 +234,11 @@ test('retired strategy product surfaces are absent', async () => {
   const productCatalog = await read('public/hring-product-catalog.html');
   const individual = await read('src/components/dashboard/IndividualDashboard.tsx');
   const corporate = await read('src/components/dashboard/CorporateDashboard.tsx');
+  const faq = await read('src/pages/FAQ.tsx');
+  const upgrade = await read('src/pages/Upgrade.tsx');
+  const llms = await read('public/llms.txt');
 
-  for (const source of [app, dashboard, individual, corporate, catalog, productCatalog]) {
+  for (const source of [app, dashboard, individual, corporate, catalog, productCatalog, faq, upgrade, llms]) {
     assert.equal(
       /StrategicCompass|StrategicRadar|strategic-compass|strategic-radar|قطب‌نمای استراتژیک|رادار اطلاعات استراتژیک/.test(source),
       false,
