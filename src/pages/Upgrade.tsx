@@ -99,7 +99,7 @@ const PLAN_PRESENTATIONS: Record<string, PlanPresentation> = {
     description: 'تا ۱۰ کاربر',
     features: [
       'تا ۱۰ عضو تیم',
-      'قطب‌نمای استراتژیک (محدود)',
+      'گزارش‌های مدیریتی سازمانی',
       'داشبورد HR پیشرفته',
       'تحلیل رفتار تیم',
       'پشتیبانی اختصاصی',
