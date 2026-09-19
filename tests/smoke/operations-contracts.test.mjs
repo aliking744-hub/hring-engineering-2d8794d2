@@ -72,3 +72,12 @@ test('offsite backup is explicitly configured, immutable, and checks its copied 
   assert.match(offsite, /Invalid backup identifier/);
   assert.doesNotMatch(offsite, /rclone sync/);
 });
+
+
+test('SEP POST-only probe accepts its reachable 404 response without creating a payment', async () => {
+  const integrations = await read('apps/api/src/hring_api/domains/integrations/service.py');
+
+  assert.match(integrations, /provider\.adapter == "sep"/);
+  assert.match(integrations, /response\.status_code in \{200, 400, 404, 405\}/);
+  assert.match(integrations, /await client\.get\(url, headers=headers\)/);
+});
