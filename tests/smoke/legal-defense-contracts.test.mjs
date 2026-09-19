@@ -42,5 +42,5 @@ test("worker complaint is metered with idempotency and employer evidence keeps v
   assert.match(defenseUi, /const supported = files\.filter/);
   assert.match(defenseUi, /await Promise\.all/);
   assert.match(complaintUi, /labor-complaint-assistant/);
-  assert.match(complaintService, /official legal/i);
+  assert.match(complaintService, /is_official_legal_url/);
 });
