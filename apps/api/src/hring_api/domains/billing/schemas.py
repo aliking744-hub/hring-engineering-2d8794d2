@@ -61,6 +61,10 @@ class PaymentInitRequest(BaseModel):
     plan_type: str = Field(min_length=1, max_length=80)
 
 
+class ProductPaymentInitRequest(BaseModel):
+    product_id: str = Field(min_length=1, max_length=160)
+
+
 class PaymentInitResponse(BaseModel):
     success: bool = True
     authority: str
@@ -82,7 +86,9 @@ class PaymentTransactionResponse(BaseModel):
 
     id: UUID
     amount_toman: int
-    plan_type: str
+    plan_type: str | None
+    purpose: str
+    product_id: str | None
     status: str
     ref_id: str | None
     description: str | None
