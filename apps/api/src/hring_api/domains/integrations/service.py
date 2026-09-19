@@ -510,7 +510,7 @@ async def test_provider_connection(
             healthy = (
                 response.status_code < 500
                 if provider.adapter == "zarinpal"
-                else response.status_code in {200, 400, 405}
+                else response.status_code in {200, 400, 404, 405}
             )
             provider_name = "Zarinpal" if provider.adapter == "zarinpal" else "SEP"
             credential_name = "merchant" if provider.adapter == "zarinpal" else "terminal"
