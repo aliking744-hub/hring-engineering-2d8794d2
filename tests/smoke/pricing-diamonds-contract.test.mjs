@@ -101,6 +101,7 @@ test("all printable AI and legal results use semantic RTL-safe PDF pagination", 
     read("src/pages/JobDescriptionGenerator.tsx"),
     read("src/components/legal/DefenseBuilder.tsx"),
     read("src/components/legal/LaborComplaintAssistant.tsx"),
+    read("src/components/hr-dashboard/PrintButton.tsx"),
   ]);
   assert.match(exporter, /html2canvas/);
   assert.match(exporter, /direction: rtl/);
