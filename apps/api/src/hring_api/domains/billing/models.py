@@ -116,6 +116,12 @@ class PaymentTransaction(Base):
             name="payment_transactions_status",
         ),
         CheckConstraint("amount_toman > 0", name="payment_transactions_amount_positive"),
+        CheckConstraint("purpose IN ('plan','product')", name="payment_transactions_purpose"),
+        CheckConstraint(
+            "(purpose = 'plan' AND plan_type IS NOT NULL AND product_id IS NULL) "
+            "OR (purpose = 'product' AND plan_type IS NULL AND product_id IS NOT NULL)",
+            name="payment_transactions_subject",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -130,9 +136,11 @@ class PaymentTransaction(Base):
     )
     provider: Mapped[str] = mapped_column(String(40), nullable=False, default="zarinpal")
     amount_toman: Mapped[int] = mapped_column(Integer, nullable=False)
-    plan_type: Mapped[str] = mapped_column(
-        String(80), ForeignKey("billing_plans.plan_type", ondelete="RESTRICT"), nullable=False
+    purpose: Mapped[str] = mapped_column(String(20), nullable=False, default="plan", index=True)
+    plan_type: Mapped[str | None] = mapped_column(
+        String(80), ForeignKey("billing_plans.plan_type", ondelete="RESTRICT"), nullable=True
     )
+    product_id: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
     authority: Mapped[str | None] = mapped_column(
         String(160), nullable=True, unique=True, index=True
     )
