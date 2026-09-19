@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /auth
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /company-admin
+Disallow: /profile
+Disallow: /payment-history
+Disallow: /company-settings
+Disallow: /company-members
+
+Sitemap: https://hring.ir/sitemap.xml

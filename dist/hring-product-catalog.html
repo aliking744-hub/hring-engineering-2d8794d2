@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hring - کاتالوگ محصول</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      background: #0a0e1a;
+      color: #e2e8f0;
+      line-height: 1.8;
+    }
+    
+    .page {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 60px 40px;
+      page-break-after: always;
+    }
+    
+    .cover {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, #0a0e1a 0%, #1a1040 50%, #0a0e1a 100%);
+    }
+    
+    .cover h1 {
+      font-size: 72px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #a78bfa, #7c3aed, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 16px;
+    }
+    
+    .cover .subtitle {
+      font-size: 28px;
+      color: #94a3b8;
+      margin-bottom: 40px;
+    }
+    
+    .cover .tagline {
+      font-size: 18px;
+      color: #64748b;
+      border: 1px solid #334155;
+      padding: 12px 32px;
+      border-radius: 999px;
+    }
+    
+    .cover .version {
+      margin-top: 60px;
+      font-size: 14px;
+      color: #475569;
+    }
+
+    h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #a78bfa, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+    }
+    
+    h3 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #c4b5fd;
+      margin: 24px 0 12px;
+    }
+    
+    .section-desc {
+      font-size: 16px;
+      color: #94a3b8;
+      margin-bottom: 32px;
+      max-width: 700px;
+    }
+    
+    .module-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin: 32px 0;
+    }
+    
+    .module-card {
+      background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 28px;
+      transition: transform 0.2s;
+    }
+    
+    .module-card:hover {
+      transform: translateY(-2px);
+      border-color: #7c3aed;
+    }
+    
+    .module-card .icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    
+    .module-card h4 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 8px;
+    }
+    
+    .module-card p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.7;
+    }
+    
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0;
+    }
+    
+    .feature-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+    }
+    
+    .feature-list li::before {
+      content: '✦';
+      color: #7c3aed;
+      font-size: 12px;
+    }
+    
+    .tier-header {
+      background: linear-gradient(90deg, #7c3aed20, transparent);
+      border-right: 4px solid #7c3aed;
+      padding: 16px 24px;
+      border-radius: 0 12px 12px 0;
+      margin: 40px 0 24px;
+    }
+    
+    .tier-header h3 {
+      margin: 0;
+      color: #c4b5fd;
+    }
+    
+    .tier-header .en {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 400;
+    }
+    
+    .screenshot-placeholder {
+      background: linear-gradient(135deg, #1e1b4b40, #0f172a);
+      border: 1px dashed #334155;
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      color: #475569;
+      margin: 24px 0;
+      font-size: 14px;
+    }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 32px 0;
+    }
+    
+    .stat-box {
+      background: #1e1b4b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .stat-box .number {
+      font-size: 36px;
+      font-weight: 900;
+      color: #a78bfa;
+    }
+    
+    .stat-box .label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .badge-purple { background: #7c3aed30; color: #a78bfa; border: 1px solid #7c3aed50; }
+    .badge-cyan { background: #06b6d430; color: #67e8f9; border: 1px solid #06b6d450; }
+    .badge-green { background: #10b98130; color: #6ee7b7; border: 1px solid #10b98150; }
+    .badge-orange { background: #f9731630; color: #fdba74; border: 1px solid #f9731650; }
+    
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #334155, transparent);
+      margin: 48px 0;
+    }
+    
+    .pricing-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 24px 0;
+    }
+    
+    .pricing-table th {
+      background: #1e1b4b;
+      padding: 14px 20px;
+      text-align: right;
+      font-size: 14px;
+      color: #c4b5fd;
+      border-bottom: 2px solid #7c3aed;
+    }
+    
+    .pricing-table td {
+      padding: 12px 20px;
+      border-bottom: 1px solid #1e293b;
+      font-size: 14px;
+    }
+    
+    .pricing-table tr:nth-child(even) td {
+      background: #0f172a80;
+    }
+    
+    .check { color: #10b981; }
+    .cross { color: #475569; }
+    
+    .tech-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 24px 0;
+    }
+    
+    .tech-tag {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    
+    .footer-note {
+      text-align: center;
+      padding: 40px;
+      color: #475569;
+      font-size: 13px;
+    }
+
+    @media print {
+      body { background: white; color: #1e293b; }
+      .module-card { border-color: #e2e8f0; background: #f8fafc; }
+      h2 { color: #7c3aed; -webkit-text-fill-color: #7c3aed; }
+      .page { padding: 40px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== COVER PAGE ===== -->
+<div class="page cover">
+  <h1>hring</h1>
+  <div class="subtitle">دستیار هوشمند منابع انسانی نسل جدید</div>
+  <div class="tagline">🚀 مبتنی بر هوش مصنوعی • ابری • امن</div>
+  <div class="version">نسخه مستقل — ۱۴۰۵</div>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<div class="page">
+  <h2>📋 نمای کلی سیستم</h2>
+  <p class="section-desc">
+    hring یک پلتفرم جامع مدیریت منابع انسانی مبتنی بر هوش مصنوعی است که فرآیندهای کلیدی HR را از استخدام تا توسعه کارکنان و مدیریت منابع انسانی پوشش می‌دهد.
+  </p>
+  
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="number">۱۲+</div>
+      <div class="label">ماژول تخصصی</div>
+    </div>
+    <div class="stat-box">
+      <div class="number">۴</div>
+      <div class="label">لایه سازمانی</div>
+    </div>
+    <div class="stat-box">
+      <div class="number">AI</div>
+      <div class="label">هوش مصنوعی یکپارچه</div>
+    </div>
+    <div class="stat-box">
+      <div class="number">۲۴/۷</div>
+      <div class="label">دسترسی ابری</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>معماری ۴ لایه‌ای داشبورد</h3>
+  <p class="section-desc">سیستم در چهار لایه سازمانی طراحی شده که هر لایه ابزارهای متناسب با نقش کاربر را ارائه می‌دهد.</p>
+  
+  <div class="module-grid">
+    <div class="module-card">
+      <div class="icon" style="background: #7c3aed30;">💼</div>
+      <h4>لایه ۱: میزکار هوشمند</h4>
+      <p>ابزارهای روزانه HR شامل تولید شرح شغل، آگهی استخدام و دستیار مصاحبه</p>
+      <span class="badge badge-purple">Smart Workspace</span>
+    </div>
+    <div class="module-card">
+      <div class="icon" style="background: #06b6d430;">👥</div>
+      <h4>لایه ۲: سرمایه انسانی و عملیات</h4>
+      <p>آنبوردینگ ۹۰ روزه، پروفایل‌ها و طراحی سازمان</p>
+      <span class="badge badge-cyan">HR & Operations</span>
+    </div>
+    <div class="module-card">
+      <div class="icon" style="background: #10b98130;">📊</div>
+      <h4>لایه ۳: پنل راهبری</h4>
+      <p>داشبورد HR، هزینه‌یابی، هدهانتینگ هوشمند و ارزیابی عملکرد</p>
+      <span class="badge badge-green">Command Center</span>
+    </div>
+    <div class="module-card">
+      <div class="icon" style="background: #f9731630;">🎯</div>
+      <h4>لایه ۴: اتاق فرماندهی</h4>
+      <p>مشاور حقوقی AI، گزارش‌های کلان منابع انسانی و ابزارهای مدیریتی</p>
+      <span class="badge badge-orange">Vision Deck</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TIER 1: SMART WORKSPACE ===== -->
+<div class="page">
+  <div class="tier-header">
+    <h3>🔹 لایه ۱: میزکار هوشمند <span class="en">Smart Workspace</span></h3>
+  </div>
+
+  <div class="module-grid">
+    <div class="module-card">
+      <h4>📝 مهندسی شغل (Job Engineering)</h4>
+      <p>تولید شرح شغل حرفه‌ای و استاندارد با هوش مصنوعی. شامل:</p>
+      <ul class="feature-list">
+        <li>تولید خودکار شرح شغل بر اساس عنوان و صنعت</li>
+        <li>تعیین مهارت‌ها، شرایط احراز و KPIها</li>
+        <li>خروجی قابل دانلود و ویرایش</li>
+        <li>پشتیبانی از چند زبان</li>
+      </ul>
+    </div>
+    
+    <div class="module-card">
+      <h4>📢 آگهی‌نویس هوشمند (Smart Ad Writer)</h4>
+      <p>ایجاد آگهی‌های استخدامی جذاب و بهینه برای پلتفرم‌های مختلف:</p>
+      <ul class="feature-list">
+        <li>تولید آگهی متناسب با هر پلتفرم (لینکدین، جابینجا، ...)</li>
+        <li>بهینه‌سازی تون و لحن بر اساس فرهنگ سازمانی</li>
+        <li>پیشنهاد هشتگ و کلمات کلیدی</li>
+      </ul>
+    </div>
+    
+    <div class="module-card">
+      <h4>🎤 دستیار مصاحبه (Interview Assistant)</h4>
+      <p>راهنمای جامع مصاحبه با سوالات تخصصی هوشمند:</p>
+      <ul class="feature-list">
+        <li>تولید سوالات رفتاری و فنی متناسب با شغل</li>
+        <li>کارت امتیازدهی مصاحبه</li>
+        <li>تحلیل پاسخ‌ها با AI</li>
+        <li>قابلیت ضبط و تحلیل مصاحبه</li>
+      </ul>
+    </div>
+
+    <div class="module-card">
+      <h4>🎯 هدهانتینگ هوشمند (Smart Headhunting)</h4>
+      <p>شناسایی و جذب استعدادها با سیستم هوشمند:</p>
+      <ul class="feature-list">
+        <li>تحلیل چندلایه رزومه و تطبیق با شغل</li>
+        <li>امتیازدهی خودکار کاندیداها</li>
+        <li>شناسایی Red/Green Flags</li>
+        <li>پیشنهاد دمای کاندیدا (Hot/Warm/Cold)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TIER 2: HR & OPERATIONS ===== -->
+<div class="page">
+  <div class="tier-header">
+    <h3>🔹 لایه ۲: سرمایه انسانی و عملیات <span class="en">HR & Operations</span></h3>
+  </div>
+
+  <div class="module-grid">
+    <div class="module-card">
+      <h4>🚀 معمار موفقیت ۹۰ روزه (Success Architect)</h4>
+      <p>برنامه جامع آنبوردینگ نیروی جدید:</p>
+      <ul class="feature-list">
+        <li>برنامه‌ریزی ۹۰ روزه شخصی‌سازی‌شده</li>
+        <li>تعیین اهداف هفتگی و ماهانه</li>
+        <li>چک‌لیست‌های خودکار</li>
+        <li>پیگیری پیشرفت و گزارش‌دهی</li>
+      </ul>
+    </div>
+    
+    <div class="module-card">
+      <h4>💰 محاسبه‌گر هزینه (Cost Calculator)</h4>
+      <p>تحلیل دقیق هزینه‌های نیروی انسانی:</p>
+      <ul class="feature-list">
+        <li>محاسبه هزینه تمام‌شده هر پوزیشن</li>
+        <li>تحلیل مزایا و بیمه</li>
+        <li>پیش‌بینی بودجه سالانه</li>
+        <li>مقایسه با استانداردهای صنعت</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TIER 3: COMMAND CENTER ===== -->
+<div class="page">
+  <div class="tier-header">
+    <h3>🔹 لایه ۳: پنل راهبری <span class="en">Command Center</span></h3>
+  </div>
+
+  <div class="module-card" style="margin-bottom: 24px;">
+    <h4>📊 داشبورد منابع انسانی (HR Dashboard)</h4>
+    <p>داشبورد تحلیلی جامع با قابلیت آپلود اکسل و نمایش گرافیکی:</p>
+    <ul class="feature-list">
+      <li><strong>نمای کلی:</strong> KPIهای کلیدی، نمودار ترکیب نیروی انسانی، وضعیت سازمانی</li>
+      <li><strong>تحلیل حقوق:</strong> توزیع حقوق، مقایسه واحدها، روند رشد</li>
+      <li><strong>اضافه‌کاری:</strong> تحلیل اضافه‌کاری به تفکیک واحد و ماه</li>
+      <li><strong>نقشه سازمانی:</strong> نمایش جغرافیایی پراکندگی نیروها</li>
+      <li><strong>پروفایل کارکنان:</strong> جستجو و مشاهده جزئیات هر فرد</li>
+      <li><strong>تقویم تولدها:</strong> یادآوری تولد کارکنان</li>
+      <li><strong>خروجی PDF:</strong> گزارش‌گیری حرفه‌ای</li>
+    </ul>
+  </div>
+
+  <div class="screenshot-placeholder">
+    📸 تصاویر داشبورد HR — شامل ۶ تب تحلیلی با نمودارهای تعاملی
+  </div>
+</div>
+
+<!-- ===== TIER 4: VISION DECK ===== -->
+<div class="page">
+  <div class="tier-header">
+    <h3>🔹 لایه ۴: اتاق فرماندهی <span class="en">Vision Deck</span></h3>
+  </div>
+
+  <div class="module-grid">
+<div class="module-card">
+      <h4>⚖️ مشاور حقوقی AI (Legal Advisor)</h4>
+      <p>چت‌بات حقوقی تخصصی قانون کار ایران:</p>
+      <ul class="feature-list">
+        <li>پاسخ‌گویی بر اساس قانون کار و تأمین اجتماعی</li>
+        <li>استناد به مواد قانونی با لینک منبع</li>
+        <li>تاریخچه مکالمات</li>
+        <li>جستجوی پیشرفته در پایگاه قوانین</li>
+        <li>سازنده لایحه دفاعیه</li>
+        <li>دستیار شکایت کارگری</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ADDITIONAL FEATURES ===== -->
+<div class="page">
+  <h2>🔧 امکانات جانبی</h2>
+  
+  <div class="module-grid">
+    <div class="module-card">
+      <h4>🛒 فروشگاه دیجیتال</h4>
+      <p>بازارچه محصولات HR شامل قالب‌ها، چک‌لیست‌ها و منابع آموزشی قابل خرید و دانلود</p>
+    </div>
+    <div class="module-card">
+      <h4>📝 وبلاگ</h4>
+      <p>سیستم مدیریت محتوا با ویرایشگر پیشرفته، SEO و دسته‌بندی مقالات</p>
+    </div>
+    <div class="module-card">
+      <h4>💬 چت‌بات پشتیبانی</h4>
+      <p>پشتیبانی ۲۴ ساعته با هوش مصنوعی آموزش‌دیده بر اساس مستندات سیستم</p>
+    </div>
+    <div class="module-card">
+      <h4>🔔 سیستم اعلان‌ها</h4>
+      <p>نوتیفیکیشن‌های هوشمند برای رویدادها، یادآوری‌ها و هشدارها</p>
+    </div>
+    <div class="module-card">
+      <h4>👤 پروفایل کاربری</h4>
+      <p>مدیریت اطلاعات شخصی، آواتار و تنظیمات اکانت</p>
+    </div>
+    <div class="module-card">
+      <h4>🏢 مدیریت شرکت</h4>
+      <p>پنل مالتی‌تنانت برای مدیریت اعضا، نقش‌ها و دعوت‌نامه‌ها</p>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <h2>🔐 امنیت و زیرساخت</h2>
+  <div class="module-grid">
+    <div class="module-card">
+      <h4>جداسازی سازمانی و RBAC</h4>
+      <p>مرز سازمان‌ها و مجوزها در API مستقل و سمت سرور کنترل می‌شوند</p>
+    </div>
+    <div class="module-card">
+      <h4>رمزنگاری ارتباطات</h4>
+      <p>ارتباطات کاربر و سرور با TLS محافظت می‌شوند</p>
+    </div>
+    <div class="module-card">
+      <h4>احراز هویت مستقل</h4>
+      <p>ایمیل و رمز عبور، نشست امن، بازیابی رمز و MFA برای حساب‌های حساس</p>
+    </div>
+    <div class="module-card">
+      <h4>Audit Logs</h4>
+      <p>ثبت عملیات حساس مدیریتی و مالی برای پیگیری</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PRICING ===== -->
+<div class="page">
+  <h2>💎 پلن‌های اشتراک</h2>
+  <p class="section-desc">
+    پلن‌های فردی شامل رایگان، حرفه‌ای و پلاس و پلن‌های سازمانی شامل اکسپرت، مدیریتی و سازمانی هستند.
+    قیمت، اعتبار و وضعیت فعال هر پلن از کنترل‌پنل مرکزی مدیریت می‌شود؛ برای مشاهده اطلاعات به‌روز به hring.ir/upgrade مراجعه کنید.
+  </p>
+  <div class="module-grid">
+    <div class="module-card">
+      <h4>پلن‌های فردی</h4>
+      <p>برای شروع، متخصصان منابع انسانی و کاربران حرفه‌ای با اعتبار متناسب با سطح استفاده</p>
+    </div>
+    <div class="module-card">
+      <h4>پلن‌های سازمانی</h4>
+      <p>برای تیم‌ها و سازمان‌ها با دسترسی چندکاربره، اعتبار مشترک و امکانات مدیریتی</p>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <h2>🏗️ استک فناوری</h2>
+  <div class="tech-stack">
+    <span class="tech-tag">⚛️ React 18</span>
+    <span class="tech-tag">📘 TypeScript</span>
+    <span class="tech-tag">⚡ Vite</span>
+    <span class="tech-tag">🎨 Tailwind CSS</span>
+    <span class="tech-tag">⚙️ FastAPI + Pydantic</span>
+    <span class="tech-tag">🗄️ PostgreSQL + pgvector</span>
+    <span class="tech-tag">🔐 Server-side RBAC</span>
+    <span class="tech-tag">🤖 درگاه هوش مصنوعی چندارائه‌دهنده</span>
+    <span class="tech-tag">📦 Redis + MinIO</span>
+    <span class="tech-tag">🐳 Docker Compose</span>
+    <span class="tech-tag">📊 Recharts</span>
+    <span class="tech-tag">🎭 Framer Motion</span>
+    <span class="tech-tag">📄 jsPDF</span>
+  </div>
+</div>
+
+<!-- ===== CONTACT ===== -->
+<div class="page" style="min-height: 50vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+  <h2>🤝 آماده همکاری</h2>
+  <p class="section-desc" style="text-align: center; margin-top: 20px;">
+    برای دموی اختصاصی و مشاوره رایگان با ما تماس بگیرید.
+  </p>
+  <div style="margin-top: 32px; font-size: 18px; color: #a78bfa;">
+    🌐 hring.ir
+  </div>
+  <div class="footer-note" style="margin-top: 60px;">
+    Architected by Ali Dehghani — Powered by AI<br>
+    © hring 2026. تمامی حقوق محفوظ است.
+  </div>
+</div>
+
+</body>
+</html>
