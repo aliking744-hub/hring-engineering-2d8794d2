@@ -1,5 +1,7 @@
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { exportElementToPdf } from '@/lib/exportPdf';
+import type { Employee } from '@/types/employee';
 
 interface PrintButtonProps {
   title?: string;
@@ -82,7 +84,8 @@ const BASE_STYLES = `
   }
   .kpi-card .kpi-value { font-size: 18px; font-weight: bold; color: #1e3a5f; }
   .kpi-card .kpi-label { font-size: 10px; color: #64748b; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; break-inside: avoid-page; page-break-inside: avoid; }
+  tr, .chart-box, .kpi-card, .profile-card { break-inside: avoid-page; page-break-inside: avoid; }
   th { background: #1e3a5f; color: white; padding: 8px 10px; text-align: right; font-weight: bold; }
   td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: right; }
   tr:nth-child(even) td { background: #f8faff; }
@@ -144,7 +147,7 @@ function openPrintWindow(title: string, bodyHTML: string) {
   <div class="footer">این گزارش توسط سامانه منابع انسانی hring تهیه شده است &mdash; ${persianDate}</div>
 </div>
 <script>
-  window.onload = function() { window.print(); };
+  window.onload = async function() { if (document.fonts && document.fonts.ready) await document.fonts.ready; window.print(); };
 <\/script>
 </body>
 </html>`);
@@ -183,48 +186,18 @@ function pieTable(items: { name: string; value: number }[]) {
 
 // ─── Tab-specific PDF generators ──────────────────────────────────────────────
 
-import type { Employee } from '@/types/employee';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
 export async function printOverviewPDF(elementId: string) {
-  const el = document.getElementById(elementId);
-  if (!el) {
+  const element = document.getElementById(elementId);
+  if (!element) {
     console.error('Overview PDF root element not found');
     return;
   }
 
-  // Capture the dashboard exactly as it appears
-  const canvas = await html2canvas(el, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: getComputedStyle(document.body).backgroundColor || '#0b1020',
-    windowWidth: el.scrollWidth,
-    windowHeight: el.scrollHeight,
+  await exportElementToPdf(element, {
+    filename: `گزارش-نمای-کلی-${new Date().toLocaleDateString('fa-IR')}.pdf`,
+    marginMm: 10,
   });
-
-  // Landscape A4: 297 x 210 mm
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const pageW = 297;
-  const pageH = 210;
-  const margin = 6;
-  const availW = pageW - margin * 2;
-  const availH = pageH - margin * 2;
-
-  // Scale image to fit entirely on one page preserving aspect ratio
-  const imgRatio = canvas.width / canvas.height;
-  let drawW = availW;
-  let drawH = drawW / imgRatio;
-  if (drawH > availH) {
-    drawH = availH;
-    drawW = drawH * imgRatio;
-  }
-  const offsetX = (pageW - drawW) / 2;
-  const offsetY = (pageH - drawH) / 2;
-
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
-  pdf.addImage(imgData, 'JPEG', offsetX, offsetY, drawW, drawH);
-  pdf.save(`گزارش-نمای-کلی-${new Date().toLocaleDateString('fa-IR')}.pdf`);
 }
 
 
